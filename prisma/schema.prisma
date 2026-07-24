@@ -1,0 +1,11 @@
+generator client { provider = "prisma-client-js" }
+datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
+enum UserRole { OWNER ADMIN CASHIER }
+enum OrderStatus { DRAFT RESERVED AWAITING_PAYMENT PAID CANCELLED REFUNDED EXPIRED }
+enum TicketStatus { VALID USED CANCELLED }
+enum PaymentStatus { PENDING SUCCEEDED CANCELLED REFUNDED }
+model User { id String @id @default(cuid()) email String @unique name String passwordHash String role UserRole @default(CASHIER) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Session { id String @id @default(cuid()) startsAt DateTime capacity Int @default(15) isActive Boolean @default(true) orders Order[] @@index([startsAt]) }
+model Order { id String @id @default(cuid()) number String @unique sessionId String session Session @relation(fields:[sessionId],references:[id]) status OrderStatus @default(DRAFT) customerName String customerPhone String customerEmail String adultCount Int @default(0) childCount Int @default(0) toddlerCount Int @default(0) totalAmount Int reservedUntil DateTime? payment Payment? tickets Ticket[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([sessionId,status]) }
+model Payment { id String @id @default(cuid()) orderId String @unique order Order @relation(fields:[orderId],references:[id]) provider String @default("yookassa") providerPaymentId String? @unique status PaymentStatus @default(PENDING) amount Int confirmationUrl String? payload Json? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
+model Ticket { id String @id @default(cuid()) orderId String order Order @relation(fields:[orderId],references:[id]) code String @unique status TicketStatus @default(VALID) usedAt DateTime? createdAt DateTime @default(now()) }

@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+:root {
+  --background: 0 0% 100%;
+  --foreground: 102 25% 17%;
+  --primary: 28 100% 57%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 98 52% 54%;
+  --secondary-foreground: 0 0% 100%;
+  --border: 98 22% 89%;
+  --muted: 96 35% 96%;
+  --muted-foreground: 98 8% 40%;
+  --accent: 98 55% 95%;
+  --accent-foreground: 101 54% 30%;
+  --card: 0 0% 100%;
+  --card-foreground: 102 25% 17%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 102 25% 17%;
+  --input: 98 22% 89%;
+  --ring: 28 100% 57%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --success: 142 71% 35%;
+  --success-foreground: 0 0% 100%;
+  --warning: 38 92% 50%;
+  --warning-foreground: 20 14% 11%;
+  --surface: 40 33% 98%;
+  --surface-foreground: 102 25% 17%;
+  --surface-muted: 96 30% 94%;
+  --surface-muted-foreground: 98 8% 40%;
+  --leaf: 142 71% 45%;
+  --leaf-foreground: 0 0% 100%;
+  --forest: 142 72% 29%;
+  --cream: 138 76% 97%;
+  --orange: 33 100% 96%;
+}
+* {
+  border-color: hsl(var(--border));
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  background: #fff;
+  color: hsl(var(--foreground));
+  font-family: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+}
+.container-site {
+  width: min(1200px, calc(100% - 32px));
+  margin-inline: auto;
+}
+.jungle-bg {
+  background:
+    radial-gradient(circle at 75% 20%, rgba(197, 231, 161, 0.55), transparent 30%),
+    radial-gradient(circle at 15% 80%, rgba(255, 223, 165, 0.45), transparent 28%),
+    linear-gradient(120deg, #fffdf9, #f7fdf1);
+}
