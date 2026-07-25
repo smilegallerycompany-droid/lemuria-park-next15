@@ -1,43 +1,15 @@
 import { prisma } from "@/lib/db/prisma";
+import type { ReservationDto, ReservationLineItemDto } from "@/types/dto/reservation";
 import type { ReservationWithItems } from "@/server/services/reservations";
 
-export interface ReservationItemResponse {
-  ticketTypeCode: string;
-  ticketTypeName: string;
-  quantity: number;
-  unitPriceAmount: number;
-  subtotalAmount: number;
-}
-
-export interface ReservationResponse {
-  id: string;
-  status: string;
-  expiresAt: string;
-  createdAt: string;
-  session: {
-    startsAt: string;
-    locationName: string;
-    locationCity: string;
-    locationSlug: string;
-  } | null;
-  customer: {
-    name: string | null;
-    phone: string | null;
-    email: string | null;
-  };
-  items: ReservationItemResponse[];
-  totalAmount: number;
-  currency: string;
-}
-
-/** Maps an internal reservation row into the public-safe API response shape. */
-export async function toReservationResponse(
+/** Maps an internal reservation row into the public-safe `ReservationDto`. */
+export async function toReservationDto(
   reservation: ReservationWithItems,
-): Promise<ReservationResponse> {
+): Promise<ReservationDto> {
   const [session, ticketTypes] = await Promise.all([
     prisma.session.findUnique({
       where: { id: reservation.sessionId },
-      include: { location: { select: { name: true, city: true, slug: true } } },
+      include: { location: { select: { name: true, city: true, slug: true, timezone: true } } },
     }),
     prisma.ticketType.findMany({
       where: { id: { in: reservation.items.map((item) => item.ticketTypeId) } },
@@ -47,7 +19,7 @@ export async function toReservationResponse(
 
   const ticketTypeById = new Map(ticketTypes.map((ticketType) => [ticketType.id, ticketType]));
 
-  const items: ReservationItemResponse[] = reservation.items.map((item) => {
+  const items: ReservationLineItemDto[] = reservation.items.map((item) => {
     const ticketType = ticketTypeById.get(item.ticketTypeId);
     const subtotalAmount = item.quantity * item.unitPriceAmount;
     return {
@@ -72,6 +44,7 @@ export async function toReservationResponse(
           locationName: session.location.name,
           locationCity: session.location.city,
           locationSlug: session.location.slug,
+          locationTimezone: session.location.timezone,
         }
       : null,
     customer: {

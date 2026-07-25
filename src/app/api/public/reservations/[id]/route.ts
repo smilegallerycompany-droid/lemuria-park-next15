@@ -1,7 +1,7 @@
 import { apiSuccess, apiError, handleApiError } from "@/lib/api/response";
 import { reservationIdParamSchema } from "@/lib/validation/reservation";
 import { getReservationByPublicId } from "@/server/services/reservations";
-import { toReservationResponse } from "@/server/mappers/reservation";
+import { toReservationDto } from "@/server/mappers/reservation";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -15,7 +15,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     if (!reservation) {
       return apiError("NOT_FOUND", "Резервирование не найдено", 404);
     }
-    const response = await toReservationResponse(reservation);
+    const response = await toReservationDto(reservation);
     return apiSuccess(response);
   } catch (error) {
     return handleApiError(error);

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { ZodError } from "zod";
 import type { ApiErrorBody, ApiSuccessBody } from "@/types/api";
+import { DomainError, type DomainErrorCode } from "@/server/domain/errors";
 
 /**
  * Well-known, stable error codes used across the public API. Keeping this as
@@ -12,11 +13,26 @@ export type ApiErrorCode =
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
   | "CONFLICT"
-  | "SESSION_FULL"
+  | "INSUFFICIENT_CAPACITY"
   | "SESSION_UNAVAILABLE"
+  | "RESERVATION_EXPIRED"
   | "INVALID_REFERENCE"
   | "DATABASE_ERROR"
   | "INTERNAL_ERROR";
+
+/** Maps a domain-layer error code to the public API error code + HTTP status. */
+const DOMAIN_ERROR_HTTP_MAP: Record<DomainErrorCode, { code: ApiErrorCode; status: number }> = {
+  LOCATION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+  SESSION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+  SESSION_UNAVAILABLE: { code: "SESSION_UNAVAILABLE", status: 409 },
+  INSUFFICIENT_CAPACITY: { code: "INSUFFICIENT_CAPACITY", status: 409 },
+  TICKET_TYPE_NOT_FOUND: { code: "INVALID_REFERENCE", status: 400 },
+  PRICE_NOT_FOUND: { code: "INVALID_REFERENCE", status: 400 },
+  RESERVATION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+  RESERVATION_EXPIRED: { code: "RESERVATION_EXPIRED", status: 409 },
+  RESERVATION_ALREADY_CONVERTED: { code: "CONFLICT", status: 409 },
+  ORDER_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+};
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */
 export class ApiError extends Error {
@@ -54,6 +70,11 @@ export function apiError(
 export function handleApiError(error: unknown): NextResponse<ApiErrorBody> {
   if (error instanceof ApiError) {
     return apiError(error.code, error.message, error.status, error.details);
+  }
+
+  if (error instanceof DomainError) {
+    const mapped = DOMAIN_ERROR_HTTP_MAP[error.code];
+    return apiError(mapped.code, error.message, mapped.status, error.details);
   }
 
   if (error instanceof ZodError) {

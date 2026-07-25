@@ -1,7 +1,7 @@
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { createReservationInputSchema } from "@/lib/validation/reservation";
 import { createReservation } from "@/server/services/reservations";
-import { toReservationResponse } from "@/server/mappers/reservation";
+import { toReservationDto } from "@/server/mappers/reservation";
 
 /**
  * Creates a temporary seat hold for a session. Runs inside a Serializable
@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     });
     const input = createReservationInputSchema.parse(json);
     const reservation = await createReservation(input);
-    const response = await toReservationResponse(reservation);
+    const response = await toReservationDto(reservation);
     return apiSuccess(response, 201);
   } catch (error) {
     return handleApiError(error);

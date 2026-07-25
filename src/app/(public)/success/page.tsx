@@ -1,45 +1,47 @@
-import { Check, Download, Mail } from "lucide-react";
+import { redirect } from "next/navigation";
 import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { H2, Body } from "@/components/ui/typography";
 import { PageSection } from "@/components/layout/page-section";
 import { Container } from "@/components/layout/container";
-export default function Success() {
+import { getOrderByNumber } from "@/server/services/orders";
+
+interface SuccessPageProps {
+  searchParams: Promise<{ order?: string }>;
+}
+
+/**
+ * Real order-confirmation page — driven entirely by the order's persisted
+ * status. No fake QR, no fake "success" state: if the order doesn't exist
+ * we send the visitor back to ticket selection; if it isn't paid yet we
+ * send them to the (real) payment-waiting page. QR ticket delivery is a
+ * later stage — for now a paid order just shows a "preparing" placeholder.
+ */
+export default async function SuccessPage({ searchParams }: SuccessPageProps) {
+  const { order: orderNumber } = await searchParams;
+  if (!orderNumber) {
+    redirect("/tickets");
+  }
+
+  const order = await getOrderByNumber(orderNumber);
+  if (!order) {
+    redirect("/tickets");
+  }
+
+  if (order.status !== "PAID") {
+    redirect(`/checkout/payment?order=${encodeURIComponent(orderNumber)}`);
+  }
+
   return (
     <PageSection tone="jungle">
       <Container className="max-w-2xl">
         <Card className="p-7 text-center">
-          <span className="mx-auto grid size-16 place-items-center rounded-full bg-green-500 text-white">
-            <Check size={34} />
-          </span>
-          <H2 as="h1" className="mt-5">
-            Оплата прошла успешно!
+          <H2 as="h1" className="mt-2">
+            Подготовка билетов
           </H2>
           <Body className="mt-2 text-muted-foreground">
-            Электронный билет готов к использованию.
+            Заказ № {order.number} оплачен. Электронные билеты с QR-кодом появятся здесь на
+            следующем этапе.
           </Body>
-          <Card className="mt-7 grid items-center gap-5 p-5 text-left sm:grid-cols-[1fr_160px]">
-            <div>
-              <b className="text-green-700">Лемурия Парк</b>
-              <p className="mt-3 text-sm">
-                23 июля 2026 · 12:00
-                <br />
-                Заказ № LP-013456
-                <br />2 взрослых, 1 детский
-              </p>
-            </div>
-            <div className="aspect-square bg-[repeating-conic-gradient(#111_0_5%,#fff_0_10%)]" />
-          </Card>
-          <div className="mt-5 flex flex-wrap justify-center gap-3">
-            <Button variant="outline">
-              <Download size={17} />
-              Скачать билет
-            </Button>
-            <Button variant="outline">
-              <Mail size={17} />
-              Отправить ещё раз
-            </Button>
-          </div>
         </Card>
       </Container>
     </PageSection>
