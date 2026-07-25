@@ -1,11 +1,490 @@
-generator client { provider = "prisma-client-js" }
-datasource db { provider = "postgresql"; url = env("DATABASE_URL") }
-enum UserRole { OWNER ADMIN CASHIER }
-enum OrderStatus { DRAFT RESERVED AWAITING_PAYMENT PAID CANCELLED REFUNDED EXPIRED }
-enum TicketStatus { VALID USED CANCELLED }
-enum PaymentStatus { PENDING SUCCEEDED CANCELLED REFUNDED }
-model User { id String @id @default(cuid()) email String @unique name String passwordHash String role UserRole @default(CASHIER) createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model Session { id String @id @default(cuid()) startsAt DateTime capacity Int @default(15) isActive Boolean @default(true) orders Order[] @@index([startsAt]) }
-model Order { id String @id @default(cuid()) number String @unique sessionId String session Session @relation(fields:[sessionId],references:[id]) status OrderStatus @default(DRAFT) customerName String customerPhone String customerEmail String adultCount Int @default(0) childCount Int @default(0) toddlerCount Int @default(0) totalAmount Int reservedUntil DateTime? payment Payment? tickets Ticket[] createdAt DateTime @default(now()) updatedAt DateTime @updatedAt @@index([sessionId,status]) }
-model Payment { id String @id @default(cuid()) orderId String @unique order Order @relation(fields:[orderId],references:[id]) provider String @default("yookassa") providerPaymentId String? @unique status PaymentStatus @default(PENDING) amount Int confirmationUrl String? payload Json? createdAt DateTime @default(now()) updatedAt DateTime @updatedAt }
-model Ticket { id String @id @default(cuid()) orderId String order Order @relation(fields:[orderId],references:[id]) code String @unique status TicketStatus @default(VALID) usedAt DateTime? createdAt DateTime @default(now()) }
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  OWNER
+  ADMIN
+  CASHIER
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum LocationStatus {
+  UPCOMING
+  ACTIVE
+  PAUSED
+  CLOSED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum PriceDayType {
+  WEEKDAY
+  WEEKEND
+}
+
+enum SessionStatus {
+  SCHEDULED
+  OPEN
+  CLOSED
+  CANCELLED
+  COMPLETED
+}
+
+enum ReservationStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  DRAFT
+  AWAITING_PAYMENT
+  PAID
+  CANCELLED
+  REFUNDED
+  EXPIRED
+}
+
+enum OrderSource {
+  ONLINE
+  CASHIER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CARD_ONLINE
+  CARD_TERMINAL
+  CASH
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+  REFUNDED
+}
+
+enum CheckInResult {
+  SUCCESS
+  ALREADY_USED
+  INVALID
+  CANCELLED
+  EXPIRED
+}
+
+// ---------------------------------------------------------------------------
+// Staff & audit
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String
+  passwordHash String
+  role         UserRole   @default(CASHIER)
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  cashierOrders   Order[]         @relation("OrderCashier")
+  cashierPayments Payment[]       @relation("PaymentCashier")
+  checkIns        TicketCheckIn[] @relation("CheckInStaff")
+  auditLogs       AuditLog[]      @relation("AuditActor")
+
+  @@index([role])
+  @@index([status])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Locations & schedule (supports sequential touring between cities)
+// ---------------------------------------------------------------------------
+
+model Location {
+  id                     String         @id @default(cuid())
+  slug                   String         @unique
+  name                   String
+  city                   String
+  address                String
+  timezone               String         @default("Europe/Moscow")
+  status                 LocationStatus @default(UPCOMING)
+  defaultCapacity        Int            @default(15)
+  sessionIntervalMinutes Int            @default(30)
+  /// Visit duration in minutes. Internal only — must never be exposed via public API.
+  visitDurationMinutes   Int            @default(45)
+  activeFrom             DateTime?
+  activeTo               DateTime?
+  phone                  String?
+  mapUrl                 String?
+  latitude               Float?
+  longitude              Float?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  schedules    LocationSchedule[]
+  priceRules   PriceRule[]
+  sessions     Session[]
+  galleryItems GalleryItem[]
+
+  @@index([status])
+  @@index([city])
+}
+
+model LocationSchedule {
+  id                     String    @id @default(cuid())
+  locationId             String
+  location               Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  dayOfWeek              DayOfWeek
+  opensAt                String
+  closesAt               String
+  sessionIntervalMinutes Int?
+  isClosed               Boolean   @default(false)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@unique([locationId, dayOfWeek])
+  @@index([locationId])
+}
+
+// ---------------------------------------------------------------------------
+// Ticket types & pricing (fully data-driven, no hardcoded prices/types)
+// ---------------------------------------------------------------------------
+
+model TicketType {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  description String?
+  minAge      Int?
+  maxAge      Int?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  priceRules       PriceRule[]
+  reservationItems ReservationItem[]
+  orderItems       OrderItem[]
+  tickets          Ticket[]
+
+  @@index([isActive, sortOrder])
+}
+
+model PriceRule {
+  id           String       @id @default(cuid())
+  locationId   String
+  location     Location     @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  ticketTypeId String
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  dayType      PriceDayType
+  /// Price in whole kopecks (1/100 RUB).
+  priceAmount  Int
+  currency     String       @default("RUB")
+  validFrom    DateTime     @default(now())
+  validTo      DateTime?
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([locationId, ticketTypeId, dayType, validFrom])
+  @@index([locationId, ticketTypeId, dayType, isActive])
+}
+
+// ---------------------------------------------------------------------------
+// Sessions
+// ---------------------------------------------------------------------------
+
+model Session {
+  id         String        @id @default(cuid())
+  publicId   String        @unique @default(cuid())
+  locationId String
+  location   Location      @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  startsAt   DateTime
+  endsAt     DateTime
+  /// Overrides Location.defaultCapacity for this specific session.
+  capacity   Int
+  status     SessionStatus @default(SCHEDULED)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  reservations Reservation[]
+  orders       Order[]
+  tickets      Ticket[]
+
+  @@unique([locationId, startsAt])
+  @@index([locationId, startsAt])
+  @@index([status, startsAt])
+}
+
+// ---------------------------------------------------------------------------
+// Reservations (temporary seat holds before an order/payment exists)
+// ---------------------------------------------------------------------------
+
+model Reservation {
+  id             String            @id @default(cuid())
+  publicId       String            @unique @default(cuid())
+  sessionId      String
+  session        Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status         ReservationStatus @default(PENDING)
+  expiresAt      DateTime
+  customerName   String?
+  customerPhone  String?
+  customerEmail  String?
+  idempotencyKey String?           @unique
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  items ReservationItem[]
+  order Order?
+
+  @@index([sessionId, status])
+  @@index([status, expiresAt])
+}
+
+model ReservationItem {
+  id              String      @id @default(cuid())
+  reservationId   String
+  reservation     Reservation @relation(fields: [reservationId], references: [id], onDelete: Cascade)
+  ticketTypeId    String
+  ticketType      TicketType  @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  quantity        Int
+  /// Price snapshot at reservation time (kopecks), so the quoted hold price is stable.
+  unitPriceAmount Int
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([reservationId, ticketTypeId])
+  @@index([reservationId])
+}
+
+// ---------------------------------------------------------------------------
+// Orders (online checkout or cashier walk-up sale)
+// ---------------------------------------------------------------------------
+
+model Order {
+  id             String       @id @default(cuid())
+  /// Safe, human-friendly identifier to show the customer (e.g. "LP-000123").
+  number         String       @unique
+  sessionId      String
+  session        Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  reservationId  String?      @unique
+  reservation    Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  status         OrderStatus  @default(DRAFT)
+  source         OrderSource  @default(ONLINE)
+  customerName   String
+  customerPhone  String
+  customerEmail  String
+  /// Total in kopecks, always computed server-side.
+  totalAmount    Int
+  currency       String       @default("RUB")
+  idempotencyKey String?      @unique
+  cashierId      String?
+  cashier        User?        @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+  tickets  Ticket[]
+
+  @@index([sessionId, status])
+  @@index([status])
+  @@index([source])
+}
+
+model OrderItem {
+  id              String     @id @default(cuid())
+  orderId         String
+  order           Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ticketTypeId    String
+  ticketType      TicketType @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  /// Snapshot of the ticket type name at the time of purchase.
+  ticketTypeName  String
+  quantity        Int
+  /// Snapshot of unit price in kopecks — later price changes never affect this order.
+  unitPriceAmount Int
+  /// Snapshot of quantity * unitPriceAmount in kopecks.
+  subtotalAmount  Int
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  tickets Ticket[]
+
+  @@unique([orderId, ticketTypeId])
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Payments
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String
+  order             Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method            PaymentMethod
+  status            PaymentStatus @default(PENDING)
+  /// Amount in kopecks.
+  amount            Int
+  currency          String        @default("RUB")
+  provider          String?
+  providerPaymentId String?       @unique
+  idempotencyKey    String?       @unique
+  confirmationUrl   String?
+  payload           Json?
+  cashierId         String?
+  cashier           User?         @relation("PaymentCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([orderId, status])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Tickets & check-ins
+// ---------------------------------------------------------------------------
+
+model Ticket {
+  id           String       @id @default(cuid())
+  publicId     String       @unique @default(cuid())
+  orderId      String
+  order        Order        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  orderItemId  String
+  orderItem    OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  sessionId    String
+  session      Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  ticketTypeId String
+  ticketType   TicketType   @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  status       TicketStatus @default(VALID)
+  /// Opaque/signed token embedded in the ticket QR code.
+  qrToken      String       @unique
+  usedAt       DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  checkIns TicketCheckIn[]
+
+  @@index([orderId])
+  @@index([sessionId, status])
+  @@index([status])
+}
+
+model TicketCheckIn {
+  id          String        @id @default(cuid())
+  ticketId    String
+  ticket      Ticket        @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  result      CheckInResult
+  scannedById String?
+  scannedBy   User?         @relation("CheckInStaff", fields: [scannedById], references: [id], onDelete: SetNull)
+  scannedAt   DateTime      @default(now())
+  note        String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([ticketId])
+  @@index([scannedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Public content, settings & contacts (DB-driven, never hardcoded)
+// ---------------------------------------------------------------------------
+
+model SiteSettings {
+  id                     String   @id @default(cuid())
+  siteName               String   @default("Лемурия Парк")
+  siteSubtitle           String   @default("Зоотеатр лемуров")
+  ctaLabel               String   @default("Купить билет")
+  defaultSessionInterval Int      @default(30)
+  defaultCapacity        Int      @default(15)
+  maintenanceMode        Boolean  @default(false)
+  metaTitle              String?
+  metaDescription        String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model ContactSettings {
+  id              String   @id @default(cuid())
+  phone           String
+  complaintsPhone String?
+  email           String?
+  supportHours    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model FaqItem {
+  id          String   @id @default(cuid())
+  question    String
+  answer      String
+  sortOrder   Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isPublished, sortOrder])
+}
+
+model GalleryItem {
+  id          String    @id @default(cuid())
+  locationId  String?
+  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  imageUrl    String
+  altText     String
+  sortOrder   Int       @default(0)
+  isPublished Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([isPublished, sortOrder])
+  @@index([locationId])
+}
