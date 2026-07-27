@@ -409,7 +409,7 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
                     >
                       Дата
                     </h3>
-                    <p className="text-xs text-muted-foreground">Листайте →</p>
+                    <p className="text-xs text-muted-foreground sm:hidden">Листайте →</p>
                   </div>
 
                   <div

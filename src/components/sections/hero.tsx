@@ -11,7 +11,7 @@ import { SITE } from "@/constants/site";
 export function Hero() {
   return (
     <section className="hero-mesh relative overflow-hidden border-b border-beige/60">
-      <div className="container-site relative grid items-center gap-6 py-8 md:grid-cols-[1fr_auto] md:gap-10 md:py-10">
+      <div className="container-site relative grid items-center gap-4 py-5 md:grid-cols-[1fr_auto] md:gap-10 md:py-8">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -20,14 +20,14 @@ export function Hero() {
           <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">
             Онлайн-касса
           </p>
-          <h1 className="mt-2 font-display text-[clamp(2rem,5vw,3.25rem)] font-semibold leading-tight tracking-tight text-forest">
+          <h1 className="mt-1.5 font-display text-[clamp(1.85rem,5vw,3rem)] font-semibold leading-tight tracking-tight text-forest">
             {SITE.name}
           </h1>
-          <p className="mt-2 max-w-xl text-base text-muted-foreground md:text-lg">
-            Выберите дату и сеанс — места резервируются сразу. {SITE.schedule}.
+          <p className="mt-1.5 max-w-xl text-sm text-muted-foreground md:text-base">
+            Выберите дату и сеанс — места резервируются сразу.
           </p>
 
-          <dl className="mt-5 flex flex-wrap gap-2">
+          <dl className="mt-4 flex flex-wrap gap-2">
             {[
               [`До ${SITE.capacity}`, "гостей"],
               [`${SITE.visitMinutes} мин`, "визит"],
@@ -48,7 +48,8 @@ export function Hero() {
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.45, delay: 0.05 }}
-          className="relative mx-auto hidden w-[140px] shrink-0 sm:block md:w-[180px]"
+          className="relative mx-auto hidden w-[140px] shrink-0 md:block md:w-[168px]"
+          aria-hidden
         >
           <Image
             src="/assets/lemur.png"
