@@ -2,8 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { formatMoneyFromKopecks, cn } from "@/lib/utils";
 import { getPublicConfig, getPublicSessions, createPublicReservation } from "@/lib/api/public";
@@ -14,12 +17,10 @@ import type { PublicSessionDto, PublicSessionsResponseDto } from "@/types/dto/se
 type ConfigStatus = "loading" | "error" | "ready";
 type SessionsStatus = "loading" | "error" | "ready";
 
-/** Builds the inclusive list of `YYYY-MM-DD` dates the date picker should offer. */
 function buildDateList(from: string, to: string): string[] {
   const dates: string[] = [];
   let cursor = new Date(`${from}T00:00:00Z`);
   const end = new Date(`${to}T00:00:00Z`);
-  // Bounded loop — `from`/`to` always come from the server's own capped range.
   while (cursor.getTime() <= end.getTime() && dates.length < 60) {
     dates.push(cursor.toISOString().slice(0, 10));
     cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
@@ -27,36 +28,42 @@ function buildDateList(from: string, to: string): string[] {
   return dates;
 }
 
-function formatDateLabel(dateKey: string, timeZone: string): string {
+function formatDateLabel(dateKey: string, timeZone: string): { day: string; weekday: string } {
   const date = new Date(`${dateKey}T00:00:00Z`);
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "short",
-    weekday: "short",
-    timeZone,
-  }).format(date);
+  return {
+    day: new Intl.DateTimeFormat("ru-RU", {
+      day: "numeric",
+      month: "short",
+      timeZone,
+    }).format(date),
+    weekday: new Intl.DateTimeFormat("ru-RU", {
+      weekday: "short",
+      timeZone,
+    }).format(date),
+  };
 }
 
-function availabilityLabel(session: PublicSessionDto): string {
-  if (session.soldOut) return "Мест нет";
-  if (session.remainingSeats === 1) return "Последнее место";
-  return `Осталось ${session.remainingSeats} мест`;
+function sessionBadge(session: PublicSessionDto) {
+  if (session.soldOut) return { label: "SOLD OUT", variant: "danger" as const };
+  if (session.remainingSeats === 1)
+    return { label: "Последнее место", variant: "warning" as const };
+  if (session.status === "LOW_AVAILABILITY")
+    return { label: "Последние места", variant: "warning" as const };
+  return { label: `${session.remainingSeats} мест`, variant: "success" as const };
 }
 
 export function BookingWidget({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
-
   const [configStatus, setConfigStatus] = useState<ConfigStatus>("loading");
   const [config, setConfig] = useState<PublicConfigDto | null>(null);
-
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [sessionsStatus, setSessionsStatus] = useState<SessionsStatus>("loading");
   const [sessionsData, setSessionsData] = useState<PublicSessionsResponseDto | null>(null);
-
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const submitLockRef = useRef(false);
 
   const loadConfig = useCallback(async () => {
     setConfigStatus("loading");
@@ -90,9 +97,7 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   }, [loadConfig]);
 
   useEffect(() => {
-    if (selectedDate) {
-      void loadSessions(selectedDate);
-    }
+    if (selectedDate) void loadSessions(selectedDate);
   }, [selectedDate, loadSessions]);
 
   const dateList = useMemo(
@@ -117,31 +122,10 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
     );
   }, [selectedSession, quantities]);
 
-  const selectDate = (date: string) => {
-    setSelectedDate(date);
-    setSubmitError(null);
-  };
-
-  const selectSession = (session: PublicSessionDto) => {
-    if (session.soldOut) return;
-    setSelectedSessionId(session.publicId);
-    setQuantities({});
-    setSubmitError(null);
-  };
-
-  const setQuantity = (code: string, next: number) => {
-    if (!selectedSession) return;
-    const clamped = Math.max(0, Math.min(next, selectedSession.remainingSeats));
-    setQuantities((prev) => ({ ...prev, [code]: clamped }));
-  };
-
   const exceedsAvailability =
     Boolean(selectedSession) && totalQuantity > (selectedSession?.remainingSeats ?? 0);
   const canContinue =
     Boolean(selectedSession) && totalQuantity > 0 && !exceedsAvailability && !submitting;
-
-  // Guards against a double-submit firing two reservations for one click.
-  const submitLockRef = useRef(false);
 
   const handleContinue = async () => {
     if (!selectedSession || !canContinue || submitLockRef.current) return;
@@ -157,10 +141,9 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const idempotencyKey = crypto.randomUUID();
       const reservation = await createPublicReservation(
         { sessionPublicId: selectedSession.publicId, items },
-        idempotencyKey,
+        crypto.randomUUID(),
       );
       router.push(`/checkout?reservation=${encodeURIComponent(reservation.publicId)}`);
     } catch (error) {
@@ -185,66 +168,80 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   const timezone = config?.location.timezone ?? "UTC";
 
   return (
-    <Card className={cn("p-5 md:p-7", compact && "shadow-none")}>
-      <h2 className="mb-6 text-2xl font-black">Купите билет онлайн</h2>
+    <Card variant="glass" className={cn("p-5 md:p-8", compact && "shadow-none")}>
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-orange">Онлайн</p>
+          <h2 className="mt-1 font-display text-2xl font-semibold text-forest md:text-3xl">
+            Выберите визит
+          </h2>
+        </div>
+        {config?.location && (
+          <p className="text-sm text-muted-foreground">
+            {config.location.city} · {config.location.venue}
+          </p>
+        )}
+      </div>
 
       {configStatus === "loading" && (
-        <div
-          className="grid min-h-40 place-items-center text-sm text-muted-foreground"
-          role="status"
-        >
-          Загружаем актуальные сеансы…
+        <div className="grid gap-4" role="status" aria-label="Загрузка">
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-40 w-full" />
         </div>
       )}
 
       {configStatus === "error" && (
         <div className="grid min-h-40 place-items-center gap-3 text-center">
-          <p className="text-sm text-muted-foreground">
-            Не удалось загрузить расписание. Проверьте соединение и попробуйте ещё раз.
-          </p>
+          <p className="text-sm text-muted-foreground">Не удалось загрузить расписание.</p>
           <Button variant="outline" onClick={() => void loadConfig()}>
             Повторить
           </Button>
         </div>
       )}
 
-      {configStatus === "ready" && dateList.length === 0 && (
-        <div className="grid min-h-40 place-items-center text-center text-sm text-muted-foreground">
-          Сейчас нет доступных дат для онлайн-бронирования. Загляните позже.
-        </div>
-      )}
-
       {configStatus === "ready" && dateList.length > 0 && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_1.35fr_1.45fr_.7fr]">
+        <div className="grid gap-8 lg:grid-cols-[220px_1fr_280px]">
           <section>
-            <p className="mb-3 text-sm font-extrabold text-forest">1. Выберите дату</p>
-            <div className="flex max-h-72 flex-col gap-2 overflow-y-auto pr-1">
-              {dateList.map((date) => (
-                <button
-                  key={date}
-                  type="button"
-                  onClick={() => selectDate(date)}
-                  aria-pressed={date === selectedDate}
-                  className={cn(
-                    "rounded-xl border p-2 text-left text-sm capitalize",
-                    date === selectedDate && "border-leaf bg-leaf text-leaf-foreground",
-                  )}
-                >
-                  {formatDateLabel(date, timezone)}
-                </button>
-              ))}
+            <p className="mb-3 text-sm font-extrabold text-forest">Дата</p>
+            <div className="flex gap-2 overflow-x-auto pb-1 lg:max-h-[420px] lg:flex-col lg:overflow-y-auto lg:overflow-x-visible lg:pr-1">
+              {dateList.map((date) => {
+                const label = formatDateLabel(date, timezone);
+                const active = date === selectedDate;
+                return (
+                  <motion.button
+                    key={date}
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setSelectedDate(date)}
+                    aria-pressed={active}
+                    className={cn(
+                      "min-w-[96px] rounded-2xl border p-3 text-left transition lg:min-w-0",
+                      active
+                        ? "border-transparent bg-primary text-primary-foreground shadow-warm"
+                        : "border-beige bg-white/70 hover:border-leaf hover:bg-cream",
+                    )}
+                  >
+                    <span className="block text-[11px] font-bold uppercase opacity-80">
+                      {label.weekday}
+                    </span>
+                    <span className="mt-0.5 block text-sm font-extrabold capitalize">
+                      {label.day}
+                    </span>
+                  </motion.button>
+                );
+              })}
             </div>
           </section>
 
           <section>
-            <p className="mb-3 text-sm font-extrabold text-forest">2. Выберите сеанс</p>
-
+            <p className="mb-3 text-sm font-extrabold text-forest">Сеанс</p>
             {sessionsStatus === "loading" && (
-              <p className="text-sm text-muted-foreground" role="status">
-                Загружаем сеансы…
-              </p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" role="status">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="h-24" />
+                ))}
+              </div>
             )}
-
             {sessionsStatus === "error" && (
               <div className="flex flex-col gap-2">
                 <p className="text-sm text-muted-foreground">Не удалось загрузить сеансы.</p>
@@ -257,75 +254,117 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
                 </Button>
               </div>
             )}
-
             {sessionsStatus === "ready" && (sessionsData?.sessions.length ?? 0) === 0 && (
               <p className="text-sm text-muted-foreground">На эту дату сеансов нет.</p>
             )}
-
             {sessionsStatus === "ready" && (sessionsData?.sessions.length ?? 0) > 0 && (
-              <div className="grid grid-cols-4 gap-2">
-                {sessionsData?.sessions.map((session) => (
-                  <button
-                    key={session.publicId}
-                    type="button"
-                    disabled={session.soldOut}
-                    onClick={() => selectSession(session)}
-                    aria-pressed={session.publicId === selectedSessionId}
-                    className={cn(
-                      "rounded-xl border p-2 text-xs disabled:cursor-not-allowed disabled:opacity-50",
-                      session.publicId === selectedSessionId &&
-                        "border-leaf bg-leaf text-leaf-foreground",
-                    )}
-                  >
-                    <b className="block text-sm">{session.localTime}</b>
-                    {availabilityLabel(session)}
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <AnimatePresence mode="popLayout">
+                  {sessionsData?.sessions.map((session) => {
+                    const badge = sessionBadge(session);
+                    const active = session.publicId === selectedSessionId;
+                    return (
+                      <motion.button
+                        key={session.publicId}
+                        layout
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0 }}
+                        whileHover={session.soldOut ? undefined : { y: -2, scale: 1.02 }}
+                        whileTap={session.soldOut ? undefined : { scale: 0.98 }}
+                        type="button"
+                        disabled={session.soldOut}
+                        onClick={() => {
+                          if (session.soldOut) return;
+                          setSelectedSessionId(session.publicId);
+                          setQuantities({});
+                          setSubmitError(null);
+                        }}
+                        aria-pressed={active}
+                        className={cn(
+                          "rounded-3xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-45",
+                          active
+                            ? "border-primary bg-orange-soft shadow-warm"
+                            : "border-beige bg-white/75 hover:border-leaf",
+                        )}
+                      >
+                        <span className="block font-display text-2xl font-semibold text-forest">
+                          {session.localTime}
+                        </span>
+                        <Badge variant={badge.variant} className="mt-3">
+                          {badge.label}
+                        </Badge>
+                      </motion.button>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
             )}
-          </section>
 
-          <section>
-            <p className="mb-3 text-sm font-extrabold text-forest">3. Количество билетов</p>
-            {selectedSession ? (
-              selectedSession.prices.map((price) => (
-                <div
-                  key={price.ticketTypeCode}
-                  className="grid grid-cols-[1fr_auto_auto] items-center gap-2 py-1 text-sm"
-                >
-                  <span>{price.ticketTypeName}</span>
-                  <span className="text-muted-foreground">
-                    {formatMoneyFromKopecks(price.unitPrice)}
-                  </span>
-                  <QuantityStepper
-                    value={quantities[price.ticketTypeCode] ?? 0}
-                    onChange={(next) => setQuantity(price.ticketTypeCode, next)}
-                    min={0}
-                    max={Math.max(0, selectedSession.remainingSeats)}
-                    valueLabel={price.ticketTypeName}
-                    decreaseLabel={`Уменьшить: ${price.ticketTypeName}`}
-                    increaseLabel={`Увеличить: ${price.ticketTypeName}`}
-                  />
+            <div className="mt-8">
+              <p className="mb-3 text-sm font-extrabold text-forest">Билеты</p>
+              {selectedSession ? (
+                <div className="grid gap-3">
+                  {selectedSession.prices.map((price) => (
+                    <div
+                      key={price.ticketTypeCode}
+                      className="flex items-center justify-between gap-3 rounded-2xl border border-beige bg-white/70 px-4 py-3"
+                    >
+                      <div>
+                        <p className="text-sm font-extrabold text-forest">{price.ticketTypeName}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {formatMoneyFromKopecks(price.unitPrice)}
+                        </p>
+                      </div>
+                      <QuantityStepper
+                        value={quantities[price.ticketTypeCode] ?? 0}
+                        onChange={(next) => {
+                          const clamped = Math.max(
+                            0,
+                            Math.min(next, selectedSession.remainingSeats),
+                          );
+                          setQuantities((prev) => ({ ...prev, [price.ticketTypeCode]: clamped }));
+                        }}
+                        min={0}
+                        max={Math.max(0, selectedSession.remainingSeats)}
+                        valueLabel={price.ticketTypeName}
+                        decreaseLabel={`Уменьшить: ${price.ticketTypeName}`}
+                        increaseLabel={`Увеличить: ${price.ticketTypeName}`}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">Выберите сеанс.</p>
-            )}
-            {exceedsAvailability && (
-              <p className="mt-2 text-xs text-destructive">
-                Доступно только {selectedSession?.remainingSeats} мест на этот сеанс.
-              </p>
-            )}
+              ) : (
+                <p className="text-sm text-muted-foreground">Выберите сеанс.</p>
+              )}
+              {exceedsAvailability && (
+                <p className="mt-2 text-xs text-destructive">
+                  Доступно только {selectedSession?.remainingSeats} мест на этот сеанс.
+                </p>
+              )}
+            </div>
           </section>
 
-          <section className="flex flex-col justify-end">
-            <span className="text-sm">Итого</span>
-            <strong className="my-2 text-3xl">{formatMoneyFromKopecks(totalAmount)}</strong>
-            <Button onClick={() => void handleContinue()} disabled={!canContinue}>
-              {submitting ? "Бронируем…" : "Продолжить"}
-            </Button>
-            {submitError && <p className="mt-2 text-xs text-destructive">{submitError}</p>}
-          </section>
+          <aside className="lg:sticky lg:top-24 lg:self-start">
+            <Card variant="soft" className="p-5">
+              <p className="text-sm font-bold text-muted-foreground">Итого</p>
+              <p className="mt-1 font-display text-4xl font-semibold text-forest">
+                {formatMoneyFromKopecks(totalAmount)}
+              </p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {totalQuantity > 0 ? `${totalQuantity} билет(ов)` : "Выберите количество"}
+              </p>
+              <Button
+                className="mt-5 w-full"
+                size="lg"
+                onClick={() => void handleContinue()}
+                disabled={!canContinue}
+              >
+                {submitting ? "Бронируем…" : "Перейти к оформлению"}
+              </Button>
+              {submitError && <p className="mt-3 text-xs text-destructive">{submitError}</p>}
+            </Card>
+          </aside>
         </div>
       )}
     </Card>

@@ -38,8 +38,8 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     return (
       <PageSection tone="jungle">
         <Container className="max-w-2xl">
-          <Card className="p-7 text-center">
-            <H2 as="h1" className="mt-2">
+          <Card variant="glass" className="p-7 text-center">
+            <H2 as="h1" className="mt-2 font-display font-semibold">
               {order.status === "EXPIRED" ? "Время оплаты истекло" : "Заказ отменён"}
             </H2>
             <Body className="mt-2 text-muted-foreground">
@@ -63,8 +63,8 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   return (
     <PageSection tone="jungle">
       <Container className="max-w-2xl">
-        <Card className="p-7 text-center">
-          <H2 as="h1" className="mt-2">
+        <Card variant="glass" className="p-7 text-center">
+          <H2 as="h1" className="mt-2 font-display font-semibold">
             Билеты формируются
           </H2>
           <Body className="mt-2 text-muted-foreground">

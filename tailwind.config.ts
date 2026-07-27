@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
+
 export default {
   darkMode: ["class"],
   content: ["./src/**/*.{ts,tsx}"],
@@ -34,10 +35,32 @@ export default {
         leaf: { DEFAULT: "hsl(var(--leaf))", foreground: "hsl(var(--leaf-foreground))" },
         forest: "hsl(var(--forest))",
         cream: "hsl(var(--cream))",
-        orange: "hsl(var(--orange))",
+        milk: "hsl(var(--milk))",
+        beige: "hsl(var(--beige))",
+        orange: { DEFAULT: "hsl(var(--orange))", soft: "hsl(var(--orange-soft))" },
       },
-      borderRadius: { xl: "1rem", "2xl": "1.5rem", "3xl": "2rem" },
-      boxShadow: { soft: "0 18px 55px rgba(38,72,25,.12)", card: "0 8px 28px rgba(38,72,25,.08)" },
+      borderRadius: {
+        xl: "1rem",
+        "2xl": "1.25rem",
+        "3xl": "1.75rem",
+        "4xl": "2.25rem",
+      },
+      boxShadow: {
+        soft: "0 18px 50px rgba(70, 90, 50, 0.08)",
+        card: "0 10px 32px rgba(70, 90, 50, 0.07)",
+        warm: "0 16px 40px rgba(230, 120, 40, 0.18)",
+        glass: "0 1px 0 rgba(255,255,255,0.7) inset, 0 18px 50px rgba(60, 80, 40, 0.08)",
+      },
+      fontFamily: {
+        sans: ["var(--font-manrope)", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: [
+          "var(--font-display)",
+          "var(--font-manrope)",
+          "ui-sans-serif",
+          "system-ui",
+          "sans-serif",
+        ],
+      },
     },
   },
   plugins: [tailwindcssAnimate],

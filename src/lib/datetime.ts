@@ -53,3 +53,22 @@ export function todayInTimezone(timeZone: string, now: Date = new Date()): strin
 export function addDaysUtc(date: Date, days: number): Date {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
+
+/**
+ * Best-effort UTC instant for local midnight of `YYYY-MM-DD` in an IANA
+ * timezone — used for "today" filters without pulling in a date library.
+ */
+export function startOfLocalDateInTimezone(dateKey: string, timeZone: string): Date {
+  const probe = new Date(`${dateKey}T12:00:00.000Z`);
+  for (let offsetHours = -14; offsetHours <= 14; offsetHours += 1) {
+    const candidate = new Date(probe.getTime() + offsetHours * 60 * 60 * 1000);
+    candidate.setUTCMinutes(0, 0, 0);
+    if (
+      formatDateInTimezone(candidate, timeZone) === dateKey &&
+      formatTimeInTimezone(candidate, timeZone) === "00:00"
+    ) {
+      return candidate;
+    }
+  }
+  return new Date(`${dateKey}T00:00:00.000Z`);
+}

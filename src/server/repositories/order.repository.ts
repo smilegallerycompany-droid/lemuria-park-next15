@@ -1,3 +1,4 @@
+import type { OrderStatus, PaymentMethod } from "@prisma/client";
 import type { DbClient } from "@/lib/db/prisma";
 import type { OrderLineItemInput } from "@/server/domain/order.domain";
 
@@ -10,6 +11,20 @@ export interface CreateOrderRecordInput {
   customerEmail: string;
   totalAmount: number;
   paymentExpiresAt: Date;
+  idempotencyKey?: string;
+  idempotencyPayloadHash?: string;
+  items: OrderLineItemInput[];
+}
+
+export interface CreateCashierOrderRecordInput {
+  number: string;
+  sessionId: string;
+  cashierId: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  totalAmount: number;
+  paymentMethod: PaymentMethod;
   idempotencyKey?: string;
   idempotencyPayloadHash?: string;
   items: OrderLineItemInput[];
@@ -90,6 +105,76 @@ export const orderRepository = {
         },
       },
       include: { items: true },
+    });
+  },
+
+  /**
+   * Walk-up cashier sale: immediately PAID, no reservation, with a SUCCEEDED
+   * Payment row (cash / terminal). Does not touch the online booking flow.
+   */
+  createCashierPaid(db: DbClient, input: CreateCashierOrderRecordInput) {
+    return db.order.create({
+      data: {
+        number: input.number,
+        sessionId: input.sessionId,
+        status: "PAID",
+        source: "CASHIER",
+        cashierId: input.cashierId,
+        customerName: input.customerName,
+        customerPhone: input.customerPhone,
+        customerEmail: input.customerEmail,
+        totalAmount: input.totalAmount,
+        paymentExpiresAt: null,
+        idempotencyKey: input.idempotencyKey,
+        idempotencyPayloadHash: input.idempotencyPayloadHash,
+        items: {
+          create: input.items.map((item) => ({
+            ticketTypeId: item.ticketTypeId,
+            ticketTypeName: item.ticketTypeName,
+            quantity: item.quantity,
+            unitPriceAmount: item.unitPriceAmount,
+            subtotalAmount: item.subtotalAmount,
+          })),
+        },
+        payments: {
+          create: {
+            method: input.paymentMethod,
+            status: "SUCCEEDED",
+            amount: input.totalAmount,
+            currency: "RUB",
+            cashierId: input.cashierId,
+          },
+        },
+      },
+      include: { items: true, payments: true },
+    });
+  },
+
+  listForCashier(
+    db: DbClient,
+    params: {
+      status?: OrderStatus | "ALL";
+      from?: Date;
+      search?: string;
+      take: number;
+    },
+  ) {
+    const search = params.search?.trim();
+    return db.order.findMany({
+      where: search
+        ? { number: { contains: search, mode: "insensitive" } }
+        : {
+            source: "CASHIER",
+            ...(params.status && params.status !== "ALL" ? { status: params.status } : {}),
+            ...(params.from ? { createdAt: { gte: params.from } } : {}),
+          },
+      include: {
+        items: true,
+        session: { include: { location: { select: { city: true, name: true, timezone: true } } } },
+        cashier: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: params.take,
     });
   },
 };
