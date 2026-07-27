@@ -2,12 +2,8 @@
 
 import * as React from "react";
 import { Minus, Plus } from "lucide-react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-
-const sizeClasses = {
-  sm: { button: "size-8", value: "w-7 text-sm" },
-  md: { button: "size-9", value: "w-8 text-base" },
-} as const;
 
 export interface QuantityStepperProps {
   value: number;
@@ -18,11 +14,16 @@ export interface QuantityStepperProps {
   disabled?: boolean;
   decreaseLabel?: string;
   increaseLabel?: string;
-  /** Accessible name for the value, announced as "{valueLabel}: {value}" via aria-label. */
   valueLabel?: string;
   className?: string;
-  size?: keyof typeof sizeClasses;
+  size?: "sm" | "md" | "lg";
 }
+
+const sizeMap = {
+  sm: { button: "size-9", value: "w-8 text-base", icon: 14 },
+  md: { button: "size-11", value: "w-10 text-lg", icon: 16 },
+  lg: { button: "size-12", value: "w-12 text-xl", icon: 18 },
+} as const;
 
 export function QuantityStepper({
   value,
@@ -39,41 +40,52 @@ export function QuantityStepper({
 }: QuantityStepperProps) {
   const decrease = () => onChange(Math.max(min, value - step));
   const increase = () => onChange(Math.min(max, value + step));
-  const { button: buttonSize, value: valueSize } = sizeClasses[size];
+  const s = sizeMap[size];
 
   return (
-    <div className={cn("flex items-center overflow-hidden rounded-lg border", className)}>
-      <button
+    <div
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-2xl border border-beige/80 bg-white/90 p-1 shadow-sm",
+        className,
+      )}
+    >
+      <motion.button
         type="button"
+        whileTap={{ scale: 0.9 }}
         onClick={decrease}
         disabled={disabled || value <= min}
         aria-label={decreaseLabel}
         className={cn(
-          "grid place-items-center bg-cream transition disabled:pointer-events-none disabled:opacity-50",
-          buttonSize,
+          "grid place-items-center rounded-xl text-forest transition enabled:hover:bg-cream disabled:pointer-events-none disabled:opacity-35",
+          s.button,
         )}
       >
-        <Minus size={14} />
-      </button>
-      <b
-        className={cn("text-center", valueSize)}
+        <Minus size={s.icon} strokeWidth={2.5} />
+      </motion.button>
+      <motion.b
+        key={value}
+        initial={{ scale: 0.85, opacity: 0.5 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: "spring", stiffness: 420, damping: 22 }}
+        className={cn("text-center font-display font-semibold tabular-nums text-forest", s.value)}
         aria-live="polite"
         aria-label={valueLabel ? `${valueLabel}: ${value}` : undefined}
       >
         {value}
-      </b>
-      <button
+      </motion.b>
+      <motion.button
         type="button"
+        whileTap={{ scale: 0.9 }}
         onClick={increase}
         disabled={disabled || value >= max}
         aria-label={increaseLabel}
         className={cn(
-          "grid place-items-center bg-cream transition disabled:pointer-events-none disabled:opacity-50",
-          buttonSize,
+          "grid place-items-center rounded-xl text-forest transition enabled:hover:bg-orange-soft enabled:hover:text-orange disabled:pointer-events-none disabled:opacity-35",
+          s.button,
         )}
       >
-        <Plus size={14} />
-      </button>
+        <Plus size={s.icon} strokeWidth={2.5} />
+      </motion.button>
     </div>
   );
 }

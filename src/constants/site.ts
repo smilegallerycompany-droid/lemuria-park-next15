@@ -6,20 +6,21 @@ export const SITE = {
   schedule: "Ежедневно, 10:30–21:00",
   capacity: 15,
   sessionMinutes: 30,
+  visitMinutes: 20,
   address: "Адрес текущей площадки уточняется",
 } as const;
 
+/** Primary CTA scrolls to the booking cashier on the home page. */
 export const CTA_BUY_TICKET_LABEL = "Купить билет";
-export const CTA_BUY_TICKET_HREF = "/tickets";
+export const CTA_BUY_TICKET_HREF = "/#booking";
 
 export interface NavItem {
   label: string;
   href: string;
 }
 
-/** Canonical public navigation, used by SiteHeader (and a subset by SiteFooter/mobile nav). */
+/** Secondary navigation — never competes with the booking cashier above. */
 export const PRIMARY_NAV: readonly NavItem[] = [
+  { label: "Как добраться", href: "/location" },
   { label: "О зоотеатре", href: "/about" },
-  { label: "Как нас найти", href: "/location" },
-  { label: "Галерея", href: "/#gallery" },
 ];

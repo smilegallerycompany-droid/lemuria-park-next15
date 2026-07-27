@@ -16,14 +16,14 @@ export function SiteFooter() {
             Посетителям
           </h4>
           <div className="mt-3 grid gap-2 text-sm text-muted-foreground">
-            <Link className="hover:text-forest" href="/tickets">
+            <Link className="hover:text-forest" href="/#booking">
               Купить билет
+            </Link>
+            <Link className="hover:text-forest" href="/location">
+              Как добраться
             </Link>
             <Link className="hover:text-forest" href="/about">
               О зоотеатре
-            </Link>
-            <Link className="hover:text-forest" href="/location">
-              Как нас найти
             </Link>
           </div>
         </div>

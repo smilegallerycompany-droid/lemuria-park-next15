@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { SITE, PRIMARY_NAV, CTA_BUY_TICKET_LABEL, CTA_BUY_TICKET_HREF } from "@/constants/site";
 
-const mobileNav = PRIMARY_NAV.filter((item) => item.href !== "/#gallery");
+const mobileNav = PRIMARY_NAV;
 
 export function SiteHeader() {
   const [open, setOpen] = useState(false);
@@ -68,19 +68,14 @@ export function SiteHeader() {
             className="overflow-hidden border-t border-white/60 lg:hidden"
           >
             <div className="container-site grid gap-4 py-5 text-lg font-bold">
-              <Link href="/" onClick={() => setOpen(false)}>
-                Главная
+              <Link href="/#booking" onClick={() => setOpen(false)}>
+                Купить билет
               </Link>
               {mobileNav.map((item) => (
                 <Link key={item.href} href={item.href} onClick={() => setOpen(false)}>
                   {item.label}
                 </Link>
               ))}
-              <Button asChild>
-                <Link href={CTA_BUY_TICKET_HREF} onClick={() => setOpen(false)}>
-                  {CTA_BUY_TICKET_LABEL}
-                </Link>
-              </Button>
             </div>
           </motion.nav>
         )}
