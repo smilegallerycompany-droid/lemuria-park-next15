@@ -269,18 +269,21 @@ model Session {
 // ---------------------------------------------------------------------------
 
 model Reservation {
-  id             String            @id @default(cuid())
-  publicId       String            @unique @default(cuid())
-  sessionId      String
-  session        Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  status         ReservationStatus @default(PENDING)
-  expiresAt      DateTime
-  customerName   String?
-  customerPhone  String?
-  customerEmail  String?
-  idempotencyKey String?           @unique
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  id                     String            @id @default(cuid())
+  publicId               String            @unique @default(cuid())
+  sessionId              String
+  session                Session           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  status                 ReservationStatus @default(PENDING)
+  expiresAt              DateTime
+  customerName           String?
+  customerPhone          String?
+  customerEmail          String?
+  idempotencyKey         String?           @unique
+  /// Hash of the request payload that created this reservation, so a repeated
+  /// Idempotency-Key with a *different* payload can be rejected (IDEMPOTENCY_CONFLICT).
+  idempotencyPayloadHash String?
+  createdAt              DateTime          @default(now())
+  updatedAt              DateTime          @updatedAt
 
   items ReservationItem[]
   order Order?
@@ -310,26 +313,34 @@ model ReservationItem {
 // ---------------------------------------------------------------------------
 
 model Order {
-  id             String       @id @default(cuid())
+  id                     String       @id @default(cuid())
   /// Safe, human-friendly identifier to show the customer (e.g. "LP-000123").
-  number         String       @unique
-  sessionId      String
-  session        Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
-  reservationId  String?      @unique
-  reservation    Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  status         OrderStatus  @default(DRAFT)
-  source         OrderSource  @default(ONLINE)
-  customerName   String
-  customerPhone  String
-  customerEmail  String
+  number                 String       @unique
+  sessionId              String
+  session                Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  reservationId          String?      @unique
+  reservation            Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  status                 OrderStatus  @default(DRAFT)
+  source                 OrderSource  @default(ONLINE)
+  customerName           String
+  customerPhone          String
+  customerEmail          String
   /// Total in kopecks, always computed server-side.
-  totalAmount    Int
-  currency       String       @default("RUB")
-  idempotencyKey String?      @unique
-  cashierId      String?
-  cashier        User?        @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  totalAmount            Int
+  currency               String       @default("RUB")
+  idempotencyKey         String?      @unique
+  /// Hash of the request payload that created this order, so a repeated
+  /// Idempotency-Key with a *different* payload can be rejected (IDEMPOTENCY_CONFLICT)
+  /// instead of silently returning an unrelated order.
+  idempotencyPayloadHash String?
+  /// Own deadline for paying an AWAITING_PAYMENT order — independent of the
+  /// originating Reservation's `expiresAt`. An order past this deadline is
+  /// swept to EXPIRED and stops occupying seats (see OrderCleanupService).
+  paymentExpiresAt       DateTime?
+  cashierId              String?
+  cashier                User?        @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
 
   items    OrderItem[]
   payments Payment[]
@@ -338,6 +349,7 @@ model Order {
   @@index([sessionId, status])
   @@index([status])
   @@index([source])
+  @@index([status, paymentExpiresAt])
 }
 
 model OrderItem {

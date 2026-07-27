@@ -1,30 +1,38 @@
 /** Public DTOs for GET /api/public/sessions. Never a Prisma model — safe to use in React. */
 
-export interface TicketPriceDto {
+export type PublicSessionAvailabilityStatus = "AVAILABLE" | "LOW_AVAILABILITY" | "SOLD_OUT";
+
+export interface PublicSessionPriceDto {
   ticketTypeCode: string;
   ticketTypeName: string;
-  /** Kopecks — always server-computed. */
-  unitPriceAmount: number;
+  /** Kopecks — always server-computed for this session's actual date. */
+  unitPrice: number;
 }
 
-export interface SessionDto {
-  /** The session's public id (never the internal database id). */
-  id: string;
+export interface PublicSessionDto {
+  publicId: string;
   startsAt: string;
-  status: string;
+  /** `YYYY-MM-DD`, in the location's own timezone. */
+  localDate: string;
+  /** `HH:MM`, in the location's own timezone. */
+  localTime: string;
   capacity: number;
-  available: number;
-  prices: TicketPriceDto[];
+  remainingSeats: number;
+  soldOut: boolean;
+  status: PublicSessionAvailabilityStatus;
+  prices: PublicSessionPriceDto[];
 }
 
-export interface LocationSummaryDto {
+export interface PublicSessionsLocationDto {
   slug: string;
-  name: string;
   city: string;
+  venue: string;
   timezone: string;
 }
 
-export interface SessionsResponseDto {
-  location: LocationSummaryDto;
-  sessions: SessionDto[];
+export interface PublicSessionsResponseDto {
+  location: PublicSessionsLocationDto;
+  /** The `YYYY-MM-DD` date these sessions were listed for. */
+  date: string;
+  sessions: PublicSessionDto[];
 }

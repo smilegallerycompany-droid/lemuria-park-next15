@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -13,10 +13,10 @@ import { H1 } from "@/components/ui/typography";
 import { PageSection } from "@/components/layout/page-section";
 import { Container } from "@/components/layout/container";
 import { checkoutContactFormSchema, type CheckoutContactFormValues } from "@/lib/validation/order";
-import { getReservation, createOrder } from "@/lib/api/public";
+import { getPublicReservationWithMeta, createPublicOrder } from "@/lib/api/public";
 import { ApiClientError } from "@/lib/api/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
-import type { ReservationDto } from "@/types/dto/reservation";
+import type { PublicReservationDto } from "@/types/dto/reservation";
 
 const COUNTDOWN_TICK_MS = 1000;
 
@@ -27,14 +27,10 @@ const checkoutFormSchema = checkoutContactFormSchema.extend({
 });
 type CheckoutFormValues = CheckoutContactFormValues & { consent: boolean };
 
-function formatSessionDateTime(iso: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone,
-  }).format(new Date(iso));
+function formatSessionDateTime(localDate: string, localTime: string): string {
+  const date = new Date(`${localDate}T00:00:00Z`);
+  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
+  return `${day}, ${localTime}`;
 }
 
 function formatRemaining(ms: number): string {
@@ -49,29 +45,40 @@ type LoadStatus = "loading" | "error" | "not-found" | "missing" | "ready";
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const reservationId = searchParams.get("reservation");
+  const reservationPublicId = searchParams.get("reservation");
 
-  const [status, setStatus] = useState<LoadStatus>(reservationId ? "loading" : "missing");
-  const [reservation, setReservation] = useState<ReservationDto | null>(null);
+  const [status, setStatus] = useState<LoadStatus>(reservationPublicId ? "loading" : "missing");
+  const [reservation, setReservation] = useState<PublicReservationDto | null>(null);
+  // clockOffsetMs = serverNow - clientNow at load time, applied to every
+  // subsequent tick so the countdown is correct even if the two clocks drift.
+  const [clockOffsetMs, setClockOffsetMs] = useState(0);
   const [now, setNow] = useState(() => Date.now());
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  // A stable idempotency key for *this* checkout attempt — regenerated only
+  // when the reservation changes, never on a retried submit of the same attempt.
+  const idempotencyKeyRef = useRef<string>(crypto.randomUUID());
+
   useEffect(() => {
-    if (!reservationId) {
+    if (!reservationPublicId) {
       setStatus("missing");
       return;
     }
     let cancelled = false;
     setStatus("loading");
-    getReservation(reservationId)
-      .then((data) => {
+    idempotencyKeyRef.current = crypto.randomUUID();
+    getPublicReservationWithMeta(reservationPublicId)
+      .then(({ data, meta }) => {
         if (cancelled) return;
         setReservation(data);
+        if (meta.serverDate) {
+          setClockOffsetMs(meta.serverDate.getTime() - Date.now());
+        }
         setStatus("ready");
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        if (error instanceof ApiClientError && error.code === "NOT_FOUND") {
+        if (error instanceof ApiClientError && error.code === "RESERVATION_NOT_FOUND") {
           setStatus("not-found");
         } else {
           setStatus("error");
@@ -80,14 +87,15 @@ function CheckoutContent() {
     return () => {
       cancelled = true;
     };
-  }, [reservationId]);
+  }, [reservationPublicId]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(Date.now()), COUNTDOWN_TICK_MS);
     return () => clearInterval(interval);
   }, []);
 
-  const msRemaining = reservation ? new Date(reservation.expiresAt).getTime() - now : 0;
+  const correctedNow = now + clockOffsetMs;
+  const msRemaining = reservation ? new Date(reservation.expiresAt).getTime() - correctedNow : 0;
   const isExpired = reservation ? reservation.status !== "PENDING" || msRemaining <= 0 : false;
 
   const form = useForm<CheckoutFormValues>({
@@ -96,16 +104,19 @@ function CheckoutContent() {
   });
 
   const onSubmit = async (values: CheckoutFormValues) => {
-    if (!reservation || isExpired) return;
+    if (!reservation || isExpired || form.formState.isSubmitting) return;
     setSubmitError(null);
     try {
-      const order = await createOrder({
-        reservationId: reservation.id,
-        customerName: values.customerName,
-        customerPhone: values.customerPhone,
-        customerEmail: values.customerEmail,
-      });
-      router.push(`/checkout/payment?order=${encodeURIComponent(order.number)}`);
+      const order = await createPublicOrder(
+        {
+          reservationPublicId: reservation.publicId,
+          customerName: values.customerName,
+          customerPhone: values.customerPhone,
+          customerEmail: values.customerEmail,
+        },
+        idempotencyKeyRef.current,
+      );
+      router.replace(`/checkout/payment?order=${encodeURIComponent(order.number)}`);
     } catch (error) {
       if (error instanceof ApiClientError) {
         setSubmitError(error.message);
@@ -114,8 +125,6 @@ function CheckoutContent() {
       }
     }
   };
-
-  const timezone = reservation?.session?.locationTimezone ?? "UTC";
 
   return (
     <PageSection tone="jungle" className="py-14">
@@ -155,24 +164,28 @@ function CheckoutContent() {
             <Card className="p-6">
               <h2 className="text-xl font-black">Ваш заказ</h2>
               <div className="mt-5 grid gap-3 text-sm">
-                {reservation.session && (
-                  <p className="flex justify-between gap-4">
-                    <span>
-                      {reservation.session.locationCity} · {reservation.session.locationName}
-                    </span>
-                  </p>
-                )}
-                {reservation.session && (
-                  <p className="flex justify-between">
-                    <span>{formatSessionDateTime(reservation.session.startsAt, timezone)}</span>
-                  </p>
-                )}
+                <p className="flex justify-between gap-4">
+                  <span>
+                    {reservation.session.city} · {reservation.session.venue}
+                  </span>
+                </p>
+                <p className="flex justify-between text-muted-foreground">
+                  <span>{reservation.session.address}</span>
+                </p>
+                <p className="flex justify-between">
+                  <span>
+                    {formatSessionDateTime(
+                      reservation.session.localDate,
+                      reservation.session.localTime,
+                    )}
+                  </span>
+                </p>
                 {reservation.items.map((item) => (
                   <p key={item.ticketTypeCode} className="flex justify-between">
                     <span>
                       {item.ticketTypeName} × {item.quantity}
                     </span>
-                    <b>{formatMoneyFromKopecks(item.subtotalAmount)}</b>
+                    <b>{formatMoneyFromKopecks(item.subtotal)}</b>
                   </p>
                 ))}
                 <p className="flex justify-between border-t pt-4 text-lg">
@@ -233,6 +246,7 @@ function CheckoutContent() {
                   <Input
                     id="checkout-phone"
                     type="tel"
+                    inputMode="tel"
                     autoComplete="tel"
                     disabled={isExpired}
                     {...form.register("customerPhone")}
@@ -250,6 +264,7 @@ function CheckoutContent() {
                   <Input
                     id="checkout-email"
                     type="email"
+                    inputMode="email"
                     autoComplete="email"
                     disabled={isExpired}
                     {...form.register("customerEmail")}
@@ -261,8 +276,8 @@ function CheckoutContent() {
                   )}
                 </div>
                 <label className="flex gap-3 text-sm text-muted-foreground md:col-span-2">
-                  <input type="checkbox" disabled={isExpired} {...form.register("consent")} />
-                  Я согласен с правилами посещения и обработкой персональных данных.
+                  <input type="checkbox" disabled={isExpired} {...form.register("consent")} />Я
+                  согласен с правилами посещения и обработкой персональных данных.
                 </label>
                 {form.formState.errors.consent && (
                   <p className="text-xs text-destructive md:col-span-2">

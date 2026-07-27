@@ -5,33 +5,37 @@ import type { ApiErrorBody, ApiSuccessBody } from "@/types/api";
 import { DomainError, type DomainErrorCode } from "@/server/domain/errors";
 
 /**
- * Well-known, stable error codes used across the public API. Keeping this as
- * a union (instead of free-form strings) keeps client-side error handling
- * exhaustive and typo-proof.
+ * Well-known, stable error codes used across the public API. Domain errors
+ * are passed through verbatim (e.g. `INSUFFICIENT_CAPACITY`,
+ * `SESSION_SOLD_OUT`) so clients can branch on the precise business reason
+ * instead of a generic bucket. A small set of generic codes covers
+ * request-validation and low-level persistence failures.
  */
 export type ApiErrorCode =
+  | DomainErrorCode
   | "VALIDATION_ERROR"
   | "NOT_FOUND"
   | "CONFLICT"
-  | "INSUFFICIENT_CAPACITY"
-  | "SESSION_UNAVAILABLE"
-  | "RESERVATION_EXPIRED"
   | "INVALID_REFERENCE"
   | "DATABASE_ERROR"
   | "INTERNAL_ERROR";
 
-/** Maps a domain-layer error code to the public API error code + HTTP status. */
-const DOMAIN_ERROR_HTTP_MAP: Record<DomainErrorCode, { code: ApiErrorCode; status: number }> = {
-  LOCATION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
-  SESSION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
-  SESSION_UNAVAILABLE: { code: "SESSION_UNAVAILABLE", status: 409 },
-  INSUFFICIENT_CAPACITY: { code: "INSUFFICIENT_CAPACITY", status: 409 },
-  TICKET_TYPE_NOT_FOUND: { code: "INVALID_REFERENCE", status: 400 },
-  PRICE_NOT_FOUND: { code: "INVALID_REFERENCE", status: 400 },
-  RESERVATION_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
-  RESERVATION_EXPIRED: { code: "RESERVATION_EXPIRED", status: 409 },
-  RESERVATION_ALREADY_CONVERTED: { code: "CONFLICT", status: 409 },
-  ORDER_NOT_FOUND: { code: "NOT_FOUND", status: 404 },
+/** Maps each domain-layer error code to its public HTTP status. */
+const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
+  CONFIG_NOT_FOUND: 404,
+  LOCATION_NOT_FOUND: 404,
+  SESSION_NOT_FOUND: 404,
+  SESSION_NOT_AVAILABLE: 409,
+  SESSION_SOLD_OUT: 409,
+  INSUFFICIENT_CAPACITY: 409,
+  INVALID_TICKET_TYPE: 422,
+  TICKET_TYPE_NOT_FOUND: 400,
+  PRICE_NOT_CONFIGURED: 409,
+  RESERVATION_NOT_FOUND: 404,
+  RESERVATION_EXPIRED: 410,
+  RESERVATION_ALREADY_CONVERTED: 409,
+  IDEMPOTENCY_CONFLICT: 409,
+  ORDER_NOT_FOUND: 404,
 };
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */
@@ -73,8 +77,7 @@ export function handleApiError(error: unknown): NextResponse<ApiErrorBody> {
   }
 
   if (error instanceof DomainError) {
-    const mapped = DOMAIN_ERROR_HTTP_MAP[error.code];
-    return apiError(mapped.code, error.message, mapped.status, error.details);
+    return apiError(error.code, error.message, DOMAIN_ERROR_STATUS[error.code], error.details);
   }
 
   if (error instanceof ZodError) {

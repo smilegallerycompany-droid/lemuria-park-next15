@@ -6,8 +6,23 @@ export const locationRepository = {
     return db.location.findFirst({ where: { slug, status: { in: ["ACTIVE", "UPCOMING"] } } });
   },
 
-  findDefaultActive(db: DbClient) {
-    return db.location.findFirst({ where: { status: "ACTIVE" }, orderBy: { activeFrom: "asc" } });
+  /**
+   * The one location the public site currently points to: status ACTIVE
+   * and — if set — the given instant falls within [activeFrom, activeTo].
+   * Supports the touring-exhibition model where locations are activated
+   * and deactivated in sequence as the show moves between cities.
+   */
+  findDefaultActive(db: DbClient, now: Date = new Date()) {
+    return db.location.findFirst({
+      where: {
+        status: "ACTIVE",
+        AND: [
+          { OR: [{ activeFrom: null }, { activeFrom: { lte: now } }] },
+          { OR: [{ activeTo: null }, { activeTo: { gte: now } }] },
+        ],
+      },
+      orderBy: { activeFrom: "asc" },
+    });
   },
 
   listPublic(db: DbClient) {

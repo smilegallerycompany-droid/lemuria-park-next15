@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeAvailability, assertCapacity } from "@/server/domain/availability.domain";
+import {
+  assertCapacity,
+  classifySessionAvailability,
+  computeAvailability,
+} from "@/server/domain/availability.domain";
+import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { DomainError } from "@/server/domain/errors";
 
 test("computeAvailability sums reserved + ordered seats against capacity", () => {
@@ -47,4 +52,30 @@ test("assertCapacity allows requesting exactly the remaining seats", () => {
     orderedQuantity: 0,
   });
   assert.doesNotThrow(() => assertCapacity(availability, 2));
+});
+
+test("assertCapacity throws SESSION_SOLD_OUT (not INSUFFICIENT_CAPACITY) when nothing is left", () => {
+  const availability = computeAvailability({
+    sessionId: "session-1",
+    capacity: 15,
+    reservedQuantity: 15,
+    orderedQuantity: 0,
+  });
+  assert.throws(
+    () => assertCapacity(availability, 1),
+    (error: unknown) => error instanceof DomainError && error.code === "SESSION_SOLD_OUT",
+  );
+});
+
+test("classifySessionAvailability maps remaining seats to a UI status", () => {
+  assert.equal(classifySessionAvailability(0), "SOLD_OUT");
+  assert.equal(classifySessionAvailability(1), "LOW_AVAILABILITY");
+  assert.equal(
+    classifySessionAvailability(DOMAIN_CONFIG.lowAvailabilityThreshold),
+    "LOW_AVAILABILITY",
+  );
+  assert.equal(
+    classifySessionAvailability(DOMAIN_CONFIG.lowAvailabilityThreshold + 1),
+    "AVAILABLE",
+  );
 });

@@ -4,10 +4,8 @@ import type { ReservationLineItemInput } from "@/server/domain/reservation.domai
 export interface CreateReservationRecordInput {
   sessionId: string;
   expiresAt: Date;
-  customerName?: string;
-  customerPhone?: string;
-  customerEmail?: string;
   idempotencyKey?: string;
+  idempotencyPayloadHash?: string;
   items: ReservationLineItemInput[];
 }
 
@@ -21,14 +19,6 @@ export const reservationRepository = {
     return db.reservation.findUnique({ where: { publicId }, include: { items: true } });
   },
 
-  /** Same as `findByPublicId` but also tells the caller whether an Order already exists for it. */
-  findByPublicIdWithOrderFlag(db: DbClient, publicId: string) {
-    return db.reservation.findUnique({
-      where: { publicId },
-      include: { items: true, order: { select: { id: true } } },
-    });
-  },
-
   /** Sum of seats currently held by active (PENDING, not yet expired) reservations for a session. */
   async aggregateReservedQuantity(db: DbClient, sessionId: string, now: Date): Promise<number> {
     const result = await db.reservationItem.aggregate({
@@ -36,6 +26,19 @@ export const reservationRepository = {
       where: { reservation: { sessionId, status: "PENDING", expiresAt: { gt: now } } },
     });
     return result._sum.quantity ?? 0;
+  },
+
+  /**
+   * Batch equivalent of `aggregateReservedQuantity`, across many sessions at
+   * once — used by the sessions-listing endpoint to avoid a per-session
+   * query (N+1).
+   */
+  findActiveForSessions(db: DbClient, sessionIds: string[], now: Date) {
+    if (sessionIds.length === 0) return Promise.resolve([]);
+    return db.reservation.findMany({
+      where: { sessionId: { in: sessionIds }, status: "PENDING", expiresAt: { gt: now } },
+      include: { items: true },
+    });
   },
 
   findStaleIds(db: DbClient, now: Date) {
@@ -55,10 +58,8 @@ export const reservationRepository = {
         sessionId: input.sessionId,
         status: "PENDING",
         expiresAt: input.expiresAt,
-        customerName: input.customerName,
-        customerPhone: input.customerPhone,
-        customerEmail: input.customerEmail,
         idempotencyKey: input.idempotencyKey,
+        idempotencyPayloadHash: input.idempotencyPayloadHash,
         items: {
           create: input.items.map((item) => ({
             ticketTypeId: item.ticketTypeId,
@@ -73,5 +74,18 @@ export const reservationRepository = {
 
   markConfirmed(db: DbClient, id: string) {
     return db.reservation.update({ where: { id }, data: { status: "CONFIRMED" } });
+  },
+
+  markExpired(db: DbClient, id: string) {
+    return db.reservation.update({
+      where: { id },
+      data: { status: "EXPIRED" },
+      include: { items: true },
+    });
+  },
+
+  /** Pessimistically locks a single Reservation row for the duration of the current transaction. */
+  async lockForUpdate(tx: DbClient, reservationId: string): Promise<void> {
+    await tx.$queryRaw`SELECT id FROM "Reservation" WHERE id = ${reservationId} FOR UPDATE`;
   },
 };

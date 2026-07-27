@@ -9,6 +9,10 @@ import { toReservationDto } from "@/server/mappers/reservation";
  * requests can never oversell the same session's capacity. Price and total
  * are always computed server-side — the client only sends ticket type
  * codes and quantities.
+ *
+ * Idempotency: pass an `Idempotency-Key` header to make retries safe. A
+ * repeated key with the same payload returns the original reservation; a
+ * repeated key with a different payload is rejected (IDEMPOTENCY_CONFLICT).
  */
 export async function POST(req: Request) {
   try {
@@ -16,7 +20,8 @@ export async function POST(req: Request) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON в теле запроса", 400);
     });
     const input = createReservationInputSchema.parse(json);
-    const reservation = await createReservation(input);
+    const idempotencyKey = req.headers.get("Idempotency-Key") ?? undefined;
+    const reservation = await createReservation(input, idempotencyKey);
     const response = await toReservationDto(reservation);
     return apiSuccess(response, 201);
   } catch (error) {

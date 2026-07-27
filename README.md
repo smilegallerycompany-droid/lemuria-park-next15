@@ -106,11 +106,14 @@ All routes under `/api/public/*` return a single, uniform JSON envelope:
   ```jsonc
   {
     "sessionId": "<id from GET /sessions>",
-    "items": [{ "ticketTypeCode": "ADULT", "quantity": 2 }, { "ticketTypeCode": "CHILD", "quantity": 1 }],
+    "items": [
+      { "ticketTypeCode": "ADULT", "quantity": 2 },
+      { "ticketTypeCode": "CHILD", "quantity": 1 },
+    ],
     "customerName": "Иван Иванов",
     "customerPhone": "+79991234567",
     "customerEmail": "ivan@example.com",
-    "idempotencyKey": "optional-client-generated-key"
+    "idempotencyKey": "optional-client-generated-key",
   }
   ```
   The hold expires after 15 minutes. Price and total are always computed server-side inside a

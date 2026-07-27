@@ -13,7 +13,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     const { number } = orderNumberParamSchema.parse(await params);
     const order = await getOrderByNumber(number);
     if (!order) {
-      return apiError("NOT_FOUND", "Заказ не найден", 404);
+      return apiError("ORDER_NOT_FOUND", "Заказ не найден", 404);
     }
     const response = await toOrderDto(order);
     return apiSuccess(response);

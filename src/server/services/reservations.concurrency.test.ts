@@ -17,9 +17,10 @@ async function isDatabaseReachable(): Promise<boolean> {
 
 /**
  * End-to-end proof of the "never oversell" business rule: a session with
- * only 2 seats left, two requests racing to buy 2 seats each — exactly one
- * must win, the other must be rejected with INSUFFICIENT_CAPACITY (which the
- * public API maps to HTTP 409 — see src/lib/api/response.test.ts).
+ * only 2 seats total, two requests racing to buy 2 seats each — exactly one
+ * must win, the other must be rejected (SESSION_SOLD_OUT once the winner has
+ * taken the last seats, which the public API maps to HTTP 409 — see
+ * src/lib/api/response.test.ts).
  *
  * Requires a real, reachable Postgres (DATABASE_URL). If none is available
  * (e.g. in a sandbox with no database), the test skips itself instead of
@@ -56,8 +57,20 @@ test("concurrent reservations never oversell a session's remaining capacity", as
 
   await prisma.priceRule.createMany({
     data: [
-      { locationId: location.id, ticketTypeId: ticketType.id, dayType: "WEEKDAY", priceAmount: 80000, validFrom: farPast },
-      { locationId: location.id, ticketTypeId: ticketType.id, dayType: "WEEKEND", priceAmount: 90000, validFrom: farPast },
+      {
+        locationId: location.id,
+        ticketTypeId: ticketType.id,
+        dayType: "WEEKDAY",
+        priceAmount: 80000,
+        validFrom: farPast,
+      },
+      {
+        locationId: location.id,
+        ticketTypeId: ticketType.id,
+        dayType: "WEEKEND",
+        priceAmount: 90000,
+        validFrom: farPast,
+      },
     ],
   });
 
@@ -68,7 +81,10 @@ test("concurrent reservations never oversell a session's remaining capacity", as
 
   try {
     const attemptToBuyTwo = () =>
-      createReservation({ sessionId: session.publicId, items: [{ ticketTypeCode: "ADULT", quantity: 2 }] });
+      createReservation({
+        sessionPublicId: session.publicId,
+        items: [{ ticketTypeCode: "ADULT", quantity: 2 }],
+      });
 
     const [first, second] = await Promise.allSettled([attemptToBuyTwo(), attemptToBuyTwo()]);
 
@@ -81,8 +97,10 @@ test("concurrent reservations never oversell a session's remaining capacity", as
 
     const rejectionReason = (rejected[0] as PromiseRejectedResult).reason;
     assert.ok(
-      rejectionReason instanceof DomainError && rejectionReason.code === "INSUFFICIENT_CAPACITY",
-      `expected a DomainError("INSUFFICIENT_CAPACITY"), got: ${String(rejectionReason)}`,
+      rejectionReason instanceof DomainError &&
+        (rejectionReason.code === "SESSION_SOLD_OUT" ||
+          rejectionReason.code === "INSUFFICIENT_CAPACITY"),
+      `expected a DomainError("SESSION_SOLD_OUT"|"INSUFFICIENT_CAPACITY"), got: ${String(rejectionReason)}`,
     );
   } finally {
     await prisma.reservationItem.deleteMany({ where: { reservation: { sessionId: session.id } } });

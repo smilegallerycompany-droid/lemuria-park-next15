@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import type { Reservation, ReservationItem, TicketType } from "@prisma/client";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import {
-  assertReservationConvertible,
+  assertReservationHoldActive,
   buildOrderLineItems,
+  computeOrderPaymentExpiry,
   computeOrderTotal,
   generateOrderNumber,
 } from "@/server/domain/order.domain";
@@ -21,6 +22,7 @@ function fakeReservation(overrides: Partial<Reservation>): Reservation {
     customerPhone: null,
     customerEmail: null,
     idempotencyKey: null,
+    idempotencyPayloadHash: null,
     createdAt: new Date("2026-07-25T11:45:00.000Z"),
     updatedAt: new Date("2026-07-25T11:45:00.000Z"),
     ...overrides,
@@ -43,46 +45,41 @@ test("generateOrderNumber is not sequential/guessable across calls", () => {
   assert.notEqual(a, b);
 });
 
-test("assertReservationConvertible rejects a missing reservation", () => {
+test("computeOrderPaymentExpiry adds the configured payment window to now", () => {
+  const expiresAt = computeOrderPaymentExpiry(NOW);
+  assert.equal(
+    expiresAt.getTime() - NOW.getTime(),
+    DOMAIN_CONFIG.orderPaymentWindowMinutes * 60 * 1000,
+  );
+});
+
+test("assertReservationHoldActive rejects a missing reservation", () => {
   assert.throws(
-    () => assertReservationConvertible(null, NOW),
+    () => assertReservationHoldActive(null, NOW),
     (error: unknown) => error instanceof DomainError && error.code === "RESERVATION_NOT_FOUND",
   );
 });
 
-test("assertReservationConvertible rejects a reservation that already has an order", () => {
+test("assertReservationHoldActive rejects an expired reservation, even if status is still PENDING", () => {
   assert.throws(
     () =>
-      assertReservationConvertible(
-        { ...fakeReservation({}), order: { id: "order-1" } },
-        NOW,
-      ),
-    (error: unknown) => error instanceof DomainError && error.code === "RESERVATION_ALREADY_CONVERTED",
-  );
-});
-
-test("assertReservationConvertible rejects an expired reservation, even if status is still PENDING", () => {
-  assert.throws(
-    () =>
-      assertReservationConvertible(
-        { ...fakeReservation({ expiresAt: new Date("2026-07-25T11:00:00.000Z") }), order: null },
+      assertReservationHoldActive(
+        fakeReservation({ expiresAt: new Date("2026-07-25T11:00:00.000Z") }),
         NOW,
       ),
     (error: unknown) => error instanceof DomainError && error.code === "RESERVATION_EXPIRED",
   );
 });
 
-test("assertReservationConvertible rejects a non-PENDING reservation", () => {
+test("assertReservationHoldActive rejects a non-PENDING reservation", () => {
   assert.throws(
-    () => assertReservationConvertible({ ...fakeReservation({ status: "CANCELLED" }), order: null }, NOW),
+    () => assertReservationHoldActive(fakeReservation({ status: "CANCELLED" }), NOW),
     (error: unknown) => error instanceof DomainError && error.code === "RESERVATION_EXPIRED",
   );
 });
 
-test("assertReservationConvertible accepts an active, unconverted PENDING reservation", () => {
-  assert.doesNotThrow(() =>
-    assertReservationConvertible({ ...fakeReservation({}), order: null }, NOW),
-  );
+test("assertReservationHoldActive accepts an active PENDING reservation", () => {
+  assert.doesNotThrow(() => assertReservationHoldActive(fakeReservation({}), NOW));
 });
 
 function fakeReservationItem(overrides: Partial<ReservationItem>): ReservationItem {
@@ -139,8 +136,20 @@ test("buildOrderLineItems throws if the reservation references an unknown ticket
 
 test("computeOrderTotal sums every line item's subtotal", () => {
   const total = computeOrderTotal([
-    { ticketTypeId: "a", ticketTypeName: "A", quantity: 2, unitPriceAmount: 80000, subtotalAmount: 160000 },
-    { ticketTypeId: "b", ticketTypeName: "B", quantity: 1, unitPriceAmount: 60000, subtotalAmount: 60000 },
+    {
+      ticketTypeId: "a",
+      ticketTypeName: "A",
+      quantity: 2,
+      unitPriceAmount: 80000,
+      subtotalAmount: 160000,
+    },
+    {
+      ticketTypeId: "b",
+      ticketTypeName: "B",
+      quantity: 1,
+      unitPriceAmount: 60000,
+      subtotalAmount: 60000,
+    },
   ]);
   assert.equal(total, 220000);
 });

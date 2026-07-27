@@ -20,22 +20,37 @@ test("computeReservationExpiry adds the configured hold duration", () => {
 
 test("isReservationExpired reflects whether `expiresAt` is in the past", () => {
   const now = new Date("2026-07-25T10:00:00.000Z");
-  assert.equal(isReservationExpired({ expiresAt: new Date("2026-07-25T09:59:59.000Z") }, now), true);
-  assert.equal(isReservationExpired({ expiresAt: new Date("2026-07-25T10:00:01.000Z") }, now), false);
+  assert.equal(
+    isReservationExpired({ expiresAt: new Date("2026-07-25T09:59:59.000Z") }, now),
+    true,
+  );
+  assert.equal(
+    isReservationExpired({ expiresAt: new Date("2026-07-25T10:00:01.000Z") }, now),
+    false,
+  );
 });
 
 test("isReservationActive requires PENDING status AND a future expiresAt", () => {
   const now = new Date("2026-07-25T10:00:00.000Z");
   assert.equal(
-    isReservationActive({ status: "PENDING", expiresAt: new Date("2026-07-25T10:05:00.000Z") }, now),
+    isReservationActive(
+      { status: "PENDING", expiresAt: new Date("2026-07-25T10:05:00.000Z") },
+      now,
+    ),
     true,
   );
   assert.equal(
-    isReservationActive({ status: "PENDING", expiresAt: new Date("2026-07-25T09:00:00.000Z") }, now),
+    isReservationActive(
+      { status: "PENDING", expiresAt: new Date("2026-07-25T09:00:00.000Z") },
+      now,
+    ),
     false,
   );
   assert.equal(
-    isReservationActive({ status: "CONFIRMED", expiresAt: new Date("2026-07-25T10:05:00.000Z") }, now),
+    isReservationActive(
+      { status: "CONFIRMED", expiresAt: new Date("2026-07-25T10:05:00.000Z") },
+      now,
+    ),
     false,
   );
 });

@@ -1,4 +1,6 @@
 import { DomainError } from "@/server/domain/errors";
+import { DOMAIN_CONFIG } from "@/server/domain/config";
+import type { PublicSessionAvailabilityStatus } from "@/types/dto/session";
 
 export interface SessionAvailability {
   sessionId: string;
@@ -30,7 +32,19 @@ export function computeAvailability(params: {
   };
 }
 
+/**
+ * Throws `SESSION_SOLD_OUT` when there is no capacity left at all, or
+ * `INSUFFICIENT_CAPACITY` when some seats remain but fewer than requested.
+ * Kept as two distinct codes because the client can react differently
+ * (sold out ⇒ hide the session; insufficient ⇒ suggest a smaller quantity).
+ */
 export function assertCapacity(availability: SessionAvailability, requestedQuantity: number): void {
+  if (availability.available <= 0) {
+    throw new DomainError("SESSION_SOLD_OUT", "На этот сеанс уже нет свободных мест", {
+      available: availability.available,
+      requested: requestedQuantity,
+    });
+  }
   if (requestedQuantity > availability.available) {
     throw new DomainError(
       "INSUFFICIENT_CAPACITY",
@@ -38,4 +52,16 @@ export function assertCapacity(availability: SessionAvailability, requestedQuant
       { available: availability.available, requested: requestedQuantity },
     );
   }
+}
+
+/**
+ * Pure UI-facing classification of remaining seats. Does not affect any
+ * capacity/overselling rule — see `DOMAIN_CONFIG.lowAvailabilityThreshold`.
+ */
+export function classifySessionAvailability(
+  remainingSeats: number,
+): PublicSessionAvailabilityStatus {
+  if (remainingSeats <= 0) return "SOLD_OUT";
+  if (remainingSeats <= DOMAIN_CONFIG.lowAvailabilityThreshold) return "LOW_AVAILABILITY";
+  return "AVAILABLE";
 }

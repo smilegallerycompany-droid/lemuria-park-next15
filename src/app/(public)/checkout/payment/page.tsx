@@ -22,13 +22,18 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   EXPIRED: "Истёк",
 };
 
-function formatSessionDateTime(iso: string, timeZone: string): string {
+function formatSessionDateTime(localDate: string, localTime: string): string {
+  const date = new Date(`${localDate}T00:00:00Z`);
+  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
+  return `${day}, ${localTime}`;
+}
+
+function formatDeadline(iso: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
-    timeZone,
   }).format(new Date(iso));
 }
 
@@ -50,7 +55,14 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
   }
 
   const dto = await toOrderDto(order);
-  const timezone = dto.session?.locationTimezone ?? "UTC";
+
+  // A real payment integration lands in the next stage — until then, PAID
+  // is the only status that should ever route to the success screen.
+  if (dto.status === "PAID") {
+    redirect(`/success?order=${encodeURIComponent(dto.number)}`);
+  }
+
+  const isExpired = dto.status === "EXPIRED" || dto.status === "CANCELLED";
 
   return (
     <PageSection tone="jungle" className="py-14">
@@ -63,24 +75,23 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
           </p>
 
           <div className="mt-5 grid gap-3 text-sm">
-            {dto.session && (
-              <p className="flex justify-between gap-4">
-                <span>
-                  {dto.session.locationCity} · {dto.session.locationName}
-                </span>
-              </p>
-            )}
-            {dto.session && (
-              <p className="flex justify-between">
-                <span>{formatSessionDateTime(dto.session.startsAt, timezone)}</span>
-              </p>
-            )}
+            <p className="flex justify-between gap-4">
+              <span>
+                {dto.session.city} · {dto.session.venue}
+              </span>
+            </p>
+            <p className="flex justify-between text-muted-foreground">
+              <span>{dto.session.address}</span>
+            </p>
+            <p className="flex justify-between">
+              <span>{formatSessionDateTime(dto.session.localDate, dto.session.localTime)}</span>
+            </p>
             {dto.items.map((item) => (
               <p key={item.ticketTypeCode} className="flex justify-between">
                 <span>
                   {item.ticketTypeName} × {item.quantity}
                 </span>
-                <b>{formatMoneyFromKopecks(item.subtotalAmount)}</b>
+                <b>{formatMoneyFromKopecks(item.subtotal)}</b>
               </p>
             ))}
             <p className="flex justify-between border-t pt-4 text-lg">
@@ -89,10 +100,27 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
             </p>
           </div>
 
-          <Body className="mt-5 text-muted-foreground">
-            Приём онлайн-оплаты подключается на следующем этапе. Мы свяжемся с вами по номеру{" "}
-            {dto.customer.phone}, как только оплата станет доступна.
-          </Body>
+          {isExpired ? (
+            <div className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              Время ожидания оплаты по этому заказу истекло. Оформите бронирование заново.
+            </div>
+          ) : (
+            <>
+              <div
+                className="mt-5 rounded-xl border p-3 text-sm text-muted-foreground"
+                role="status"
+              >
+                Заказ создан, места временно зафиксированы. Онлайн-оплата будет подключена на
+                следующем этапе.
+                {dto.paymentExpiresAt && (
+                  <> Дождитесь оплаты до {formatDeadline(dto.paymentExpiresAt)}.</>
+                )}
+              </div>
+              <Body className="mt-5 text-muted-foreground">
+                Мы свяжемся с вами по номеру {dto.maskedPhone}, как только оплата станет доступна.
+              </Body>
+            </>
+          )}
         </Card>
 
         <Button asChild variant="outline" className="mt-5">

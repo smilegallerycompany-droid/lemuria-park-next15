@@ -1,24 +1,29 @@
 import { z } from "zod";
+import { DOMAIN_CONFIG } from "@/server/domain/config";
 
-export const reservationItemInputSchema = z.object({
-  ticketTypeCode: z.string().trim().min(1, "ticketTypeCode обязателен"),
-  quantity: z.number().int().min(0).max(50),
-});
+export const reservationItemInputSchema = z
+  .object({
+    ticketTypeCode: z.string().trim().min(1, "ticketTypeCode обязателен"),
+    quantity: z.number().int().min(0).max(DOMAIN_CONFIG.maxQuantityPerLineItem),
+  })
+  .strict();
 
+/**
+ * Deliberately accepts *only* what the customer chose. Price, subtotal,
+ * total, remainingSeats, startsAt, ticket names, status and expiresAt are
+ * always server-computed — `.strict()` rejects any of those if a client
+ * tries to send them.
+ */
 export const createReservationInputSchema = z
   .object({
     /** The public `id` of a session, as returned by GET /api/public/sessions. */
-    sessionId: z.string().trim().min(1, "sessionId обязателен"),
+    sessionPublicId: z.string().trim().min(1, "sessionPublicId обязателен"),
     items: z
       .array(reservationItemInputSchema)
       .min(1, "Нужно указать хотя бы один тип билета")
-      .max(20),
-    customerName: z.string().trim().min(2).max(120).optional(),
-    customerPhone: z.string().trim().min(5).max(32).optional(),
-    customerEmail: z.string().trim().email().optional(),
-    /** Optional client-supplied idempotency key — safe to retry the same request. */
-    idempotencyKey: z.string().trim().min(8).max(128).optional(),
+      .max(DOMAIN_CONFIG.maxReservationLineItems),
   })
+  .strict()
   .refine((value) => value.items.some((item) => item.quantity > 0), {
     message: "Суммарное количество билетов должно быть больше нуля",
     path: ["items"],
@@ -36,6 +41,6 @@ export const sessionsQuerySchema = z.object({
 
 export type SessionsQuery = z.infer<typeof sessionsQuerySchema>;
 
-export const reservationIdParamSchema = z.object({
-  id: z.string().trim().min(1),
+export const reservationPublicIdParamSchema = z.object({
+  publicId: z.string().trim().min(1),
 });

@@ -1,13 +1,18 @@
 import { prisma } from "@/lib/db/prisma";
-import type { OrderDto, OrderLineItemDto } from "@/types/dto/order";
+import { formatDateInTimezone, formatTimeInTimezone } from "@/lib/datetime";
+import { maskEmail, maskPhone } from "@/lib/privacy";
+import { DomainError } from "@/server/domain/errors";
+import type { PublicOrderDto, PublicOrderItemDto } from "@/types/dto/order";
 import type { OrderWithItems } from "@/server/services/orders";
 
-/** Maps an internal order row into the public-safe `OrderDto`. */
-export async function toOrderDto(order: OrderWithItems): Promise<OrderDto> {
+/** Maps an internal order row into the public-safe `PublicOrderDto`. */
+export async function toOrderDto(order: OrderWithItems): Promise<PublicOrderDto> {
   const [session, ticketTypes] = await Promise.all([
     prisma.session.findUnique({
       where: { id: order.sessionId },
-      include: { location: { select: { name: true, city: true, slug: true, timezone: true } } },
+      include: {
+        location: { select: { name: true, city: true, address: true, timezone: true, slug: true } },
+      },
     }),
     prisma.ticketType.findMany({
       where: { id: { in: order.items.map((item) => item.ticketTypeId) } },
@@ -15,37 +20,45 @@ export async function toOrderDto(order: OrderWithItems): Promise<OrderDto> {
     }),
   ]);
 
-  const codeByTicketTypeId = new Map(ticketTypes.map((ticketType) => [ticketType.id, ticketType.code]));
+  if (!session) {
+    throw new DomainError("SESSION_NOT_FOUND", "Сеанс, связанный с заказом, не найден");
+  }
 
-  const items: OrderLineItemDto[] = order.items.map((item) => ({
+  const codeByTicketTypeId = new Map(
+    ticketTypes.map((ticketType) => [ticketType.id, ticketType.code]),
+  );
+
+  const items: PublicOrderItemDto[] = order.items.map((item) => ({
     ticketTypeCode: codeByTicketTypeId.get(item.ticketTypeId) ?? "UNKNOWN",
     ticketTypeName: item.ticketTypeName,
     quantity: item.quantity,
-    unitPriceAmount: item.unitPriceAmount,
-    subtotalAmount: item.subtotalAmount,
+    unitPrice: item.unitPriceAmount,
+    subtotal: item.subtotalAmount,
   }));
+
+  // No payment provider integration yet — always null (never a fake "paid"/"pending" value).
+  const paymentStatus: string | null = null;
 
   return {
     number: order.number,
     status: order.status,
-    source: order.source,
+    paymentStatus,
+    customerName: order.customerName,
+    maskedPhone: maskPhone(order.customerPhone),
+    maskedEmail: maskEmail(order.customerEmail),
+    totalAmount: order.totalAmount,
     createdAt: order.createdAt.toISOString(),
-    session: session
-      ? {
-          startsAt: session.startsAt.toISOString(),
-          locationName: session.location.name,
-          locationCity: session.location.city,
-          locationSlug: session.location.slug,
-          locationTimezone: session.location.timezone,
-        }
-      : null,
-    customer: {
-      name: order.customerName,
-      phone: order.customerPhone,
-      email: order.customerEmail,
+    paymentExpiresAt: order.paymentExpiresAt?.toISOString() ?? null,
+    session: {
+      publicId: session.publicId,
+      startsAt: session.startsAt.toISOString(),
+      localDate: formatDateInTimezone(session.startsAt, session.location.timezone),
+      localTime: formatTimeInTimezone(session.startsAt, session.location.timezone),
+      city: session.location.city,
+      venue: session.location.name,
+      address: session.location.address,
+      timezone: session.location.timezone,
     },
     items,
-    totalAmount: order.totalAmount,
-    currency: order.currency,
   };
 }

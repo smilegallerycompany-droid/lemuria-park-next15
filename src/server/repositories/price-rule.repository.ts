@@ -23,4 +23,25 @@ export const priceRuleRepository = {
       },
     });
   },
+
+  /**
+   * Fetches the *entire* active rule set for a location + a set of ticket
+   * types in one query (no date/day-type filter — those are applied in
+   * memory via `PricingDomain.filterActiveRuleCandidates`). The active rule
+   * set per location is always small, so this comfortably replaces one
+   * query per session when listing many sessions at once.
+   */
+  findActiveForLocationAndTicketTypes(
+    db: DbClient,
+    params: { locationId: string; ticketTypeIds: string[] },
+  ) {
+    if (params.ticketTypeIds.length === 0) return Promise.resolve([]);
+    return db.priceRule.findMany({
+      where: {
+        locationId: params.locationId,
+        ticketTypeId: { in: params.ticketTypeIds },
+        isActive: true,
+      },
+    });
+  },
 };

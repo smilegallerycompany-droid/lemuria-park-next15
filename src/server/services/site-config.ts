@@ -1,28 +1,69 @@
 import { prisma } from "@/lib/db/prisma";
+import { addDaysUtc, formatDateInTimezone, todayInTimezone } from "@/lib/datetime";
+import { DOMAIN_CONFIG } from "@/server/domain/config";
+import { DomainError } from "@/server/domain/errors";
 import { locationRepository } from "@/server/repositories/location.repository";
 import { ticketTypeRepository } from "@/server/repositories/ticket-type.repository";
-import type { SiteConfigDto } from "@/types/dto/config";
+import type { PublicConfigDto } from "@/types/dto/config";
 
 /**
- * SiteConfigService — assembles the public site configuration (brand
- * strings, contact info, active/upcoming locations, active ticket types),
- * entirely from the database. Never includes `visitDurationMinutes`.
+ * SiteConfigService — assembles the public site configuration (the single
+ * currently-active Location, brand strings, contact info, active ticket
+ * types) entirely from the database. Never includes `visitDurationMinutes`,
+ * internal ids, or a single "eternal" price — ticket-type prices vary by
+ * date, so the client asks GET /api/public/sessions for those.
  */
-export async function getPublicSiteConfig(): Promise<SiteConfigDto> {
-  const [settings, contact, locations, ticketTypes] = await Promise.all([
-    prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } }),
+export async function getPublicSiteConfig(): Promise<PublicConfigDto> {
+  const now = new Date();
+  const location = await locationRepository.findDefaultActive(prisma, now);
+
+  if (!location) {
+    throw new DomainError("CONFIG_NOT_FOUND", "Активная локация не найдена");
+  }
+
+  const [contact, ticketTypes] = await Promise.all([
     prisma.contactSettings.findFirst({ orderBy: { createdAt: "asc" } }),
-    locationRepository.listPublic(prisma),
     ticketTypeRepository.listActive(prisma),
   ]);
 
+  const settings = await prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } });
+
+  const todayLocal = todayInTimezone(location.timezone, now);
+  const lookaheadEnd = formatDateInTimezone(
+    addDaysUtc(now, DOMAIN_CONFIG.sessionsLookaheadDays),
+    location.timezone,
+  );
+  const activeToLocal = location.activeTo
+    ? formatDateInTimezone(location.activeTo, location.timezone)
+    : null;
+
   return {
+    location: {
+      slug: location.slug,
+      city: location.city,
+      venue: location.name,
+      address: location.address,
+      timezone: location.timezone,
+    },
+    availableDateRange: {
+      from: todayLocal,
+      to: activeToLocal && activeToLocal < lookaheadEnd ? activeToLocal : lookaheadEnd,
+    },
+    ticketTypes: ticketTypes.map((ticketType) => ({
+      code: ticketType.code,
+      name: ticketType.name,
+      description: ticketType.description,
+      minAge: ticketType.minAge,
+      maxAge: ticketType.maxAge,
+    })),
+    displayRules: {
+      sessionIntervalMinutes: location.sessionIntervalMinutes,
+      lowAvailabilityThreshold: DOMAIN_CONFIG.lowAvailabilityThreshold,
+    },
     site: {
       name: settings?.siteName ?? "Лемурия Парк",
       subtitle: settings?.siteSubtitle ?? "Зоотеатр лемуров",
       ctaLabel: settings?.ctaLabel ?? "Купить билет",
-      sessionIntervalMinutes: settings?.defaultSessionInterval ?? 30,
-      capacity: settings?.defaultCapacity ?? 15,
     },
     contact: contact
       ? {
@@ -32,25 +73,5 @@ export async function getPublicSiteConfig(): Promise<SiteConfigDto> {
           supportHours: contact.supportHours,
         }
       : null,
-    locations: locations.map((location) => ({
-      slug: location.slug,
-      name: location.name,
-      city: location.city,
-      address: location.address,
-      status: location.status,
-      phone: location.phone,
-      mapUrl: location.mapUrl,
-      sessionIntervalMinutes: location.sessionIntervalMinutes,
-      defaultCapacity: location.defaultCapacity,
-      activeFrom: location.activeFrom?.toISOString() ?? null,
-      activeTo: location.activeTo?.toISOString() ?? null,
-    })),
-    ticketTypes: ticketTypes.map((ticketType) => ({
-      code: ticketType.code,
-      name: ticketType.name,
-      description: ticketType.description,
-      minAge: ticketType.minAge,
-      maxAge: ticketType.maxAge,
-    })),
   };
 }

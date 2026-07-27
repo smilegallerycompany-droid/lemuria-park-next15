@@ -4,6 +4,7 @@ import type { PriceRule, TicketType } from "@prisma/client";
 import {
   assertTicketTypeActive,
   buildResolvedPrice,
+  filterActiveRuleCandidates,
   pickActivePriceRule,
   resolveDayType,
 } from "@/server/domain/pricing.domain";
@@ -54,8 +55,16 @@ test("pickActivePriceRule returns null when there are no candidates", () => {
 });
 
 test("pickActivePriceRule picks the most recently started rule among overlapping candidates", () => {
-  const older = fakePriceRule({ id: "old", validFrom: new Date("2026-01-01T00:00:00.000Z"), priceAmount: 70000 });
-  const newer = fakePriceRule({ id: "new", validFrom: new Date("2026-06-01T00:00:00.000Z"), priceAmount: 80000 });
+  const older = fakePriceRule({
+    id: "old",
+    validFrom: new Date("2026-01-01T00:00:00.000Z"),
+    priceAmount: 70000,
+  });
+  const newer = fakePriceRule({
+    id: "new",
+    validFrom: new Date("2026-06-01T00:00:00.000Z"),
+    priceAmount: 80000,
+  });
   const picked = pickActivePriceRule([older, newer]);
   assert.equal(picked?.id, "new");
   assert.equal(picked?.priceAmount, 80000);
@@ -72,10 +81,34 @@ test("assertTicketTypeActive rejects a missing or inactive ticket type", () => {
   );
 });
 
-test("buildResolvedPrice throws PRICE_NOT_FOUND when no rule applies", () => {
+test("buildResolvedPrice throws PRICE_NOT_CONFIGURED when no rule applies", () => {
   assert.throws(
     () => buildResolvedPrice(fakeTicketType({}), null),
-    (error: unknown) => error instanceof DomainError && error.code === "PRICE_NOT_FOUND",
+    (error: unknown) => error instanceof DomainError && error.code === "PRICE_NOT_CONFIGURED",
+  );
+});
+
+test("filterActiveRuleCandidates keeps only rules matching ticket type, day type and date window", () => {
+  const rules = [
+    fakePriceRule({ id: "weekday-adult", ticketTypeId: "ticket-type-1", dayType: "WEEKDAY" }),
+    fakePriceRule({ id: "weekend-adult", ticketTypeId: "ticket-type-1", dayType: "WEEKEND" }),
+    fakePriceRule({ id: "weekday-child", ticketTypeId: "ticket-type-2", dayType: "WEEKDAY" }),
+    fakePriceRule({
+      id: "expired-weekday-adult",
+      ticketTypeId: "ticket-type-1",
+      dayType: "WEEKDAY",
+      validFrom: new Date("2020-01-01T00:00:00.000Z"),
+      validTo: new Date("2020-12-31T00:00:00.000Z"),
+    }),
+  ];
+  const matched = filterActiveRuleCandidates(rules, {
+    ticketTypeId: "ticket-type-1",
+    dayType: "WEEKDAY",
+    atDate: new Date("2026-07-27T09:00:00.000Z"),
+  });
+  assert.deepEqual(
+    matched.map((rule) => rule.id),
+    ["weekday-adult"],
   );
 });
 

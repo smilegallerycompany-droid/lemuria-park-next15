@@ -1,8 +1,14 @@
-import { apiGet, apiPost, type RequestOptions } from "@/lib/api/client";
-import type { SiteConfigDto } from "@/types/dto/config";
-import type { SessionsResponseDto } from "@/types/dto/session";
-import type { ReservationDto } from "@/types/dto/reservation";
-import type { OrderDto } from "@/types/dto/order";
+import {
+  apiGet,
+  apiGetWithMeta,
+  apiPost,
+  type RequestOptions,
+  type ResponseMeta,
+} from "@/lib/api/client";
+import type { PublicConfigDto } from "@/types/dto/config";
+import type { PublicSessionsResponseDto } from "@/types/dto/session";
+import type { PublicReservationDto } from "@/types/dto/reservation";
+import type { PublicOrderDto } from "@/types/dto/order";
 
 /**
  * Single typed client for `/api/public/*`. Components must go through
@@ -10,69 +16,93 @@ import type { OrderDto } from "@/types/dto/order";
  * only the DTO types below — never a Prisma model.
  */
 
-export function getPublicConfig(options?: RequestOptions): Promise<SiteConfigDto> {
-  return apiGet<SiteConfigDto>("/api/public/config", options);
+export function getPublicConfig(options?: RequestOptions): Promise<PublicConfigDto> {
+  return apiGet<PublicConfigDto>("/api/public/config", options);
 }
 
 export interface GetPublicSessionsParams {
   locationSlug?: string;
+  /** `YYYY-MM-DD`, interpreted in the active location's own timezone. */
   date?: string;
 }
 
 export function getPublicSessions(
   params: GetPublicSessionsParams = {},
   options?: RequestOptions,
-): Promise<SessionsResponseDto> {
+): Promise<PublicSessionsResponseDto> {
   const search = new URLSearchParams();
   if (params.locationSlug) search.set("locationSlug", params.locationSlug);
   if (params.date) search.set("date", params.date);
   const query = search.toString();
-  return apiGet<SessionsResponseDto>(
+  return apiGet<PublicSessionsResponseDto>(
     `/api/public/sessions${query ? `?${query}` : ""}`,
     options,
   );
 }
 
-export interface CreateReservationItemPayload {
+export interface CreatePublicReservationItemInput {
   ticketTypeCode: string;
   quantity: number;
 }
 
-export interface CreateReservationPayload {
-  sessionId: string;
-  items: CreateReservationItemPayload[];
-  customerName?: string;
-  customerPhone?: string;
-  customerEmail?: string;
-  idempotencyKey?: string;
+export interface CreatePublicReservationInput {
+  sessionPublicId: string;
+  items: CreatePublicReservationItemInput[];
 }
 
-export function createReservation(
-  payload: CreateReservationPayload,
+/** Pass `idempotencyKey` so a retried submit never creates a second reservation. */
+export function createPublicReservation(
+  input: CreatePublicReservationInput,
+  idempotencyKey: string,
+  options?: Omit<RequestOptions, "idempotencyKey">,
+): Promise<PublicReservationDto> {
+  return apiPost<PublicReservationDto>("/api/public/reservations", input, {
+    ...options,
+    idempotencyKey,
+  });
+}
+
+export function getPublicReservation(
+  publicId: string,
   options?: RequestOptions,
-): Promise<ReservationDto> {
-  return apiPost<ReservationDto>("/api/public/reservations", payload, options);
+): Promise<PublicReservationDto> {
+  return apiGet<PublicReservationDto>(
+    `/api/public/reservations/${encodeURIComponent(publicId)}`,
+    options,
+  );
 }
 
-export function getReservation(id: string, options?: RequestOptions): Promise<ReservationDto> {
-  return apiGet<ReservationDto>(`/api/public/reservations/${encodeURIComponent(id)}`, options);
+/**
+ * Same as `getPublicReservation`, but also returns the server's own clock
+ * (from the response `Date` header) — used to correct the checkout
+ * countdown timer for drift between the client's and server's clocks.
+ */
+export function getPublicReservationWithMeta(
+  publicId: string,
+  options?: RequestOptions,
+): Promise<{ data: PublicReservationDto; meta: ResponseMeta }> {
+  return apiGetWithMeta<PublicReservationDto>(
+    `/api/public/reservations/${encodeURIComponent(publicId)}`,
+    options,
+  );
 }
 
-export interface CreateOrderPayload {
-  reservationId: string;
+export interface CreatePublicOrderInput {
+  reservationPublicId: string;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
-  idempotencyKey?: string;
 }
 
-export function createOrder(
-  payload: CreateOrderPayload,
-  options?: RequestOptions,
-): Promise<OrderDto> {
-  return apiPost<OrderDto>("/api/public/orders", payload, options);
+/** Pass `idempotencyKey` so a retried submit never creates a second order. */
+export function createPublicOrder(
+  input: CreatePublicOrderInput,
+  idempotencyKey: string,
+  options?: Omit<RequestOptions, "idempotencyKey">,
+): Promise<PublicOrderDto> {
+  return apiPost<PublicOrderDto>("/api/public/orders", input, { ...options, idempotencyKey });
 }
 
-export function getOrder(number: string, options?: RequestOptions): Promise<OrderDto> {
-  return apiGet<OrderDto>(`/api/public/orders/${encodeURIComponent(number)}`, options);
+export function getPublicOrder(number: string, options?: RequestOptions): Promise<PublicOrderDto> {
+  return apiGet<PublicOrderDto>(`/api/public/orders/${encodeURIComponent(number)}`, options);
 }

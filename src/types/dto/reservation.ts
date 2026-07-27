@@ -1,36 +1,34 @@
 /** Public DTOs for the reservation endpoints. Never a Prisma model — safe to use in React. */
 
-export interface ReservationSessionDto {
+export interface PublicReservationSessionDto {
+  publicId: string;
   startsAt: string;
-  locationName: string;
-  locationCity: string;
-  locationSlug: string;
-  locationTimezone: string;
+  localDate: string;
+  localTime: string;
+  city: string;
+  venue: string;
+  address: string;
+  timezone: string;
 }
 
-export interface ReservationLineItemDto {
+export interface PublicReservationItemDto {
   ticketTypeCode: string;
   ticketTypeName: string;
   quantity: number;
-  unitPriceAmount: number;
-  subtotalAmount: number;
+  /** Kopecks. */
+  unitPrice: number;
+  /** Kopecks — `quantity * unitPrice`. */
+  subtotal: number;
 }
 
-export interface ReservationCustomerDto {
-  name: string | null;
-  phone: string | null;
-  email: string | null;
-}
-
-export interface ReservationDto {
+export interface PublicReservationDto {
   /** The reservation's public id (never the internal database id). */
-  id: string;
+  publicId: string;
   status: string;
   expiresAt: string;
-  createdAt: string;
-  session: ReservationSessionDto | null;
-  customer: ReservationCustomerDto;
-  items: ReservationLineItemDto[];
+  session: PublicReservationSessionDto;
+  items: PublicReservationItemDto[];
+  totalQuantity: number;
+  /** Kopecks. */
   totalAmount: number;
-  currency: string;
 }

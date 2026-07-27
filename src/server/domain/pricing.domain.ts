@@ -34,6 +34,26 @@ export function pickActivePriceRule(candidates: PriceRule[]): PriceRule | null {
   );
 }
 
+/**
+ * In-memory equivalent of the repository's `findActiveCandidates` filter.
+ * Lets a caller fetch the *entire* (small) active rule set for a
+ * location+ticket-types once, then filter/pick per session in JS —
+ * avoiding one DB round trip per session when listing many sessions.
+ */
+export function filterActiveRuleCandidates(
+  rules: PriceRule[],
+  params: { ticketTypeId: string; dayType: PriceDayType; atDate: Date },
+): PriceRule[] {
+  return rules.filter(
+    (rule) =>
+      rule.ticketTypeId === params.ticketTypeId &&
+      rule.dayType === params.dayType &&
+      rule.isActive &&
+      rule.validFrom.getTime() <= params.atDate.getTime() &&
+      (rule.validTo === null || rule.validTo.getTime() >= params.atDate.getTime()),
+  );
+}
+
 export function assertTicketTypeActive(
   ticketType: TicketType | null,
   code: string,
@@ -46,7 +66,7 @@ export function assertTicketTypeActive(
 export function buildResolvedPrice(ticketType: TicketType, rule: PriceRule | null): ResolvedPrice {
   if (!rule) {
     throw new DomainError(
-      "PRICE_NOT_FOUND",
+      "PRICE_NOT_CONFIGURED",
       `Не найдена активная цена для типа билета «${ticketType.name}»`,
       { ticketTypeCode: ticketType.code },
     );

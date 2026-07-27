@@ -33,3 +33,23 @@ export function formatDateInTimezone(date: Date, timeZone: string): string {
     day: "2-digit",
   }).format(date);
 }
+
+/** Formats an instant as a 24h `HH:MM` clock time in the given IANA timezone. */
+export function formatTimeInTimezone(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(date);
+}
+
+/** `YYYY-MM-DD` for "now" in the given IANA timezone — used to default date-scoped queries. */
+export function todayInTimezone(timeZone: string, now: Date = new Date()): string {
+  return formatDateInTimezone(now, timeZone);
+}
+
+/** Adds N calendar days (as UTC-anchored 24h steps) to an instant. Used for coarse date-range math only. */
+export function addDaysUtc(date: Date, days: number): Date {
+  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
+}

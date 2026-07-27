@@ -1,36 +1,40 @@
 /** Public DTOs for the order endpoints. Never a Prisma model — safe to use in React. */
 
-export interface OrderSessionDto {
+export interface PublicOrderSessionDto {
+  publicId: string;
   startsAt: string;
-  locationName: string;
-  locationCity: string;
-  locationSlug: string;
-  locationTimezone: string;
+  localDate: string;
+  localTime: string;
+  city: string;
+  venue: string;
+  address: string;
+  timezone: string;
 }
 
-export interface OrderLineItemDto {
+export interface PublicOrderItemDto {
   ticketTypeCode: string;
   ticketTypeName: string;
   quantity: number;
-  unitPriceAmount: number;
-  subtotalAmount: number;
+  /** Kopecks. */
+  unitPrice: number;
+  /** Kopecks — `quantity * unitPrice`. */
+  subtotal: number;
 }
 
-export interface OrderCustomerDto {
-  name: string;
-  phone: string;
-  email: string;
-}
-
-export interface OrderDto {
-  /** Safe, human-friendly, non-guessable identifier (never the internal database id). */
+export interface PublicOrderDto {
+  /** Safe, non-guessable, human-friendly identifier (never the internal database id). */
   number: string;
   status: string;
-  source: string;
-  createdAt: string;
-  session: OrderSessionDto | null;
-  customer: OrderCustomerDto;
-  items: OrderLineItemDto[];
+  /** Null until a real payment provider integration exists (no fake payments). */
+  paymentStatus: string | null;
+  customerName: string;
+  maskedPhone: string;
+  maskedEmail: string;
+  /** Kopecks. */
   totalAmount: number;
-  currency: string;
+  createdAt: string;
+  /** Deadline to complete payment before the order is auto-released. Null once resolved (paid/cancelled). */
+  paymentExpiresAt: string | null;
+  session: PublicOrderSessionDto;
+  items: PublicOrderItemDto[];
 }

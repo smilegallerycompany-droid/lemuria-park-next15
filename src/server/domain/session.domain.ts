@@ -7,7 +7,10 @@ import { DomainError } from "@/server/domain/errors";
  * decisions or throws a `DomainError`.
  */
 
-export function isSessionBookable(session: Pick<Session, "status" | "startsAt">, now: Date): boolean {
+export function isSessionBookable(
+  session: Pick<Session, "status" | "startsAt">,
+  now: Date,
+): boolean {
   if (session.status !== "SCHEDULED" && session.status !== "OPEN") {
     return false;
   }
@@ -27,6 +30,6 @@ export function assertSessionBookable<T extends Pick<Session, "status" | "starts
     throw new DomainError("SESSION_NOT_FOUND", "Сеанс не найден");
   }
   if (!isSessionBookable(session, now)) {
-    throw new DomainError("SESSION_UNAVAILABLE", "Сеанс недоступен для бронирования");
+    throw new DomainError("SESSION_NOT_AVAILABLE", "Сеанс недоступен для бронирования");
   }
 }
