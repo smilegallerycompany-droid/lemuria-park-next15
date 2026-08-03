@@ -15,7 +15,12 @@ const WEEKDAY_MAP: Record<string, DayOfWeek> = {
  * using the platform `Intl` API — no extra date/timezone library needed.
  */
 export function dayOfWeekInTimezone(date: Date, timeZone: string): DayOfWeek {
-  const weekday = new Intl.DateTimeFormat("en-US", { timeZone, weekday: "long" }).format(date);
+  // Explicit `timeZone: timeZone` — avoids a SWC minify bug where object
+  // shorthand `{ timeZone }` can be left as a free identifier after rename.
+  const weekday = new Intl.DateTimeFormat("en-US", {
+    timeZone: timeZone,
+    weekday: "long",
+  }).format(date);
   return WEEKDAY_MAP[weekday] ?? "MONDAY";
 }
 
@@ -27,7 +32,7 @@ export function isWeekendInTimezone(date: Date, timeZone: string): boolean {
 /** Formats an instant as a `YYYY-MM-DD` calendar date in the given IANA timezone. */
 export function formatDateInTimezone(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("en-CA", {
-    timeZone,
+    timeZone: timeZone,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -37,7 +42,7 @@ export function formatDateInTimezone(date: Date, timeZone: string): string {
 /** Formats an instant as a 24h `HH:MM` clock time in the given IANA timezone. */
 export function formatTimeInTimezone(date: Date, timeZone: string): string {
   return new Intl.DateTimeFormat("ru-RU", {
-    timeZone,
+    timeZone: timeZone,
     hour: "2-digit",
     minute: "2-digit",
     hourCycle: "h23",
