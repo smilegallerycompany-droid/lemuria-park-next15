@@ -1,11 +1,5 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { H1, Body } from "@/components/ui/typography";
-import { PageSection } from "@/components/layout/page-section";
-import { Container } from "@/components/layout/container";
-import { PaymentWaitingVisual } from "@/components/checkout/payment-waiting-visual";
 import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
 import { formatMoneyFromKopecks } from "@/lib/utils";
@@ -14,36 +8,16 @@ interface PaymentPageProps {
   searchParams: Promise<{ order?: string }>;
 }
 
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  DRAFT: "Черновик",
-  AWAITING_PAYMENT: "Ожидает оплаты",
-  PAID: "Оплачен",
-  CANCELLED: "Отменён",
-  REFUNDED: "Возвращён",
-  EXPIRED: "Истёк",
-};
-
-function formatSessionDateTime(localDate: string, localTime: string): string {
-  const date = new Date(`${localDate}T00:00:00Z`);
-  const day = new Intl.DateTimeFormat("ru-RU", { day: "numeric", month: "long" }).format(date);
-  return `${day}, ${localTime}`;
-}
-
-function formatDeadline(iso: string): string {
-  return new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(iso));
-}
-
+/**
+ * Honest payment-waiting state — production order status, awwwards visual.
+ * No fake success while YooKassa is not connected.
+ */
 export default async function CheckoutPaymentPage({ searchParams }: PaymentPageProps) {
   const { order: orderNumber } = await searchParams;
-  if (!orderNumber) redirect("/tickets");
+  if (!orderNumber) redirect("/#booking");
 
   const order = await getOrderByNumber(orderNumber);
-  if (!order) redirect("/tickets");
+  if (!order) redirect("/#booking");
 
   const dto = await toOrderDto(order);
   if (dto.status === "PAID") redirect(`/success?order=${encodeURIComponent(dto.number)}`);
@@ -51,60 +25,70 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
   const isExpired = dto.status === "EXPIRED" || dto.status === "CANCELLED";
 
   return (
-    <PageSection tone="jungle" className="py-10 md:py-14">
-      <Container className="max-w-2xl">
-        <H1 className="font-display text-4xl font-semibold">Ожидание оплаты</H1>
-        <Card variant="glass" className="mt-8 overflow-hidden p-6 md:p-8">
-          <PaymentWaitingVisual />
+    <main className="page-shell">
+      <div className="container">
+        <Link href="/">← На главную</Link>
+        <h1 className="page-title">Ожидание оплаты</h1>
 
-          <p className="mt-6 text-sm text-muted-foreground">Заказ № {dto.number}</p>
-          <p className="mt-1 font-display text-3xl font-semibold text-forest">
-            {ORDER_STATUS_LABELS[dto.status] ?? dto.status}
-          </p>
-
-          <div className="mt-6 grid gap-3 text-sm">
-            <p className="font-extrabold text-forest">
-              {dto.session.city} · {dto.session.venue}
-            </p>
-            <p className="text-muted-foreground">{dto.session.address}</p>
-            <p>{formatSessionDateTime(dto.session.localDate, dto.session.localTime)}</p>
-            <div className="my-1 h-px bg-beige" />
-            {dto.items.map((item) => (
-              <p key={item.ticketTypeCode} className="flex justify-between">
-                <span>
-                  {item.ticketTypeName} × {item.quantity}
-                </span>
-                <b>{formatMoneyFromKopecks(item.subtotal)}</b>
-              </p>
-            ))}
-            <p className="flex justify-between border-t border-beige pt-4 text-lg">
-              <b>Итого</b>
-              <b className="font-display text-2xl">{formatMoneyFromKopecks(dto.totalAmount)}</b>
+        <section className="success-card">
+          <div className="success-top">
+            <div className="success-badge" style={{ background: "var(--orange)", fontSize: 28 }}>
+              …
+            </div>
+            <h1 style={{ margin: 0, fontSize: 42, letterSpacing: "-.055em" }}>
+              {isExpired ? "Оплата недоступна" : "Заказ ожидает оплаты"}
+            </h1>
+            <p style={{ color: "var(--muted)", maxWidth: 560, margin: "12px auto 0" }}>
+              {isExpired
+                ? "Время ожидания оплаты истекло или заказ отменён. Оформите бронирование заново."
+                : "ЮKassa ещё не подключена. Мы не показываем фальшивую успешную оплату. После webhook заказ станет PAID и откроется билет."}
             </p>
           </div>
 
-          {isExpired ? (
-            <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-              Время ожидания оплаты истекло. Оформите бронирование заново.
+          <div className="ticket">
+            <div className="ticket-info">
+              <h2>Заказ {dto.number}</h2>
+              <div className="summary-list">
+                <div className="summary-row">
+                  <span>Статус</span>
+                  <strong>{dto.status}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Дата</span>
+                  <strong>{dto.session.localDate}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Сеанс</span>
+                  <strong>{dto.session.localTime}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Сумма</span>
+                  <strong>{formatMoneyFromKopecks(dto.totalAmount)}</strong>
+                </div>
+                {dto.paymentExpiresAt && !isExpired && (
+                  <div className="summary-row">
+                    <span>Оплатить до</span>
+                    <strong>{new Date(dto.paymentExpiresAt).toLocaleString("ru-RU")}</strong>
+                  </div>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>
+                <Link className="button button-ghost" href="/#booking">
+                  Выбрать другой сеанс
+                </Link>
+              </div>
             </div>
-          ) : (
-            <div className="mt-6 rounded-2xl border border-beige bg-cream/70 p-4 text-sm text-muted-foreground">
-              Заказ создан, места временно зафиксированы. Онлайн-оплата будет подключена на
-              следующем этапе.
-              {dto.paymentExpiresAt && (
-                <> Дождитесь оплаты до {formatDeadline(dto.paymentExpiresAt)}.</>
-              )}
-              <Body className="mt-3 text-muted-foreground">
-                Мы свяжемся с вами по номеру {dto.maskedPhone}, как только оплата станет доступна.
-              </Body>
+            <div className="qr">
+              <div style={{ textAlign: "center", padding: 24 }}>
+                <p style={{ fontSize: 18, fontWeight: 850 }}>Оплата не завершена</p>
+                <p style={{ fontSize: 14, color: "var(--muted)" }}>
+                  Билет и QR появятся только после статуса PAID
+                </p>
+              </div>
             </div>
-          )}
-        </Card>
-
-        <Button asChild variant="outline" className="mt-5">
-          <Link href="/tickets">К выбору билетов</Link>
-        </Button>
-      </Container>
-    </PageSection>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }

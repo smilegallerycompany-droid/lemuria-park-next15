@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Booking lives on the home page cashier — keep /tickets as a stable alias. */
-export default function Tickets() {
+/** Legacy route — booking lives on the approved home composition. */
+export default function TicketsPage() {
   redirect("/#booking");
 }

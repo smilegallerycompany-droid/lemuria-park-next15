@@ -1,33 +1,23 @@
 import { redirect } from "next/navigation";
-import { Card } from "@/components/ui/card";
-import { H2, Body } from "@/components/ui/typography";
-import { PageSection } from "@/components/layout/page-section";
-import { Container } from "@/components/layout/container";
+import Link from "next/link";
 import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
+import { formatMoneyFromKopecks } from "@/lib/utils";
 
 interface SuccessPageProps {
   searchParams: Promise<{ order?: string }>;
 }
 
 /**
- * Real order-confirmation page — driven entirely by the order's persisted
- * status. No fake QR, no fake "success" state: if the order doesn't exist
- * we send the visitor back to ticket selection; if it's still awaiting
- * payment we send them to the (real) payment-waiting page; if it expired
- * or was cancelled we show that plainly, right here. QR ticket delivery is
- * a later stage — for now a paid order just shows a "preparing" placeholder.
+ * Success only for real PAID orders (production status check).
+ * Awwwards ticket card visual — no fabricated QR until tickets exist.
  */
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   const { order: orderNumber } = await searchParams;
-  if (!orderNumber) {
-    redirect("/tickets");
-  }
+  if (!orderNumber) redirect("/#booking");
 
   const order = await getOrderByNumber(orderNumber);
-  if (!order) {
-    redirect("/tickets");
-  }
+  if (!order) redirect("/#booking");
 
   if (order.status === "AWAITING_PAYMENT" || order.status === "DRAFT") {
     redirect(`/checkout/payment?order=${encodeURIComponent(orderNumber)}`);
@@ -36,19 +26,26 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   if (order.status === "EXPIRED" || order.status === "CANCELLED") {
     const dto = await toOrderDto(order);
     return (
-      <PageSection tone="jungle">
-        <Container className="max-w-2xl">
-          <Card variant="glass" className="p-7 text-center">
-            <H2 as="h1" className="mt-2 font-display font-semibold">
-              {order.status === "EXPIRED" ? "Время оплаты истекло" : "Заказ отменён"}
-            </H2>
-            <Body className="mt-2 text-muted-foreground">
-              Заказ № {dto.number} {order.status === "EXPIRED" ? "не был оплачен вовремя и" : ""}{" "}
-              больше не действителен. Чтобы приобрести билеты, оформите бронирование заново.
-            </Body>
-          </Card>
-        </Container>
-      </PageSection>
+      <main className="page-shell">
+        <div className="container">
+          <section className="success-card">
+            <div className="success-top">
+              <div className="success-badge" style={{ background: "var(--orange-deep)" }}>
+                !
+              </div>
+              <h1 style={{ margin: 0, fontSize: 42, letterSpacing: "-.055em" }}>
+                {order.status === "EXPIRED" ? "Время оплаты истекло" : "Заказ отменён"}
+              </h1>
+              <p style={{ color: "var(--muted)" }}>
+                Заказ № {dto.number} больше не действителен. Оформите бронирование заново.
+              </p>
+              <Link className="button button-orange" href="/#booking" style={{ marginTop: 24 }}>
+                К билетам
+              </Link>
+            </div>
+          </section>
+        </div>
+      </main>
     );
   }
 
@@ -58,21 +55,66 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
 
   const dto = await toOrderDto(order);
 
-  // Real payment succeeded but tickets/QR issuance is a later stage — never
-  // fabricate a QR here.
   return (
-    <PageSection tone="jungle">
-      <Container className="max-w-2xl">
-        <Card variant="glass" className="p-7 text-center">
-          <H2 as="h1" className="mt-2 font-display font-semibold">
-            Билеты формируются
-          </H2>
-          <Body className="mt-2 text-muted-foreground">
-            Заказ № {dto.number} оплачен. Электронные билеты с QR-кодом появятся здесь на следующем
-            этапе.
-          </Body>
-        </Card>
-      </Container>
-    </PageSection>
+    <main className="page-shell">
+      <div className="container">
+        <section className="success-card">
+          <div className="success-top">
+            <div className="success-badge">✓</div>
+            <h1 style={{ margin: 0, fontSize: 52, letterSpacing: "-.055em" }}>
+              Оплата прошла успешно
+            </h1>
+            <p style={{ color: "var(--muted)" }}>
+              Заказ оплачен. QR-билеты будут показаны здесь после выпуска (отдельный этап).
+            </p>
+          </div>
+
+          <div className="ticket">
+            <div className="ticket-info">
+              <h2>Электронный билет</h2>
+              <div className="summary-list">
+                <div className="summary-row">
+                  <span>Номер заказа</span>
+                  <strong>№ {dto.number}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Покупатель</span>
+                  <strong>{dto.customerName}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Дата посещения</span>
+                  <strong>{dto.session.localDate}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Время сеанса</span>
+                  <strong>{dto.session.localTime}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Билеты</span>
+                  <strong>
+                    {dto.items.map((i) => `${i.quantity} ${i.ticketTypeName}`).join(" · ")}
+                  </strong>
+                </div>
+                <div className="summary-row">
+                  <span>Оплачено</span>
+                  <strong>{formatMoneyFromKopecks(dto.totalAmount)}</strong>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>
+                <Link className="button button-ghost" href="/">
+                  На главную
+                </Link>
+              </div>
+            </div>
+            <div className="qr">
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 100, lineHeight: 1 }}>▦</div>
+                <p style={{ fontSize: 15 }}>QR появится после выпуска билетов</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }

@@ -1,82 +1,198 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { Clock3, MapPin, Phone, Users } from "lucide-react";
-import { Hero } from "@/components/sections/hero";
-import { BookingWidget } from "@/components/booking/booking-widget";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Container } from "@/components/layout/container";
-import { SITE } from "@/constants/site";
+import { motion } from "framer-motion";
+import { Camera, Leaf, MapPin, Sparkles } from "lucide-react";
+import { BookingAwwwards as Booking } from "@/components/booking/BookingAwwwards";
 
 /**
- * Home = online ticket counter. Booking is the first step.
- * Secondary visit info sits below and never blocks purchase.
+ * Approved awwwards home composition — visual source of truth.
+ * Booking widget talks to production `/api/public/*` (next15 services).
  */
-export default function Home() {
+export default function HomePage() {
   return (
-    <>
-      <Hero />
+    <main>
+      <header className="site-header">
+        <div className="container header-shell">
+          <Link href="/" className="brand">
+            <span className="brand-symbol">◉</span>
+            <span className="brand-copy">
+              Лемурия Парк
+              <small>зоотеатр лемуров</small>
+            </span>
+          </Link>
 
-      <section id="booking" className="scroll-mt-24 py-6 pb-8 md:py-8">
-        <Container>
-          <BookingWidget />
-        </Container>
+          <nav className="nav">
+            <a href="#booking">Билеты</a>
+            <a href="#about">О зоотеатре</a>
+            <a href="#gallery">Галерея</a>
+            <a href="#faq">Вопросы</a>
+          </nav>
+
+          <div className="header-action">
+            <a href="#booking" className="button button-orange">
+              Купить билет
+            </a>
+          </div>
+        </div>
+      </header>
+
+      <section className="hero">
+        <div className="container hero-content">
+          <motion.div
+            className="hero-copy"
+            initial={{ opacity: 0, y: 26 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.75 }}
+          >
+            <span className="kicker">Онлайн-касса</span>
+            <h1>
+              Лемурия
+              <br />
+              Парк
+            </h1>
+            <div className="hero-subtitle">Зоотеатр лемуров</div>
+            <p>
+              Пространство живого общения, ярких впечатлений и добрых эмоций для всей семьи.
+            </p>
+            <div className="hero-actions">
+              <a className="button button-orange" href="#booking">
+                Купить билет
+              </a>
+              <span className="button button-ghost">
+                <Leaf size={18} /> Живое общение
+              </span>
+            </div>
+          </motion.div>
+        </div>
       </section>
 
-      <section
-        className="border-t border-beige/70 py-12 md:py-16"
-        aria-labelledby="visit-info-heading"
-      >
-        <Container>
-          <h2 id="visit-info-heading" className="font-display text-2xl font-semibold text-forest">
-            Перед визитом
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Коротко о том, что важно знать, чтобы спокойно приехать на сеанс.
+      <Booking />
+
+      <section id="about" className="section container">
+        <div className="section-head">
+          <div>
+            <span className="kicker">Впечатления</span>
+            <h2>
+              Ближе к природе.
+              <br />
+              Ближе друг к другу.
+            </h2>
+          </div>
+          <p>
+            Небольшие группы, спокойный формат посещения и атмосфера, в которой каждый гость
+            успевает почувствовать настоящий контакт с животными.
           </p>
+        </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                icon: Users,
-                title: `До ${SITE.capacity} гостей`,
-                text: "Небольшие группы — спокойная атмосфера.",
-              },
-              {
-                icon: Clock3,
-                title: `${SITE.visitMinutes} минут`,
-                text: `Сеансы каждые ${SITE.sessionMinutes} минут.`,
-              },
-              {
-                icon: MapPin,
-                title: "Адрес",
-                text: SITE.address,
-              },
-              {
-                icon: Phone,
-                title: "Телефон",
-                text: SITE.phone,
-              },
-            ].map((item) => (
-              <Card key={item.title} variant="soft" className="p-4">
-                <item.icon size={18} className="text-orange" aria-hidden />
-                <h3 className="mt-3 text-sm font-extrabold text-forest">{item.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{item.text}</p>
-              </Card>
-            ))}
+        <div className="trust-strip">
+          <div className="trust-item">
+            <span className="trust-icon">
+              <Leaf />
+            </span>
+            <strong>Живое общение</strong>
           </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            <Button asChild variant="outline">
-              <Link href="/location">Как добраться</Link>
-            </Button>
-            <Button asChild variant="ghost">
-              <Link href="/about">О зоотеатре</Link>
-            </Button>
+          <div className="trust-item">
+            <span className="trust-icon">
+              <Camera />
+            </span>
+            <strong>Яркие фотографии</strong>
           </div>
-        </Container>
+          <div className="trust-item">
+            <span className="trust-icon">
+              <Sparkles />
+            </span>
+            <strong>Эмоции для всей семьи</strong>
+          </div>
+          <div className="trust-item">
+            <span className="trust-icon">
+              <MapPin />
+            </span>
+            <strong>Удобное расположение</strong>
+          </div>
+        </div>
       </section>
-    </>
+
+      <section id="gallery" className="section container">
+        <div className="section-head">
+          <div>
+            <span className="kicker">Галерея</span>
+            <h2>
+              Моменты, которые
+              <br />
+              хочется сохранить
+            </h2>
+          </div>
+          <p>Минимум постановки — максимум живых эмоций и настоящего интереса.</p>
+        </div>
+
+        <div className="gallery">
+          <figure>
+            <Image src="/gallery-1.png" alt="Лемур" width={1200} height={900} />
+          </figure>
+          <figure>
+            <Image src="/gallery-2.png" alt="Лемур" width={800} height={600} />
+          </figure>
+          <figure>
+            <Image src="/hero-lemur.png" alt="Лемур" width={800} height={600} />
+          </figure>
+          <figure>
+            <Image src="/gallery-2.png" alt="Лемур" width={800} height={600} />
+          </figure>
+          <figure>
+            <Image src="/gallery-1.png" alt="Лемур" width={800} height={600} />
+          </figure>
+        </div>
+      </section>
+
+      <section id="faq" className="section container">
+        <div className="section-head">
+          <div>
+            <span className="kicker">Перед визитом</span>
+            <h2>Ответы на частые вопросы</h2>
+          </div>
+        </div>
+        <div className="faq">
+          <details>
+            <summary>Можно фотографировать?</summary>
+            <p>Да, личная съёмка разрешена. Просим соблюдать рекомендации сотрудников.</p>
+          </details>
+          <details>
+            <summary>Сколько длится посещение?</summary>
+            <p>Сеансы проходят по расписанию каждые 30 минут.</p>
+          </details>
+          <details>
+            <summary>Сколько гостей бывает на сеансе?</summary>
+            <p>Не более 15 человек, чтобы всем было комфортно.</p>
+          </details>
+          <details>
+            <summary>Можно прийти с маленьким ребёнком?</summary>
+            <p>Да. Дети находятся рядом со взрослыми и следуют правилам посещения.</p>
+          </details>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <div className="container footer-inner">
+          <div>
+            <strong style={{ fontSize: 24 }}>Лемурия Парк</strong>
+            <p>Зоотеатр лемуров</p>
+          </div>
+          <div>
+            <small>Телефон</small>
+            <p>+7 920 971-40-22</p>
+          </div>
+          <div>
+            <small>Адрес</small>
+            <p>Москва, ВДНХ</p>
+          </div>
+          <div>
+            <small>Документы</small>
+            <p>Политика · Оферта</p>
+          </div>
+        </div>
+      </footer>
+    </main>
   );
 }
