@@ -5,5 +5,13 @@ out/
 coverage/
 .env
 .env.local
+.env.*.local
 .DS_Store
-node_modules
+*.tsbuildinfo
+.tmp-screenshots/
+tmp/
+test-results/
+playwright-report/
+lemuria-park-next15/
+docs/screenshots/*.png
+!docs/screenshots/.gitkeep
