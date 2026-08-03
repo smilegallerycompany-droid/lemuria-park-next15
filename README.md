@@ -153,3 +153,11 @@ values (called `id` in the JSON) and human-safe fields are returned.
 Payments (ЮKassa), signed QR codes / ticket check-in, email delivery, authentication & role guards,
 and the admin/cashier UIs are intentionally out of scope for this stage — see
 `docs/ARCHITECTURE.md` for the full implementation order.
+
+## Design vs backend sources of truth
+
+- **Public visual design:** approved awwwards frontend (scoped under `.public-awwwards`)
+- **Business logic / Prisma / API / tests:** this production repository (`src/server`, `prisma`, `/api/public`, `/api/cashier`)
+
+Do not overwrite Prisma migrations with the parallel awwwards experiment DB schema.
+
