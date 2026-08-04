@@ -338,3 +338,39 @@ export function sumPaidRevenueKopecks(
     .filter((order) => order.status === "PAID")
     .reduce((sum, order) => sum + order.totalAmount, 0);
 }
+
+/** Pure helper — average order value from PAID totals only. */
+export function averagePaidOrderValueKopecks(
+  orders: Array<{ status: string; totalAmount: number }>,
+): number {
+  const paid = orders.filter((order) => order.status === "PAID");
+  if (paid.length === 0) return 0;
+  const total = paid.reduce((sum, order) => sum + order.totalAmount, 0);
+  return Math.round(total / paid.length);
+}
+
+/** Pure helper — net revenue after completed refunds. */
+export function netRevenueKopecks(revenueKopecks: number, refundsKopecks: number): number {
+  return Math.max(0, revenueKopecks - refundsKopecks);
+}
+
+/** Pure helper — occupancy ratio clamped to [0, 1]. */
+export function occupancyRate(booked: number, capacity: number): number {
+  if (capacity <= 0) return 0;
+  return booked / capacity;
+}
+
+/** Pure helper — split payment method buckets (cash / card / other). */
+export function classifyPaymentMethodRevenue(
+  payments: Array<{ method: string; amount: number; status: string }>,
+): { cash: number; card: number; other: number } {
+  const out = { cash: 0, card: 0, other: 0 };
+  for (const payment of payments) {
+    if (payment.status !== "SUCCEEDED" && payment.status !== "REFUNDED") continue;
+    if (payment.method === "CASH") out.cash += payment.amount;
+    else if (payment.method === "CARD_ONLINE" || payment.method === "CARD_TERMINAL") {
+      out.card += payment.amount;
+    } else out.other += payment.amount;
+  }
+  return out;
+}

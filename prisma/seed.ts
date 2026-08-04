@@ -1,7 +1,15 @@
+import { randomBytes } from "node:crypto";
 import { PrismaClient, type DayOfWeek, type PriceDayType } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+
+/**
+ * Demo staff password for local/staging seeds only.
+ * NEVER use ChangeMe123! (or any seed default) in production.
+ * `main()` refuses to run when NODE_ENV === "production".
+ */
+const DEMO_PASSWORD = "ChangeMe123!";
 
 /**
  * Moscow (MSK) has used a fixed UTC+3 offset year-round since 2014 (no DST),
@@ -78,14 +86,12 @@ const EXHIBITION_FROM = "2026-08-01";
 const EXHIBITION_TO = "2026-09-15";
 
 async function seedUsers() {
-  const ownerPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
-  const cashierPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
-  const adminPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
+  const passwordHash = await bcrypt.hash(DEMO_PASSWORD, 10);
 
   const owner = await prisma.user.upsert({
     where: { email: "owner@lemuriapark.ru" },
     update: {
-      passwordHash: ownerPasswordHash,
+      passwordHash,
       role: "OWNER",
       status: "ACTIVE",
       name: "Владелец",
@@ -93,46 +99,79 @@ async function seedUsers() {
     create: {
       email: "owner@lemuriapark.ru",
       name: "Владелец",
-      passwordHash: ownerPasswordHash,
+      passwordHash,
       role: "OWNER",
       status: "ACTIVE",
     },
   });
 
-  // Optional admin account for the director panel (OWNER also works).
   await prisma.user.upsert({
     where: { email: "admin@lemuriapark.ru" },
     update: {
-      passwordHash: adminPasswordHash,
+      passwordHash,
       role: "ADMIN",
       status: "ACTIVE",
     },
     create: {
       email: "admin@lemuriapark.ru",
       name: "Администратор",
-      passwordHash: adminPasswordHash,
+      passwordHash,
       role: "ADMIN",
       status: "ACTIVE",
     },
   });
 
-  await prisma.user.upsert({
+  const cashier = await prisma.user.upsert({
     where: { email: "cashier@lemuriapark.ru" },
     update: {
-      passwordHash: cashierPasswordHash,
+      passwordHash,
       role: "CASHIER",
       status: "ACTIVE",
     },
     create: {
       email: "cashier@lemuriapark.ru",
       name: "Кассир",
-      passwordHash: cashierPasswordHash,
+      passwordHash,
       role: "CASHIER",
       status: "ACTIVE",
     },
   });
 
-  return { owner };
+  await prisma.user.upsert({
+    where: { email: "cashier2@lemuriapark.ru" },
+    update: {
+      passwordHash,
+      role: "CASHIER",
+      status: "ACTIVE",
+      name: "Кассир 2",
+    },
+    create: {
+      email: "cashier2@lemuriapark.ru",
+      name: "Кассир 2",
+      passwordHash,
+      role: "CASHIER",
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.user.upsert({
+    where: { email: "disabled@lemuriapark.ru" },
+    update: {
+      passwordHash,
+      role: "CASHIER",
+      status: "DISABLED",
+      name: "Отключённый",
+    },
+    create: {
+      email: "disabled@lemuriapark.ru",
+      name: "Отключённый",
+      passwordHash,
+      role: "CASHIER",
+      status: "DISABLED",
+    },
+  });
+
+  return { owner, cashier };
 }
 
 async function seedTicketTypes() {
@@ -274,7 +313,7 @@ function dayOfWeekFromLocalDate(dateIso: string): DayOfWeek {
 
 async function removeClosedDaySessions(locationId: string) {
   const sessions = await prisma.session.findMany({
-    where: { locationId, status: "SCHEDULED" },
+    where: { locationId, status: { in: ["SCHEDULED", "OPEN"] } },
     select: { id: true, startsAt: true },
   });
 
@@ -288,8 +327,26 @@ async function removeClosedDaySessions(locationId: string) {
     }
   }
 
-  if (closedIds.length > 0) {
-    await prisma.session.deleteMany({ where: { id: { in: closedIds } } });
+  if (closedIds.length === 0) return;
+
+  // Never delete sessions that already have orders (financial history / FK).
+  const withOrders = await prisma.order.findMany({
+    where: { sessionId: { in: closedIds } },
+    select: { sessionId: true },
+    distinct: ["sessionId"],
+  });
+  const protectedIds = new Set(withOrders.map((row) => row.sessionId));
+  const deletable = closedIds.filter((id) => !protectedIds.has(id));
+  const toCancel = closedIds.filter((id) => protectedIds.has(id));
+
+  if (deletable.length > 0) {
+    await prisma.session.deleteMany({ where: { id: { in: deletable } } });
+  }
+  if (toCancel.length > 0) {
+    await prisma.session.updateMany({
+      where: { id: { in: toCancel } },
+      data: { status: "CANCELLED" },
+    });
   }
 }
 
@@ -328,17 +385,23 @@ async function seedSessions(location: {
 
       // Demonstrates the per-session capacity override business rule.
       const capacity = isFirstSession ? 10 : location.defaultCapacity;
+      // Mix of availability statuses for director demos (most stay SCHEDULED).
+      let status: "SCHEDULED" | "OPEN" | "CLOSED" | "CANCELLED" = "SCHEDULED";
+      if (createdCount === 3) status = "OPEN";
+      if (createdCount === 7) status = "CLOSED";
+      if (createdCount === 11) status = "CANCELLED";
       isFirstSession = false;
 
       await prisma.session.upsert({
         where: { locationId_startsAt: { locationId: location.id, startsAt } },
-        update: { status: "SCHEDULED", capacity },
+        // Preserve existing status on re-seed so demo commerce FKs stay consistent.
+        update: { capacity, endsAt },
         create: {
           locationId: location.id,
           startsAt,
           endsAt,
           capacity,
-          status: "SCHEDULED",
+          status,
         },
       });
       createdCount += 1;
@@ -346,6 +409,320 @@ async function seedSessions(location: {
   }
 
   return createdCount;
+}
+
+function demoOrderNumber(suffix: string): string {
+  return `LP-SEED${suffix}`;
+}
+
+function demoQr(label: string): string {
+  return `seed-qr-${label}-${randomBytes(8).toString("hex")}`;
+}
+
+/**
+ * Rich demo orders/tickets for director analytics & staff training.
+ * Idempotent via stable order numbers.
+ */
+/**
+ * Ensures bookable sessions exist for the current local calendar day even when
+ * the weekly schedule marks the day closed (e.g. Tuesday). Needed for cashier
+ * check-in demos and E2E on closed weekdays. Demo / non-production only.
+ */
+async function ensureTodayDemoSessions(location: {
+  id: string;
+  visitDurationMinutes: number;
+  defaultCapacity: number;
+}) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: DEMO_LOCATION_TIMEZONE });
+  // Spread across the day so E2E/check-in still have future startsAt in the evening.
+  const slots = ["12:00", "14:00", "16:00", "18:00", "18:30", "19:00", "20:00", "21:00", "22:00"];
+  for (const time of slots) {
+    const startsAt = moscowInstant(today, time);
+    const endsAt = new Date(startsAt.getTime() + location.visitDurationMinutes * 60 * 1000);
+    await prisma.session.upsert({
+      where: { locationId_startsAt: { locationId: location.id, startsAt } },
+      update: { status: "SCHEDULED", capacity: location.defaultCapacity },
+      create: {
+        locationId: location.id,
+        startsAt,
+        endsAt,
+        capacity: location.defaultCapacity,
+        status: "SCHEDULED",
+      },
+    });
+  }
+}
+
+async function seedDemoCommerce(params: {
+  locationId: string;
+  cashierId: string;
+  adultTicketTypeId: string;
+  childTicketTypeId: string;
+}) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: DEMO_LOCATION_TIMEZONE });
+  const todaySessions = await prisma.session.findMany({
+    where: {
+      locationId: params.locationId,
+      status: { in: ["SCHEDULED", "OPEN"] },
+      startsAt: {
+        gte: moscowInstant(today, "00:00"),
+        lte: moscowInstant(today, "23:59"),
+      },
+    },
+    orderBy: { startsAt: "asc" },
+    take: 6,
+  });
+
+  if (todaySessions.length < 2) {
+    console.log("⚠️  Skipping demo commerce — need ≥2 sessions today");
+    return;
+  }
+
+  const [sessionA, sessionB] = todaySessions;
+
+  // PAID online order + VALID ticket
+  const onlinePaid = await prisma.order.upsert({
+    where: { number: demoOrderNumber("ONPAY01") },
+    update: { status: "PAID" },
+    create: {
+      number: demoOrderNumber("ONPAY01"),
+      sessionId: sessionA.id,
+      locationId: params.locationId,
+      status: "PAID",
+      source: "ONLINE",
+      customerName: "Онлайн Гость",
+      customerPhone: "+79001112233",
+      customerEmail: "online-paid@example.com",
+      totalAmount: 90000,
+      items: {
+        create: [
+          {
+            ticketTypeId: params.adultTicketTypeId,
+            ticketTypeName: "Взрослый",
+            quantity: 1,
+            unitPriceAmount: 90000,
+            subtotalAmount: 90000,
+          },
+        ],
+      },
+      payments: {
+        create: [
+          {
+            method: "CARD_ONLINE",
+            status: "SUCCEEDED",
+            amount: 90000,
+            provider: "yookassa",
+            providerPaymentId: "seed-pay-online-01",
+          },
+        ],
+      },
+    },
+    include: { items: true, tickets: true },
+  });
+
+  if (onlinePaid.tickets.length === 0 && onlinePaid.items[0]) {
+    await prisma.ticket.create({
+      data: {
+        orderId: onlinePaid.id,
+        orderItemId: onlinePaid.items[0].id,
+        sessionId: sessionA.id,
+        ticketTypeId: params.adultTicketTypeId,
+        status: "VALID",
+        qrToken: demoQr("online-valid"),
+      },
+    });
+  }
+
+  // PAID cashier order + USED ticket
+  const cashierPaid = await prisma.order.upsert({
+    where: { number: demoOrderNumber("CASH01") },
+    update: { status: "PAID", cashierId: params.cashierId },
+    create: {
+      number: demoOrderNumber("CASH01"),
+      sessionId: sessionA.id,
+      locationId: params.locationId,
+      status: "PAID",
+      source: "CASHIER",
+      cashierId: params.cashierId,
+      customerName: "Кассовый Гость",
+      customerPhone: "+79004445566",
+      customerEmail: "cashier-paid@example.com",
+      totalAmount: 170000,
+      items: {
+        create: [
+          {
+            ticketTypeId: params.adultTicketTypeId,
+            ticketTypeName: "Взрослый",
+            quantity: 1,
+            unitPriceAmount: 90000,
+            subtotalAmount: 90000,
+          },
+          {
+            ticketTypeId: params.childTicketTypeId,
+            ticketTypeName: "Детский",
+            quantity: 1,
+            unitPriceAmount: 80000,
+            subtotalAmount: 80000,
+          },
+        ],
+      },
+      payments: {
+        create: [
+          {
+            method: "CASH",
+            status: "SUCCEEDED",
+            amount: 170000,
+            cashierId: params.cashierId,
+          },
+        ],
+      },
+    },
+    include: { items: true, tickets: true },
+  });
+
+  if (cashierPaid.tickets.length === 0 && cashierPaid.items[0]) {
+    const usedTicket = await prisma.ticket.create({
+      data: {
+        orderId: cashierPaid.id,
+        orderItemId: cashierPaid.items[0].id,
+        sessionId: sessionA.id,
+        ticketTypeId: params.adultTicketTypeId,
+        status: "USED",
+        usedAt: new Date(),
+        qrToken: demoQr("cashier-used"),
+      },
+    });
+    await prisma.ticketCheckIn.create({
+      data: {
+        ticketId: usedTicket.id,
+        result: "SUCCESS",
+        scannedById: params.cashierId,
+      },
+    });
+    if (cashierPaid.items[1]) {
+      await prisma.ticket.create({
+        data: {
+          orderId: cashierPaid.id,
+          orderItemId: cashierPaid.items[1].id,
+          sessionId: sessionA.id,
+          ticketTypeId: params.childTicketTypeId,
+          status: "VALID",
+          qrToken: demoQr("cashier-child-valid"),
+        },
+      });
+    }
+  }
+
+  // AWAITING_PAYMENT online
+  await prisma.order.upsert({
+    where: { number: demoOrderNumber("AWAIT01") },
+    update: { status: "AWAITING_PAYMENT" },
+    create: {
+      number: demoOrderNumber("AWAIT01"),
+      sessionId: sessionB.id,
+      locationId: params.locationId,
+      status: "AWAITING_PAYMENT",
+      source: "ONLINE",
+      customerName: "Ожидает Оплату",
+      customerPhone: "+79007778899",
+      customerEmail: "awaiting@example.com",
+      totalAmount: 90000,
+      paymentExpiresAt: new Date(Date.now() + 20 * 60 * 1000),
+      items: {
+        create: [
+          {
+            ticketTypeId: params.adultTicketTypeId,
+            ticketTypeName: "Взрослый",
+            quantity: 1,
+            unitPriceAmount: 90000,
+            subtotalAmount: 90000,
+          },
+        ],
+      },
+    },
+  });
+
+  // CANCELLED
+  await prisma.order.upsert({
+    where: { number: demoOrderNumber("CANCEL01") },
+    update: { status: "CANCELLED" },
+    create: {
+      number: demoOrderNumber("CANCEL01"),
+      sessionId: sessionB.id,
+      locationId: params.locationId,
+      status: "CANCELLED",
+      source: "ONLINE",
+      customerName: "Отменённый",
+      customerPhone: "+79001231212",
+      customerEmail: "cancelled@example.com",
+      totalAmount: 80000,
+      items: {
+        create: [
+          {
+            ticketTypeId: params.childTicketTypeId,
+            ticketTypeName: "Детский",
+            quantity: 1,
+            unitPriceAmount: 80000,
+            subtotalAmount: 80000,
+          },
+        ],
+      },
+    },
+  });
+
+  // REFUNDED + refund row
+  const refunded = await prisma.order.upsert({
+    where: { number: demoOrderNumber("REFUND01") },
+    update: { status: "REFUNDED" },
+    create: {
+      number: demoOrderNumber("REFUND01"),
+      sessionId: sessionB.id,
+      locationId: params.locationId,
+      status: "REFUNDED",
+      source: "ONLINE",
+      customerName: "Возврат",
+      customerPhone: "+79005556677",
+      customerEmail: "refunded@example.com",
+      totalAmount: 90000,
+      items: {
+        create: [
+          {
+            ticketTypeId: params.adultTicketTypeId,
+            ticketTypeName: "Взрослый",
+            quantity: 1,
+            unitPriceAmount: 90000,
+            subtotalAmount: 90000,
+          },
+        ],
+      },
+      payments: {
+        create: [
+          {
+            method: "CARD_ONLINE",
+            status: "REFUNDED",
+            amount: 90000,
+            provider: "yookassa",
+            providerPaymentId: "seed-pay-refund-01",
+          },
+        ],
+      },
+    },
+  });
+
+  const existingRefund = await prisma.refund.findFirst({
+    where: { orderId: refunded.id, status: "COMPLETED" },
+  });
+  if (!existingRefund) {
+    await prisma.refund.create({
+      data: {
+        orderId: refunded.id,
+        amount: 90000,
+        status: "COMPLETED",
+        reason: "Seed demo refund",
+        actorId: params.cashierId,
+      },
+    });
+  }
 }
 
 async function seedFaqAndGallery(locationId: string) {
@@ -385,22 +762,50 @@ async function seedFaqAndGallery(locationId: string) {
 }
 
 async function main() {
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "❌ Refusing to seed when NODE_ENV=production. Demo password ChangeMe123! must never ship to prod.",
+    );
+    process.exit(1);
+  }
+
   console.log("🌱 Seeding database...");
 
   await seedSiteAndContactSettings();
-  const { owner } = await seedUsers();
+  const { owner, cashier } = await seedUsers();
   const { adult, child } = await seedTicketTypes();
   const location = await seedLocation();
   await seedLocationSchedule(location.id);
   await seedPriceRules(location.id, { adult: adult.id, child: child.id });
   await seedFaqAndGallery(location.id);
   const sessionsCreated = await seedSessions(location);
+  await ensureTodayDemoSessions(location);
+  await seedDemoCommerce({
+    locationId: location.id,
+    cashierId: cashier.id,
+    adultTicketTypeId: adult.id,
+    childTicketTypeId: child.id,
+  });
+
+  // Bind cashiers to the demo location for director staff views.
+  for (const email of ["cashier@lemuriapark.ru", "cashier2@lemuriapark.ru", "owner@lemuriapark.ru"]) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) continue;
+    await prisma.userLocation.upsert({
+      where: { userId_locationId: { userId: user.id, locationId: location.id } },
+      update: {},
+      create: { userId: user.id, locationId: location.id },
+    });
+  }
 
   console.log("✅ Seed complete:");
-  console.log(`   Owner user:      ${owner.email}`);
+  console.log(`   Owner user:      ${owner.email} / ${DEMO_PASSWORD}`);
+  console.log(`   Cashier user:    cashier@lemuriapark.ru / ${DEMO_PASSWORD}`);
+  console.log(`   Disabled user:   disabled@lemuriapark.ru (cannot login)`);
   console.log(`   Location:        ${location.name} (${location.slug})`);
   console.log(`   Ticket types:    ${adult.name}, ${child.name}`);
   console.log(`   Sessions ready:  ${sessionsCreated}`);
+  console.log("   Demo orders:     PAID online/cashier, AWAITING_PAYMENT, CANCELLED, REFUNDED");
 }
 
 main()
