@@ -25,8 +25,19 @@ import type { PublicSessionDto } from "@/types/dto/session";
 
 type QtyMap = Record<string, number>;
 
-const NEAREST_DATES_LIMIT = 14;
+/** Enough for the full exhibition window (1 Aug – 15 Sep), excluding closed days. */
+const NEAREST_DATES_LIMIT = 60;
 const NEAREST_SESSIONS_LIMIT = 8;
+
+const JS_WEEKDAY_TO_ENUM = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+] as const;
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -55,6 +66,10 @@ function formatDateOption(dateKey: string) {
   return `${dayMonth}, ${weekday}`;
 }
 
+function weekdayEnum(dateKey: string) {
+  return JS_WEEKDAY_TO_ENUM[new Date(`${dateKey}T12:00:00`).getDay()];
+}
+
 export function BookingAwwwards() {
   const [config, setConfig] = useState<PublicConfigDto | null>(null);
   const [sessions, setSessions] = useState<PublicSessionDto[]>([]);
@@ -74,7 +89,6 @@ export function BookingAwwwards() {
         const cfg = await getPublicConfig();
         if (cancelled) return;
         setConfig(cfg);
-        setSelectedDate(cfg.availableDateRange.from);
         const initial: QtyMap = {};
         for (const t of cfg.ticketTypes) {
           if (t.code === "ADULT") initial[t.code] = 2;
@@ -97,12 +111,23 @@ export function BookingAwwwards() {
 
   const dateOptions = useMemo(() => {
     if (!config) return [];
+    const closed = new Set(config.closedWeekdays ?? []);
     return eachDateKey(
       config.availableDateRange.from,
       config.availableDateRange.to,
       NEAREST_DATES_LIMIT,
-    );
+    ).filter((key) => !closed.has(weekdayEnum(key)));
   }, [config]);
+
+  useEffect(() => {
+    if (dateOptions.length === 0) {
+      setSelectedDate("");
+      return;
+    }
+    if (!dateOptions.includes(selectedDate)) {
+      setSelectedDate(dateOptions[0]);
+    }
+  }, [dateOptions, selectedDate]);
 
   const loadSessions = useCallback(async (date: string, locationSlug?: string) => {
     setLoadingSessions(true);
@@ -371,7 +396,7 @@ export function BookingAwwwards() {
         <Trust icon={<ShieldCheck />} text="Онлайн-оплата билетов" />
         <Trust icon={<Clock3 />} text="Только ближайшие сеансы" />
         <Trust icon={<Users />} text="До 15 гостей на сеанс" />
-        <Trust icon={<CalendarDays />} text="Удобная онлайн-покупка" />
+        <Trust icon={<CalendarDays />} text="Интересные факты о Лемурах и их жизни" />
       </div>
     </section>
   );

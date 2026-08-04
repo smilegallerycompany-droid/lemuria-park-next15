@@ -67,6 +67,10 @@ export default function HomePage() {
                 <Leaf size={18} /> Сеансы по расписанию
               </span>
             </div>
+            <p className="hero-address">
+              <MapPin size={16} aria-hidden />
+              Краснодар, Мегацентр Красная площадь, второй этаж, рядом с магазином Kari
+            </p>
           </motion.div>
         </div>
       </section>
@@ -112,7 +116,7 @@ export default function HomePage() {
             <span className="trust-icon">
               <MapPin />
             </span>
-            <strong>МегаЦентр, 2 этаж</strong>
+            <strong>С 1 августа по 15 сентября</strong>
           </div>
         </div>
       </section>
@@ -175,7 +179,11 @@ export default function HomePage() {
           </details>
           <details>
             <summary>Сколько длится посещение?</summary>
-            <p>Сеансы проходят по расписанию каждые 30 минут.</p>
+            <p>Сеансы проходят по расписанию каждые 30 минут. Вторник — выходной.</p>
+          </details>
+          <details>
+            <summary>До какого числа работает выставка?</summary>
+            <p>Выставка в Краснодаре проходит с 1 августа по 15 сентября.</p>
           </details>
           <details>
             <summary>Сколько гостей бывает на сеансе?</summary>

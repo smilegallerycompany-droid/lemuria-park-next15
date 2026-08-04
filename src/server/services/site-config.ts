@@ -21,9 +21,13 @@ export async function getPublicSiteConfig(): Promise<PublicConfigDto> {
     throw new DomainError("CONFIG_NOT_FOUND", "Активная локация не найдена");
   }
 
-  const [contact, ticketTypes] = await Promise.all([
+  const [contact, ticketTypes, closedSchedules] = await Promise.all([
     prisma.contactSettings.findFirst({ orderBy: { createdAt: "asc" } }),
     ticketTypeRepository.listActive(prisma),
+    prisma.locationSchedule.findMany({
+      where: { locationId: location.id, isClosed: true },
+      select: { dayOfWeek: true },
+    }),
   ]);
 
   const settings = await prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } });
@@ -33,9 +37,16 @@ export async function getPublicSiteConfig(): Promise<PublicConfigDto> {
     addDaysUtc(now, DOMAIN_CONFIG.sessionsLookaheadDays),
     location.timezone,
   );
+  const activeFromLocal = location.activeFrom
+    ? formatDateInTimezone(location.activeFrom, location.timezone)
+    : null;
   const activeToLocal = location.activeTo
     ? formatDateInTimezone(location.activeTo, location.timezone)
     : null;
+
+  const from =
+    activeFromLocal && activeFromLocal > todayLocal ? activeFromLocal : todayLocal;
+  const to = activeToLocal ?? lookaheadEnd;
 
   return {
     location: {
@@ -45,10 +56,8 @@ export async function getPublicSiteConfig(): Promise<PublicConfigDto> {
       address: location.address,
       timezone: location.timezone,
     },
-    availableDateRange: {
-      from: todayLocal,
-      to: activeToLocal && activeToLocal < lookaheadEnd ? activeToLocal : lookaheadEnd,
-    },
+    availableDateRange: { from, to },
+    closedWeekdays: closedSchedules.map((row) => row.dayOfWeek),
     ticketTypes: ticketTypes.map((ticketType) => ({
       code: ticketType.code,
       name: ticketType.name,

@@ -33,6 +33,16 @@ export interface PublicConfigDto {
   location: PublicConfigLocationDto;
   /** Inclusive `YYYY-MM-DD` window the public date picker should offer. */
   availableDateRange: { from: string; to: string };
+  /** Weekdays when the venue is closed (e.g. `TUESDAY`). */
+  closedWeekdays: Array<
+    | "MONDAY"
+    | "TUESDAY"
+    | "WEDNESDAY"
+    | "THURSDAY"
+    | "FRIDAY"
+    | "SATURDAY"
+    | "SUNDAY"
+  >;
   ticketTypes: PublicTicketTypeDto[];
   displayRules: PublicConfigDisplayRulesDto;
   site: { name: string; subtitle: string; ctaLabel: string };

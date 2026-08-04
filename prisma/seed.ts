@@ -17,14 +17,6 @@ function moscowInstant(dateIso: string, time: string): Date {
   return new Date(`${dateIso}T${time}:00${DEMO_LOCATION_OFFSET}`);
 }
 
-function toDateIso(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
 function parseMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
@@ -67,16 +59,22 @@ async function seedSiteAndContactSettings() {
 
   await prisma.contactSettings.upsert({
     where: { id: "singleton-contact-settings" },
-    update: {},
+    update: {
+      supportHours: "Ежедневно кроме вторника, 10:30–21:00",
+    },
     create: {
       id: "singleton-contact-settings",
       phone: "+7 920 971-40-22",
       complaintsPhone: "+7 915 356-00-57",
       email: "info@lemuriapark.ru",
-      supportHours: "Ежедневно, 10:30–21:00",
+      supportHours: "Ежедневно кроме вторника, 10:30–21:00",
     },
   });
 }
+
+/** Krasnodar exhibition window (inclusive local calendar dates). */
+const EXHIBITION_FROM = "2026-08-01";
+const EXHIBITION_TO = "2026-09-15";
 
 async function seedUsers() {
   const ownerPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
@@ -139,6 +137,9 @@ async function seedTicketTypes() {
 }
 
 async function seedLocation() {
+  const activeFrom = moscowInstant(EXHIBITION_FROM, "00:00");
+  const activeTo = moscowInstant(EXHIBITION_TO, "23:59");
+
   return prisma.location.upsert({
     where: { slug: "moscow-vdnh" },
     update: {
@@ -147,6 +148,9 @@ async function seedLocation() {
       address:
         "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
       phone: "+7 920 971-40-22",
+      activeFrom,
+      activeTo,
+      status: "ACTIVE",
     },
     create: {
       slug: "moscow-vdnh",
@@ -159,7 +163,8 @@ async function seedLocation() {
       defaultCapacity: 15,
       sessionIntervalMinutes: 30,
       visitDurationMinutes: 45,
-      activeFrom: new Date(),
+      activeFrom,
+      activeTo,
       phone: "+7 920 971-40-22",
     },
   });
@@ -167,13 +172,24 @@ async function seedLocation() {
 
 async function seedLocationSchedule(locationId: string) {
   const schedules = await Promise.all(
-    WEEK_DAYS.map((dayOfWeek) =>
-      prisma.locationSchedule.upsert({
+    WEEK_DAYS.map((dayOfWeek) => {
+      const isClosed = dayOfWeek === "TUESDAY";
+      return prisma.locationSchedule.upsert({
         where: { locationId_dayOfWeek: { locationId, dayOfWeek } },
-        update: {},
-        create: { locationId, dayOfWeek, opensAt: "10:30", closesAt: "21:00" },
-      }),
-    ),
+        update: {
+          opensAt: "10:30",
+          closesAt: "21:00",
+          isClosed,
+        },
+        create: {
+          locationId,
+          dayOfWeek,
+          opensAt: "10:30",
+          closesAt: "21:00",
+          isClosed,
+        },
+      });
+    }),
   );
   return schedules;
 }
@@ -183,10 +199,10 @@ async function seedPriceRules(locationId: string, ticketTypeIds: { adult: string
   const validFrom = new Date("2026-01-01T00:00:00Z");
 
   const rules: Array<{ ticketTypeId: string; dayType: PriceDayType; priceAmount: number }> = [
-    { ticketTypeId: ticketTypeIds.adult, dayType: "WEEKDAY", priceAmount: 80000 }, // 800 RUB
-    { ticketTypeId: ticketTypeIds.adult, dayType: "WEEKEND", priceAmount: 90000 }, // 900 RUB
-    { ticketTypeId: ticketTypeIds.child, dayType: "WEEKDAY", priceAmount: 60000 }, // 600 RUB
-    { ticketTypeId: ticketTypeIds.child, dayType: "WEEKEND", priceAmount: 70000 }, // 700 RUB
+    { ticketTypeId: ticketTypeIds.adult, dayType: "WEEKDAY", priceAmount: 90000 }, // 900 RUB
+    { ticketTypeId: ticketTypeIds.adult, dayType: "WEEKEND", priceAmount: 110000 }, // 1100 RUB
+    { ticketTypeId: ticketTypeIds.child, dayType: "WEEKDAY", priceAmount: 80000 }, // 800 RUB
+    { ticketTypeId: ticketTypeIds.child, dayType: "WEEKEND", priceAmount: 100000 }, // 1000 RUB
   ];
 
   for (const rule of rules) {
@@ -211,6 +227,44 @@ async function seedPriceRules(locationId: string, ticketTypeIds: { adult: string
   }
 }
 
+function eachExhibitionDate(): string[] {
+  const out: string[] = [];
+  const cursor = new Date(`${EXHIBITION_FROM}T12:00:00Z`);
+  const end = new Date(`${EXHIBITION_TO}T12:00:00Z`);
+  while (cursor.getTime() <= end.getTime()) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
+
+function dayOfWeekFromLocalDate(dateIso: string): DayOfWeek {
+  // Noon MSK avoids DST/boundary ambiguity for the calendar weekday.
+  const instant = moscowInstant(dateIso, "12:00");
+  return JS_DAY_TO_ENUM[instant.getUTCDay()];
+}
+
+async function removeClosedDaySessions(locationId: string) {
+  const sessions = await prisma.session.findMany({
+    where: { locationId, status: "SCHEDULED" },
+    select: { id: true, startsAt: true },
+  });
+
+  const closedIds: string[] = [];
+  for (const session of sessions) {
+    const localDate = session.startsAt.toLocaleDateString("en-CA", {
+      timeZone: DEMO_LOCATION_TIMEZONE,
+    });
+    if (dayOfWeekFromLocalDate(localDate) === "TUESDAY") {
+      closedIds.push(session.id);
+    }
+  }
+
+  if (closedIds.length > 0) {
+    await prisma.session.deleteMany({ where: { id: { in: closedIds } } });
+  }
+}
+
 async function seedSessions(location: {
   id: string;
   defaultCapacity: number;
@@ -220,14 +274,13 @@ async function seedSessions(location: {
   const schedules = await prisma.locationSchedule.findMany({ where: { locationId: location.id } });
   const scheduleByDay = new Map(schedules.map((schedule) => [schedule.dayOfWeek, schedule]));
 
-  const today = new Date();
+  await removeClosedDaySessions(location.id);
+
   let createdCount = 0;
   let isFirstSession = true;
 
-  for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
-    const day = addDays(today, dayOffset);
-    const dateIso = toDateIso(day);
-    const dayOfWeek = JS_DAY_TO_ENUM[day.getUTCDay()];
+  for (const dateIso of eachExhibitionDate()) {
+    const dayOfWeek = dayOfWeekFromLocalDate(dateIso);
     const schedule = scheduleByDay.get(dayOfWeek);
     if (!schedule || schedule.isClosed) continue;
 
@@ -251,7 +304,7 @@ async function seedSessions(location: {
 
       await prisma.session.upsert({
         where: { locationId_startsAt: { locationId: location.id, startsAt } },
-        update: {},
+        update: { status: "SCHEDULED", capacity },
         create: {
           locationId: location.id,
           startsAt,

@@ -158,11 +158,22 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
     active?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
   }, [selectedDate]);
 
-  const dateList = useMemo(
-    () =>
-      config ? buildDateList(config.availableDateRange.from, config.availableDateRange.to) : [],
-    [config],
-  );
+  const dateList = useMemo(() => {
+    if (!config) return [];
+    const closed = new Set(config.closedWeekdays ?? []);
+    const weekdayEnum = [
+      "SUNDAY",
+      "MONDAY",
+      "TUESDAY",
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+      "SATURDAY",
+    ] as const;
+    return buildDateList(config.availableDateRange.from, config.availableDateRange.to).filter(
+      (key) => !closed.has(weekdayEnum[new Date(`${key}T12:00:00`).getDay()]),
+    );
+  }, [config]);
 
   const selectedSession =
     sessionsData?.sessions.find((session) => session.publicId === selectedSessionId) ?? null;

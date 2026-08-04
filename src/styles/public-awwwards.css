@@ -184,6 +184,22 @@
   gap: 14px;
   margin-top: 28px;
 }
+.public-awwwards .hero-address {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 420px;
+  margin: 16px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+.public-awwwards .hero-address svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--green-deep);
+}
 
 .public-awwwards .booking-section {
   position: relative;
@@ -687,6 +703,10 @@
   .public-awwwards .hero-subtitle { font-size: 21px; }
   .public-awwwards .hero-copy p { max-width: 310px; font-size: 15px; }
   .public-awwwards .hero-actions .button-ghost { display: none; }
+  .public-awwwards .hero-address {
+    max-width: 310px;
+    font-size: 13px;
+  }
 
   .public-awwwards .booking-section { margin-top: -68px; }
   .public-awwwards .booking-card,
