@@ -19,7 +19,17 @@ const eslintConfig = [
       tailwindcss: {
         callees: ["cn", "cva"],
         config: `${__dirname}/tailwind.config.ts`,
+        whitelist: ["director-.*", "cashier-.*"],
       },
+    },
+  },
+  {
+    files: ["src/app/director/**/*.{ts,tsx}", "src/app/(cashier)/**/*.{ts,tsx}"],
+    rules: {
+      // Staff UIs use adjacent label/input pairs styled by scoped CSS.
+      "jsx-a11y/label-has-associated-control": "off",
+      "jsx-a11y/no-autofocus": "off",
+      "tailwindcss/no-custom-classname": "off",
     },
   },
 ];

@@ -115,6 +115,7 @@ async function createCashierSaleInTransaction(
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,
+    locationId: session.locationId,
     cashierId,
     customerName: input.customerName,
     customerPhone: input.customerPhone,

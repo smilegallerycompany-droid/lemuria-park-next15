@@ -103,6 +103,18 @@ enum CheckInResult {
   EXPIRED
 }
 
+enum RefundStatus {
+  PENDING
+  COMPLETED
+  REJECTED
+}
+
+enum TicketDeliveryStatus {
+  SENT
+  FAILED
+  NOT_CONFIGURED
+}
+
 // ---------------------------------------------------------------------------
 // Staff & audit
 // ---------------------------------------------------------------------------
@@ -118,13 +130,51 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  cashierOrders   Order[]         @relation("OrderCashier")
-  cashierPayments Payment[]       @relation("PaymentCashier")
-  checkIns        TicketCheckIn[] @relation("CheckInStaff")
-  auditLogs       AuditLog[]      @relation("AuditActor")
+  locations        UserLocation[]
+  staffSessions    StaffSession[]
+  cashierOrders    Order[]          @relation("OrderCashier")
+  cashierPayments  Payment[]        @relation("PaymentCashier")
+  checkIns         TicketCheckIn[]  @relation("CheckInStaff")
+  auditLogs        AuditLog[]       @relation("AuditActor")
+  refunds          Refund[]         @relation("RefundActor")
+  printLogs        PrintLog[]       @relation("PrintActor")
+  ticketDeliveries TicketDelivery[] @relation("DeliveryActor")
 
   @@index([role])
   @@index([status])
+}
+
+model UserLocation {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  locationId String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, locationId])
+  @@index([locationId])
+  @@index([userId])
+}
+
+model StaffSession {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  /// Client IP at session creation.
+  ip        String?
+  /// User-Agent at session creation.
+  ua        String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([userId, revokedAt])
 }
 
 model AuditLog {
@@ -134,8 +184,11 @@ model AuditLog {
   action     String
   entityType String
   entityId   String?
+  before     Json?
+  after      Json?
   metadata   Json?
   ipAddress  String?
+  userAgent  String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -169,10 +222,12 @@ model Location {
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
-  schedules    LocationSchedule[]
-  priceRules   PriceRule[]
-  sessions     Session[]
-  galleryItems GalleryItem[]
+  schedules     LocationSchedule[]
+  priceRules    PriceRule[]
+  sessions      Session[]
+  galleryItems  GalleryItem[]
+  userLocations UserLocation[]
+  orders        Order[]
 
   @@index([status])
   @@index([city])
@@ -318,6 +373,9 @@ model Order {
   number                 String       @unique
   sessionId              String
   session                Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  /// Denormalized from session for director/cashier filtering. Optional for legacy rows.
+  locationId             String?
+  location               Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
   reservationId          String?      @unique
   reservation            Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
   status                 OrderStatus  @default(DRAFT)
@@ -342,11 +400,15 @@ model Order {
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
 
-  items    OrderItem[]
-  payments Payment[]
-  tickets  Ticket[]
+  items      OrderItem[]
+  payments   Payment[]
+  tickets    Ticket[]
+  refunds    Refund[]
+  deliveries TicketDelivery[]
+  printLogs  PrintLog[]
 
   @@index([sessionId, status])
+  @@index([locationId])
   @@index([status])
   @@index([source])
   @@index([status, paymentExpiresAt])
@@ -399,6 +461,55 @@ model Payment {
 
   @@index([orderId, status])
   @@index([status])
+}
+
+/// Financial refund history — never delete rows; mark status instead.
+model Refund {
+  id        String       @id @default(cuid())
+  orderId   String
+  order     Order        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  /// Amount in kopecks.
+  amount    Int
+  status    RefundStatus @default(PENDING)
+  reason    String?
+  actorId   String?
+  actor     User?        @relation("RefundActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TicketDelivery {
+  id           String               @id @default(cuid())
+  orderId      String
+  order        Order                @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  channel      String
+  toAddress    String
+  status       TicketDeliveryStatus
+  errorMessage String?
+  actorId      String?
+  actor        User?                @relation("DeliveryActor", fields: [actorId], references: [id], onDelete: SetNull)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+model PrintLog {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  actorId   String?
+  actor     User?    @relation("PrintActor", fields: [actorId], references: [id], onDelete: SetNull)
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -457,6 +568,7 @@ model SiteSettings {
   ctaLabel               String   @default("Купить билет")
   defaultSessionInterval Int      @default(30)
   defaultCapacity        Int      @default(15)
+  sessionGenerationDays  Int      @default(60)
   maintenanceMode        Boolean  @default(false)
   metaTitle              String?
   metaDescription        String?

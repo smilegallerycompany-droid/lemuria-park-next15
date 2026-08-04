@@ -6,8 +6,11 @@ export interface AuditLogInput {
   action: string;
   entityType: string;
   entityId?: string | null;
+  before?: Prisma.InputJsonValue;
+  after?: Prisma.InputJsonValue;
   metadata?: Prisma.InputJsonValue;
   ipAddress?: string | null;
+  userAgent?: string | null;
 }
 
 /**
@@ -22,8 +25,11 @@ export async function recordAuditLog(db: DbClient, input: AuditLogInput): Promis
       action: input.action,
       entityType: input.entityType,
       entityId: input.entityId ?? null,
+      before: input.before ?? undefined,
+      after: input.after ?? undefined,
       metadata: input.metadata ?? undefined,
       ipAddress: input.ipAddress ?? null,
+      userAgent: input.userAgent ?? null,
     },
   });
 }

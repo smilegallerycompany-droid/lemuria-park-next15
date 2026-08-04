@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { CashierShell } from "@/components/cashier/cashier-shell";
+import "./cashier.css";
 
 export const metadata: Metadata = {
   title: "Касса — Лемурия Парк",
@@ -6,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function CashierLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  return <CashierShell>{children}</CashierShell>;
 }

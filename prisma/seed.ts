@@ -46,7 +46,7 @@ const JS_DAY_TO_ENUM: DayOfWeek[] = [
 async function seedSiteAndContactSettings() {
   await prisma.siteSettings.upsert({
     where: { id: "singleton-site-settings" },
-    update: {},
+    update: { sessionGenerationDays: 60 },
     create: {
       id: "singleton-site-settings",
       siteName: "Лемурия Парк",
@@ -54,6 +54,7 @@ async function seedSiteAndContactSettings() {
       ctaLabel: "Купить билет",
       defaultSessionInterval: 30,
       defaultCapacity: 15,
+      sessionGenerationDays: 60,
     },
   });
 
@@ -79,10 +80,16 @@ const EXHIBITION_TO = "2026-09-15";
 async function seedUsers() {
   const ownerPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
   const cashierPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
+  const adminPasswordHash = await bcrypt.hash("ChangeMe123!", 10);
 
   const owner = await prisma.user.upsert({
     where: { email: "owner@lemuriapark.ru" },
-    update: {},
+    update: {
+      passwordHash: ownerPasswordHash,
+      role: "OWNER",
+      status: "ACTIVE",
+      name: "Владелец",
+    },
     create: {
       email: "owner@lemuriapark.ru",
       name: "Владелец",
@@ -92,9 +99,30 @@ async function seedUsers() {
     },
   });
 
+  // Optional admin account for the director panel (OWNER also works).
+  await prisma.user.upsert({
+    where: { email: "admin@lemuriapark.ru" },
+    update: {
+      passwordHash: adminPasswordHash,
+      role: "ADMIN",
+      status: "ACTIVE",
+    },
+    create: {
+      email: "admin@lemuriapark.ru",
+      name: "Администратор",
+      passwordHash: adminPasswordHash,
+      role: "ADMIN",
+      status: "ACTIVE",
+    },
+  });
+
   await prisma.user.upsert({
     where: { email: "cashier@lemuriapark.ru" },
-    update: {},
+    update: {
+      passwordHash: cashierPasswordHash,
+      role: "CASHIER",
+      status: "ACTIVE",
+    },
     create: {
       email: "cashier@lemuriapark.ru",
       name: "Кассир",

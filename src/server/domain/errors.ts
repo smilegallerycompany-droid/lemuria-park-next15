@@ -22,7 +22,9 @@ export type DomainErrorCode =
   | "ORDER_NOT_PAID"
   | "PAYMENT_NOT_CONFIGURED"
   | "PAYMENT_PROVIDER_ERROR"
-  | "PAYMENT_WEBHOOK_INVALID";
+  | "PAYMENT_WEBHOOK_INVALID"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

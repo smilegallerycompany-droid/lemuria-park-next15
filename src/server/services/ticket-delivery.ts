@@ -8,6 +8,25 @@ export type TicketEmailResult = {
   message: string;
 };
 
+async function recordDelivery(params: {
+  orderId: string;
+  toAddress: string;
+  status: "SENT" | "NOT_CONFIGURED" | "FAILED";
+  errorMessage?: string;
+  actorId?: string;
+}) {
+  await prisma.ticketDelivery.create({
+    data: {
+      orderId: params.orderId,
+      channel: "EMAIL",
+      toAddress: params.toAddress,
+      status: params.status,
+      errorMessage: params.errorMessage ?? null,
+      actorId: params.actorId ?? null,
+    },
+  });
+}
+
 /**
  * Sends ticket email via Yandex Cloud Postbox (SMTP over HTTPS API later).
  * Until credentials are set — returns NOT_CONFIGURED and never pretends the email was sent.
@@ -30,6 +49,13 @@ export async function queueTicketEmail(params: {
     Boolean(env.EMAIL_FROM && env.EMAIL_SMTP_HOST && env.EMAIL_SMTP_USER && env.EMAIL_SMTP_PASSWORD);
 
   if (!configured) {
+    await recordDelivery({
+      orderId: order.id,
+      toAddress: order.customerEmail,
+      status: "NOT_CONFIGURED",
+      errorMessage: "EMAIL_NOT_CONFIGURED",
+      actorId: params.actorId,
+    });
     await recordAuditLog(prisma, {
       actorId: params.actorId,
       action: "TICKET_EMAIL_SKIPPED",
@@ -43,11 +69,14 @@ export async function queueTicketEmail(params: {
     };
   }
 
-  // SMTP send without adding a heavy dependency: use Node's fetch against a
-  // lightweight relay is not available — call Postbox-compatible endpoint via
-  // documented SMTP credentials through a minimal TCP-less path is not viable.
-  // For production we use the Postbox HTTP API (AWS SES-compatible) when endpoint is set.
   if (!env.EMAIL_API_ENDPOINT || !env.EMAIL_API_KEY) {
+    await recordDelivery({
+      orderId: order.id,
+      toAddress: order.customerEmail,
+      status: "NOT_CONFIGURED",
+      errorMessage: "EMAIL_API_NOT_CONFIGURED",
+      actorId: params.actorId,
+    });
     await recordAuditLog(prisma, {
       actorId: params.actorId,
       action: "TICKET_EMAIL_SKIPPED",
@@ -73,8 +102,6 @@ export async function queueTicketEmail(params: {
   ].join("\n");
 
   try {
-    // SES-compatible SendEmail (Postbox). Signature/v4 can be added when keys arrive;
-    // until then we require a pre-signed gateway or simple bearer if provided.
     const res = await fetch(env.EMAIL_API_ENDPOINT, {
       method: "POST",
       headers: {
@@ -91,6 +118,13 @@ export async function queueTicketEmail(params: {
 
     if (!res.ok) {
       const body = await res.text().catch(() => "");
+      await recordDelivery({
+        orderId: order.id,
+        toAddress: order.customerEmail,
+        status: "FAILED",
+        errorMessage: `HTTP ${res.status}: ${body.slice(0, 300)}`,
+        actorId: params.actorId,
+      });
       await recordAuditLog(prisma, {
         actorId: params.actorId,
         action: "TICKET_EMAIL_FAILED",
@@ -101,6 +135,12 @@ export async function queueTicketEmail(params: {
       return { status: "FAILED", message: "Провайдер email отклонил отправку" };
     }
 
+    await recordDelivery({
+      orderId: order.id,
+      toAddress: order.customerEmail,
+      status: "SENT",
+      actorId: params.actorId,
+    });
     await recordAuditLog(prisma, {
       actorId: params.actorId,
       action: "TICKET_EMAIL_SENT",
@@ -110,12 +150,20 @@ export async function queueTicketEmail(params: {
     });
     return { status: "SENT", message: "Письмо отправлено" };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "unknown";
+    await recordDelivery({
+      orderId: order.id,
+      toAddress: order.customerEmail,
+      status: "FAILED",
+      errorMessage: message,
+      actorId: params.actorId,
+    });
     await recordAuditLog(prisma, {
       actorId: params.actorId,
       action: "TICKET_EMAIL_FAILED",
       entityType: "Order",
       entityId: order.id,
-      metadata: { error: error instanceof Error ? error.message : "unknown" },
+      metadata: { error: message },
     });
     return { status: "FAILED", message: "Не удалось связаться с почтовым сервисом" };
   }

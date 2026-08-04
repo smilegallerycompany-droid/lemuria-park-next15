@@ -133,9 +133,15 @@ async function createOrderInTransaction(
   const totalAmount = computeOrderTotal(lineItems);
   const number = generateOrderNumber();
 
+  const session = await tx.session.findUnique({
+    where: { id: reservation.sessionId },
+    select: { locationId: true },
+  });
+
   const order = await orderRepository.create(tx, {
     number,
     sessionId: reservation.sessionId,
+    locationId: session?.locationId ?? null,
     reservationId: reservation.id,
     customerName: input.customerName,
     customerPhone: input.customerPhone,

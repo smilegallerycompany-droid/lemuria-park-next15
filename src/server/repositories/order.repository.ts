@@ -5,6 +5,7 @@ import type { OrderLineItemInput } from "@/server/domain/order.domain";
 export interface CreateOrderRecordInput {
   number: string;
   sessionId: string;
+  locationId?: string | null;
   reservationId: string;
   customerName: string;
   customerPhone: string;
@@ -19,6 +20,7 @@ export interface CreateOrderRecordInput {
 export interface CreateCashierOrderRecordInput {
   number: string;
   sessionId: string;
+  locationId?: string | null;
   cashierId: string;
   customerName: string;
   customerPhone: string;
@@ -84,6 +86,7 @@ export const orderRepository = {
       data: {
         number: input.number,
         sessionId: input.sessionId,
+        locationId: input.locationId ?? null,
         reservationId: input.reservationId,
         status: "AWAITING_PAYMENT",
         source: "ONLINE",
@@ -117,6 +120,7 @@ export const orderRepository = {
       data: {
         number: input.number,
         sessionId: input.sessionId,
+        locationId: input.locationId ?? null,
         status: "PAID",
         source: "CASHIER",
         cashierId: input.cashierId,

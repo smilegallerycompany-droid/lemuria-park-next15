@@ -18,7 +18,9 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "INVALID_REFERENCE"
   | "DATABASE_ERROR"
-  | "INTERNAL_ERROR";
+  | "INTERNAL_ERROR"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN";
 
 /** Maps each domain-layer error code to its public HTTP status. */
 const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
@@ -40,6 +42,8 @@ const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   PAYMENT_NOT_CONFIGURED: 503,
   PAYMENT_PROVIDER_ERROR: 502,
   PAYMENT_WEBHOOK_INVALID: 400,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
 };
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */
