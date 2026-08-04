@@ -40,11 +40,15 @@ export async function createStaffSession(params: {
     },
   });
 
+  // Secure cookies only on HTTPS. `next start` sets NODE_ENV=production even for
+  // local http://127.0.0.1 E2E — Secure+http would drop the session cookie.
+  const secure = env.NEXT_PUBLIC_APP_URL.startsWith("https://");
+
   const jar = await cookies();
   jar.set(STAFF_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: env.NODE_ENV === "production",
+    secure,
     path: "/",
     maxAge: SESSION_TTL_MS / 1000,
   });

@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { loginStaff } from "@/server/auth/login";
+import { clientIpFromRequest, consumeRateLimit } from "@/server/security/rate-limit";
+import { DomainError } from "@/server/domain/errors";
 
 const schema = z.object({
   email: z.string().email(),
@@ -14,8 +16,16 @@ export async function POST(req: Request) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON в теле запроса", 400);
     });
     const input = schema.parse(json);
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
+    const ip = clientIpFromRequest(req);
     const ua = req.headers.get("user-agent");
+
+    const limit = consumeRateLimit(`login:${ip}:${input.email.toLowerCase()}`, {
+      limit: 10,
+      windowMs: 15 * 60 * 1000,
+    });
+    if (!limit.allowed) {
+      throw new DomainError("RATE_LIMITED", "Слишком много попыток входа. Попробуйте позже.");
+    }
 
     const allowedRoles =
       input.portal === "director"

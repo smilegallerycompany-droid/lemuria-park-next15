@@ -3,7 +3,13 @@ import { z } from "zod";
 /**
  * Environment for Lemuria Park on Yandex Cloud / local.
  * Payment and email never invent success when credentials are missing.
+ *
+ * Seed passwords such as ChangeMe123! are demo-only — never use them in
+ * production. `prisma/seed.ts` refuses to run when NODE_ENV=production.
  */
+const DEFAULT_AUTH_SECRET = "dev-only-auth-secret-change-me";
+const DEFAULT_QR_SECRET = "dev-qr-signing-secret-change-me";
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
@@ -28,11 +34,28 @@ const envSchema = z.object({
   EMAIL_API_ENDPOINT: z.string().optional().default(""),
   EMAIL_API_KEY: z.string().optional().default(""),
 
-  QR_SIGNING_SECRET: z.string().min(8).default("dev-qr-signing-secret-change-me"),
-  AUTH_SECRET: z.string().min(16).default("dev-only-auth-secret-change-me"),
+  QR_SIGNING_SECRET: z.string().min(8).default(DEFAULT_QR_SECRET),
+  AUTH_SECRET: z.string().min(16).default(DEFAULT_AUTH_SECRET),
+
+  /**
+   * Optional DSN for a future error monitoring SDK (Sentry, etc.).
+   * Presently only signals ConsoleErrorReporter that a sink is configured.
+   */
+  ERROR_MONITORING_DSN: z.string().optional().default(""),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+function isWeakSecret(value: string, defaults: string[]): boolean {
+  const lower = value.toLowerCase();
+  if (defaults.some((d) => value === d || lower.includes("change-me") || lower.includes("dev-only"))) {
+    return true;
+  }
+  if (lower.includes("dev-qr") || lower.includes("replace-with")) {
+    return true;
+  }
+  return false;
+}
 
 function loadEnv(): Env {
   const parsed = envSchema.safeParse(process.env);
@@ -53,11 +76,21 @@ function loadEnv(): Env {
     data.NEXT_PUBLIC_APP_URL.includes("127.0.0.1");
 
   if (isProductionRuntime && !isLocalhostApp) {
-    if (data.AUTH_SECRET.includes("dev-only") || data.AUTH_SECRET.length < 32) {
-      throw new Error("Production requires a strong AUTH_SECRET (min 32 chars).");
+    if (
+      isWeakSecret(data.AUTH_SECRET, [DEFAULT_AUTH_SECRET]) ||
+      data.AUTH_SECRET.length < 32
+    ) {
+      throw new Error(
+        "Production requires a strong AUTH_SECRET (min 32 chars, not a default/dev value).",
+      );
     }
-    if (data.QR_SIGNING_SECRET.includes("dev-qr") || data.QR_SIGNING_SECRET.length < 32) {
-      throw new Error("Production requires a strong QR_SIGNING_SECRET (min 32 chars).");
+    if (
+      isWeakSecret(data.QR_SIGNING_SECRET, [DEFAULT_QR_SECRET]) ||
+      data.QR_SIGNING_SECRET.length < 32
+    ) {
+      throw new Error(
+        "Production requires a strong QR_SIGNING_SECRET (min 32 chars, not a default/dev value).",
+      );
     }
   }
 

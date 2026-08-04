@@ -2,6 +2,8 @@ import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { createOrderInputSchema } from "@/lib/validation/order";
 import { createOrder } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
+import { clientIpFromRequest, consumeRateLimit } from "@/server/security/rate-limit";
+import { DomainError } from "@/server/domain/errors";
 
 /**
  * Creates an Order from an existing Reservation. The client sends only
@@ -17,6 +19,15 @@ import { toOrderDto } from "@/server/mappers/order";
  */
 export async function POST(req: Request) {
   try {
+    const ip = clientIpFromRequest(req);
+    const limit = consumeRateLimit(`public-order:${ip}`, {
+      limit: 20,
+      windowMs: 60 * 1000,
+    });
+    if (!limit.allowed) {
+      throw new DomainError("RATE_LIMITED", "Слишком много запросов. Попробуйте позже.");
+    }
+
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON в теле запроса", 400);
     });

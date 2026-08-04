@@ -2,6 +2,8 @@ import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { createReservationInputSchema } from "@/lib/validation/reservation";
 import { createReservation } from "@/server/services/reservations";
 import { toReservationDto } from "@/server/mappers/reservation";
+import { clientIpFromRequest, consumeRateLimit } from "@/server/security/rate-limit";
+import { DomainError } from "@/server/domain/errors";
 
 /**
  * Creates a temporary seat hold for a session. Runs inside a Serializable
@@ -16,6 +18,15 @@ import { toReservationDto } from "@/server/mappers/reservation";
  */
 export async function POST(req: Request) {
   try {
+    const ip = clientIpFromRequest(req);
+    const limit = consumeRateLimit(`public-reservation:${ip}`, {
+      limit: 30,
+      windowMs: 60 * 1000,
+    });
+    if (!limit.allowed) {
+      throw new DomainError("RATE_LIMITED", "Слишком много запросов. Попробуйте позже.");
+    }
+
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON в теле запроса", 400);
     });

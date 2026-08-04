@@ -1,0 +1,10 @@
+User-agent: *
+Disallow: /cashier
+Disallow: /director
+Disallow: /admin
+Disallow: /staff
+Disallow: /api/
+
+Allow: /
+
+Sitemap: https://lemuriapark.ru/sitemap.xml

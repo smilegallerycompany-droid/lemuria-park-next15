@@ -5,6 +5,7 @@ import { DomainError } from "@/server/domain/errors";
 import { getPaymentProvider } from "@/server/payments";
 import { issueTicketsForOrder } from "@/server/services/tickets";
 import { queueTicketEmail } from "@/server/services/ticket-delivery";
+import { getErrorReporter } from "@/server/monitoring/error-reporter";
 import type { OrderWithItems } from "@/server/services/orders";
 
 export type OnlinePaymentStart = {
@@ -61,52 +62,81 @@ export async function startOnlinePayment(order: OrderWithItems): Promise<OnlineP
   }
 
   const idempotencyKey = `order-pay-${order.id}`;
-  const created = await provider.createPayment({
-    orderId: order.id,
-    orderNumber: order.number,
-    amountKopecks: order.totalAmount,
-    description: `Лемурия Парк · заказ ${order.number}`,
-    returnUrl: `${env.NEXT_PUBLIC_APP_URL}/checkout/payment?order=${encodeURIComponent(order.number)}`,
-    idempotencyKey,
-    customerEmail: order.customerEmail,
-  });
-
-  const payment = await prisma.payment.create({
-    data: {
+  try {
+    const created = await provider.createPayment({
       orderId: order.id,
-      method: "CARD_ONLINE",
-      status: "PENDING",
-      amount: order.totalAmount,
-      currency: "RUB",
-      provider: created.provider,
-      providerPaymentId: created.providerPaymentId,
+      orderNumber: order.number,
+      amountKopecks: order.totalAmount,
+      description: `Лемурия Парк · заказ ${order.number}`,
+      returnUrl: `${env.NEXT_PUBLIC_APP_URL}/checkout/payment?order=${encodeURIComponent(order.number)}`,
       idempotencyKey,
-      confirmationUrl: created.confirmationUrl,
-      payload: created as object,
-    },
-  });
+      customerEmail: order.customerEmail,
+    });
 
-  await recordAuditLog(prisma, {
-    action: "PAYMENT_CREATED",
-    entityType: "Payment",
-    entityId: payment.id,
-    metadata: { orderId: order.id, providerPaymentId: created.providerPaymentId },
-  });
+    const payment = await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        method: "CARD_ONLINE",
+        status: "PENDING",
+        amount: order.totalAmount,
+        currency: "RUB",
+        provider: created.provider,
+        providerPaymentId: created.providerPaymentId,
+        idempotencyKey,
+        confirmationUrl: created.confirmationUrl,
+        payload: created as object,
+      },
+    });
 
-  return {
-    configured: true,
-    confirmationUrl: payment.confirmationUrl,
-    paymentStatus: payment.status,
-    providerPaymentId: payment.providerPaymentId,
-  };
+    await recordAuditLog(prisma, {
+      action: "PAYMENT_CREATED",
+      entityType: "Payment",
+      entityId: payment.id,
+      metadata: { orderId: order.id, providerPaymentId: created.providerPaymentId },
+    });
+
+    return {
+      configured: true,
+      confirmationUrl: payment.confirmationUrl,
+      paymentStatus: payment.status,
+      providerPaymentId: payment.providerPaymentId,
+    };
+  } catch (error) {
+    getErrorReporter().captureException(error, {
+      event: "PAYMENT_CREATE_FAILED",
+      tags: { orderNumber: order.number, orderId: order.id },
+    });
+    throw error;
+  }
 }
 
 /**
  * Applies a YooKassa webhook. Only marks PAID on real provider SUCCEEDED.
+ * Rejects when provider is not configured or payload lacks object.id.
  */
 export async function applyYooKassaWebhook(payload: unknown): Promise<{ handled: boolean }> {
   const provider = getPaymentProvider();
-  const update = provider.parseWebhook(payload);
+  if (!provider.configured) {
+    getErrorReporter().captureMessage("Webhook rejected: YooKassa not configured", {
+      event: "PAYMENT_WEBHOOK_INVALID",
+      tags: { reason: "NOT_CONFIGURED" },
+    });
+    throw new DomainError(
+      "PAYMENT_NOT_CONFIGURED",
+      "ЮKassa не настроена — webhook отклонён",
+    );
+  }
+
+  let update;
+  try {
+    update = provider.parseWebhook(payload);
+  } catch (error) {
+    getErrorReporter().captureException(error, {
+      event: "PAYMENT_WEBHOOK_INVALID",
+      tags: { reason: "PARSE_FAILED" },
+    });
+    throw error;
+  }
 
   const payment = await prisma.payment.findUnique({
     where: { providerPaymentId: update.providerPaymentId },
@@ -124,7 +154,10 @@ export async function applyYooKassaWebhook(payload: unknown): Promise<{ handled:
     if (payment.status === "PENDING") {
       await prisma.payment.update({
         where: { id: payment.id },
-        data: { status: update.status === "FAILED" ? "FAILED" : "CANCELLED", payload: update.raw as object },
+        data: {
+          status: update.status === "FAILED" ? "FAILED" : "CANCELLED",
+          payload: update.raw as object,
+        },
       });
     }
     return { handled: true };
@@ -134,37 +167,49 @@ export async function applyYooKassaWebhook(payload: unknown): Promise<{ handled:
     return { handled: true };
   }
 
+  // Idempotent: duplicate SUCCEEDED webhooks must not double-issue tickets.
   if (payment.status === "SUCCEEDED") {
     return { handled: true };
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.payment.update({
-      where: { id: payment.id },
-      data: { status: "SUCCEEDED", payload: update.raw as object },
-    });
-
-    const order = await tx.order.findUnique({ where: { id: payment.orderId } });
-    if (!order) {
-      throw new DomainError("ORDER_NOT_FOUND", "Заказ для платежа не найден");
-    }
-
-    if (order.status !== "PAID") {
-      await tx.order.update({
-        where: { id: order.id },
-        data: { status: "PAID", paymentExpiresAt: null },
+  try {
+    await prisma.$transaction(async (tx) => {
+      const claimed = await tx.payment.updateMany({
+        where: { id: payment.id, status: { not: "SUCCEEDED" } },
+        data: { status: "SUCCEEDED", payload: update.raw as object },
       });
-    }
+      if (claimed.count === 0) {
+        return;
+      }
 
-    await issueTicketsForOrder(order.id, tx);
+      const order = await tx.order.findUnique({ where: { id: payment.orderId } });
+      if (!order) {
+        throw new DomainError("ORDER_NOT_FOUND", "Заказ для платежа не найден");
+      }
 
-    await recordAuditLog(tx, {
-      action: "PAYMENT_SUCCEEDED",
-      entityType: "Order",
-      entityId: order.id,
-      metadata: { providerPaymentId: update.providerPaymentId },
+      if (order.status !== "PAID") {
+        await tx.order.update({
+          where: { id: order.id },
+          data: { status: "PAID", paymentExpiresAt: null },
+        });
+      }
+
+      await issueTicketsForOrder(order.id, tx);
+
+      await recordAuditLog(tx, {
+        action: "PAYMENT_SUCCEEDED",
+        entityType: "Order",
+        entityId: order.id,
+        metadata: { providerPaymentId: update.providerPaymentId },
+      });
     });
-  });
+  } catch (error) {
+    getErrorReporter().captureException(error, {
+      event: "PAYMENT_WEBHOOK_APPLY_FAILED",
+      tags: { providerPaymentId: update.providerPaymentId, orderId: payment.orderId },
+    });
+    throw error;
+  }
 
   // Email is best-effort and must never fake success.
   await queueTicketEmail({ orderId: payment.orderId }).catch(() => undefined);

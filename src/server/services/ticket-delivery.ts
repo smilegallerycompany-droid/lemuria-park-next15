@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 import { recordAuditLog } from "@/lib/audit";
 import { DomainError } from "@/server/domain/errors";
+import { getErrorReporter } from "@/server/monitoring/error-reporter";
 
 export type TicketEmailResult = {
   status: "SENT" | "NOT_CONFIGURED" | "FAILED";
@@ -61,7 +62,7 @@ export async function queueTicketEmail(params: {
       action: "TICKET_EMAIL_SKIPPED",
       entityType: "Order",
       entityId: order.id,
-      metadata: { reason: "EMAIL_NOT_CONFIGURED", to: order.customerEmail },
+      metadata: { reason: "EMAIL_NOT_CONFIGURED" },
     });
     return {
       status: "NOT_CONFIGURED",
@@ -130,7 +131,11 @@ export async function queueTicketEmail(params: {
         action: "TICKET_EMAIL_FAILED",
         entityType: "Order",
         entityId: order.id,
-        metadata: { status: res.status, body: body.slice(0, 300) },
+        metadata: { status: res.status },
+      });
+      getErrorReporter().captureMessage("Ticket email provider rejected send", {
+        event: "TICKET_EMAIL_FAILED",
+        tags: { orderId: order.id, httpStatus: res.status },
       });
       return { status: "FAILED", message: "Провайдер email отклонил отправку" };
     }
@@ -146,7 +151,7 @@ export async function queueTicketEmail(params: {
       action: "TICKET_EMAIL_SENT",
       entityType: "Order",
       entityId: order.id,
-      metadata: { to: order.customerEmail },
+      metadata: { orderNumber: order.number },
     });
     return { status: "SENT", message: "Письмо отправлено" };
   } catch (error) {
@@ -163,7 +168,11 @@ export async function queueTicketEmail(params: {
       action: "TICKET_EMAIL_FAILED",
       entityType: "Order",
       entityId: order.id,
-      metadata: { error: message },
+      metadata: { error: message.slice(0, 200) },
+    });
+    getErrorReporter().captureException(error, {
+      event: "TICKET_EMAIL_FAILED",
+      tags: { orderId: order.id },
     });
     return { status: "FAILED", message: "Не удалось связаться с почтовым сервисом" };
   }
