@@ -212,7 +212,15 @@ export default function HomePage() {
           </div>
           <div>
             <small>Документы</small>
-            <p>Политика · Оферта</p>
+            <p>
+              <Link href="/policy" style={{ color: "inherit" }}>
+                Политика
+              </Link>
+              {" · "}
+              <Link href="/offer" style={{ color: "inherit" }}>
+                Оферта
+              </Link>
+            </p>
           </div>
         </div>
       </footer>

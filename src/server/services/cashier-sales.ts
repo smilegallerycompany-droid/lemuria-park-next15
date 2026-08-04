@@ -17,6 +17,7 @@ import { expireStaleReservations } from "@/server/services/reservation-cleanup";
 import { expireStalePaymentOrders } from "@/server/services/order-cleanup";
 import { getSessionAvailability } from "@/server/services/availability";
 import { findTicketTypeByCode, resolveTicketPrice } from "@/server/services/pricing";
+import { issueTicketsForOrder } from "@/server/services/tickets";
 import type { CashierSaleInput } from "@/lib/validation/cashier";
 
 function isRetryable(error: unknown): boolean {
@@ -136,6 +137,8 @@ async function createCashierSaleInTransaction(
       sessionId: session.id,
     },
   });
+
+  await issueTicketsForOrder(order.id, tx);
 
   return order;
 }

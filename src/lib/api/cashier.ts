@@ -83,3 +83,19 @@ export function createCashierSale(
     items: Array<{ ticketTypeName: string; quantity: number; subtotal: number }>;
   }>("/api/cashier/sales", input, { idempotencyKey });
 }
+
+export type CashierCheckInResult = {
+  result: "SUCCESS" | "ALREADY_USED" | "INVALID" | "CANCELLED" | "EXPIRED";
+  message: string;
+  ticket?: {
+    publicId: string;
+    status: string;
+    sessionLocalDate: string;
+    sessionLocalTime: string;
+    usedAt: string | null;
+  };
+};
+
+export function cashierCheckIn(qrToken: string) {
+  return apiPost<CashierCheckInResult>("/api/cashier/check-in", { qrToken });
+}

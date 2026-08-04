@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
+import { issueTicketsForOrder } from "@/server/services/tickets";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 interface SuccessPageProps {
@@ -9,8 +10,7 @@ interface SuccessPageProps {
 }
 
 /**
- * Success only for real PAID orders (production status check).
- * Awwwards ticket card visual — no fabricated QR until tickets exist.
+ * Success only for real PAID orders. Tickets issued server-side if missing.
  */
 export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   const { order: orderNumber } = await searchParams;
@@ -24,7 +24,7 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
   }
 
   if (order.status === "EXPIRED" || order.status === "CANCELLED") {
-    const dto = await toOrderDto(order);
+    const dto = await toOrderDto(order, { ensurePayment: false });
     return (
       <main className="page-shell">
         <div className="container">
@@ -53,7 +53,8 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
     redirect(`/checkout/payment?order=${encodeURIComponent(orderNumber)}`);
   }
 
-  const dto = await toOrderDto(order);
+  await issueTicketsForOrder(order.id);
+  const dto = await toOrderDto(order, { ensurePayment: false });
 
   return (
     <main className="page-shell">
@@ -65,7 +66,7 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
               Оплата прошла успешно
             </h1>
             <p style={{ color: "var(--muted)" }}>
-              Заказ оплачен. QR-билеты будут показаны здесь после выпуска (отдельный этап).
+              Заказ оплачен. Покажите QR-код (или токен) на входе.
             </p>
           </div>
 
@@ -106,11 +107,42 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
                 </Link>
               </div>
             </div>
-            <div className="qr">
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 100, lineHeight: 1 }}>▦</div>
-                <p style={{ fontSize: 15 }}>QR появится после выпуска билетов</p>
-              </div>
+            <div className="qr" style={{ alignContent: "start", padding: 24, gap: 16 }}>
+              {dto.tickets.length === 0 ? (
+                <p style={{ fontSize: 15 }}>Билеты выпускаются… обновите страницу</p>
+              ) : (
+                dto.tickets.map((ticket, index) => (
+                  <div
+                    key={ticket.publicId}
+                    style={{
+                      width: "100%",
+                      border: "1px dashed #ccd9c3",
+                      borderRadius: 16,
+                      padding: 16,
+                      textAlign: "left",
+                    }}
+                  >
+                    <p style={{ margin: 0, fontWeight: 850 }}>Билет {index + 1}</p>
+                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>
+                      {ticket.publicId}
+                    </p>
+                    <p
+                      style={{
+                        margin: "12px 0 0",
+                        fontFamily: "ui-monospace, monospace",
+                        fontSize: 13,
+                        wordBreak: "break-all",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {ticket.qrToken}
+                    </p>
+                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>
+                      Статус: {ticket.status}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </section>

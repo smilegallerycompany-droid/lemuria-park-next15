@@ -93,6 +93,10 @@ function CheckoutInner() {
         },
         createIdempotencyKey(),
       );
+      if (order.confirmationUrl) {
+        window.location.href = order.confirmationUrl;
+        return;
+      }
       router.push(`/checkout/payment?order=${encodeURIComponent(order.number)}`);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Не удалось создать заказ");

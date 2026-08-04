@@ -3,14 +3,14 @@ import Link from "next/link";
 import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
 import { formatMoneyFromKopecks } from "@/lib/utils";
+import { PaymentStatusClient } from "@/components/checkout/payment-status-client";
 
 interface PaymentPageProps {
   searchParams: Promise<{ order?: string }>;
 }
 
 /**
- * Honest payment-waiting state — production order status, awwwards visual.
- * No fake success while YooKassa is not connected.
+ * Honest payment-waiting state. Success only after provider webhook → PAID.
  */
 export default async function CheckoutPaymentPage({ searchParams }: PaymentPageProps) {
   const { order: orderNumber } = await searchParams;
@@ -19,7 +19,7 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
   const order = await getOrderByNumber(orderNumber);
   if (!order) redirect("/#booking");
 
-  const dto = await toOrderDto(order);
+  const dto = await toOrderDto(order, { ensurePayment: true });
   if (dto.status === "PAID") redirect(`/success?order=${encodeURIComponent(dto.number)}`);
 
   const isExpired = dto.status === "EXPIRED" || dto.status === "CANCELLED";
@@ -41,7 +41,9 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
             <p style={{ color: "var(--muted)", maxWidth: 560, margin: "12px auto 0" }}>
               {isExpired
                 ? "Время ожидания оплаты истекло или заказ отменён. Оформите бронирование заново."
-                : "ЮKassa ещё не подключена. Мы не показываем фальшивую успешную оплату. После webhook заказ станет PAID и откроется билет."}
+                : dto.paymentConfigured
+                  ? "Перейдите в ЮKassa для оплаты. Билет откроется только после подтверждения платежа."
+                  : "ЮKassa не настроена на сервере. Мы не показываем фальшивую успешную оплату."}
             </p>
           </div>
 
@@ -52,6 +54,10 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
                 <div className="summary-row">
                   <span>Статус</span>
                   <strong>{dto.status}</strong>
+                </div>
+                <div className="summary-row">
+                  <span>Платёж</span>
+                  <strong>{dto.paymentStatus ?? "не создан"}</strong>
                 </div>
                 <div className="summary-row">
                   <span>Дата</span>
@@ -72,6 +78,13 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
                   </div>
                 )}
               </div>
+              {!isExpired && (
+                <PaymentStatusClient
+                  orderNumber={dto.number}
+                  confirmationUrl={dto.confirmationUrl}
+                  paymentConfigured={dto.paymentConfigured}
+                />
+              )}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>
                 <Link className="button button-ghost" href="/#booking">
                   Выбрать другой сеанс

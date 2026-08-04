@@ -36,6 +36,10 @@ const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   RESERVATION_ALREADY_CONVERTED: 409,
   IDEMPOTENCY_CONFLICT: 409,
   ORDER_NOT_FOUND: 404,
+  ORDER_NOT_PAID: 409,
+  PAYMENT_NOT_CONFIGURED: 503,
+  PAYMENT_PROVIDER_ERROR: 502,
+  PAYMENT_WEBHOOK_INVALID: 400,
 };
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */

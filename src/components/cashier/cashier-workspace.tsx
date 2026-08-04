@@ -21,12 +21,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoneyFromKopecks, cn } from "@/lib/utils";
 import { ApiClientError } from "@/lib/api/client";
 import {
+  cashierCheckIn,
   cashierLogin,
   cashierLogout,
   createCashierSale,
   getCashierMe,
   getCashierOrders,
   getCashierSessions,
+  type CashierCheckInResult,
   type CashierOrderRow,
   type CashierSessionCard,
   type CashierSessionsResponse,
@@ -415,18 +417,19 @@ export function CashierWorkspace() {
             </div>
           </Card>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            {[
-              [QrCode, "QR Scanner", "Скоро"],
-              [RotateCcw, "Возврат", "Скоро"],
-              [Printer, "Печать", "Скоро"],
-            ].map(([Icon, title, hint]) => (
-              <Card key={title as string} variant="soft" className="p-4 opacity-80">
-                <Icon className="text-forest" aria-hidden />
-                <p className="mt-2 font-extrabold text-forest">{title as string}</p>
-                <p className="text-xs text-muted-foreground">{hint as string}</p>
-              </Card>
-            ))}
+          <CashierCheckInPanel />
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <Card variant="soft" className="p-4 opacity-80">
+              <RotateCcw className="text-forest" aria-hidden />
+              <p className="mt-2 font-extrabold text-forest">Возврат</p>
+              <p className="text-xs text-muted-foreground">Ещё не подключено</p>
+            </Card>
+            <Card variant="soft" className="p-4 opacity-80">
+              <Printer className="text-forest" aria-hidden />
+              <p className="mt-2 font-extrabold text-forest">Печать</p>
+              <p className="text-xs text-muted-foreground">Ещё не подключено</p>
+            </Card>
           </div>
         </section>
 
@@ -532,5 +535,65 @@ export function CashierWorkspace() {
         </aside>
       </main>
     </div>
+  );
+}
+
+function CashierCheckInPanel() {
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<CashierCheckInResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onScan(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const data = await cashierCheckIn(token);
+      setResult(data);
+      if (data.result === "SUCCESS") setToken("");
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Ошибка сканирования");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card variant="soft" className="mt-5 p-4">
+      <div className="flex items-center gap-2">
+        <QrCode className="text-forest" aria-hidden />
+        <p className="font-extrabold text-forest">Проверка QR</p>
+      </div>
+      <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={(e) => void onScan(e)}>
+        <Input
+          value={token}
+          onChange={(e) => setToken(e.target.value)}
+          placeholder="Вставьте qrToken билета"
+          className="font-mono text-sm"
+          required
+        />
+        <Button type="submit" disabled={busy || !token.trim()}>
+          {busy ? "…" : "Проверить"}
+        </Button>
+      </form>
+      {result && (
+        <p
+          className={cn(
+            "mt-3 rounded-2xl px-3 py-2 text-sm font-bold",
+            result.result === "SUCCESS"
+              ? "bg-emerald-50 text-emerald-800"
+              : "bg-amber-50 text-amber-900",
+          )}
+        >
+          {result.message}
+          {result.ticket
+            ? ` · ${result.ticket.sessionLocalDate} ${result.ticket.sessionLocalTime}`
+            : ""}
+        </p>
+      )}
+      {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
+    </Card>
   );
 }

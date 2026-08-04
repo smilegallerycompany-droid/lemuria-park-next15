@@ -25,8 +25,12 @@ export interface PublicOrderDto {
   /** Safe, non-guessable, human-friendly identifier (never the internal database id). */
   number: string;
   status: string;
-  /** Null until a real payment provider integration exists (no fake payments). */
+  /** Null when ЮKassa is not configured or no payment row exists yet. */
   paymentStatus: string | null;
+  /** YooKassa redirect URL — null when payment provider is not configured. */
+  confirmationUrl: string | null;
+  /** True only when YUKASSA_* credentials are present. */
+  paymentConfigured: boolean;
   customerName: string;
   maskedPhone: string;
   maskedEmail: string;
@@ -37,4 +41,6 @@ export interface PublicOrderDto {
   paymentExpiresAt: string | null;
   session: PublicOrderSessionDto;
   items: PublicOrderItemDto[];
+  /** Present only for PAID orders after ticket issuance. */
+  tickets: Array<{ publicId: string; qrToken: string; status: string }>;
 }

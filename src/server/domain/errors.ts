@@ -18,7 +18,11 @@ export type DomainErrorCode =
   | "RESERVATION_EXPIRED"
   | "RESERVATION_ALREADY_CONVERTED"
   | "IDEMPOTENCY_CONFLICT"
-  | "ORDER_NOT_FOUND";
+  | "ORDER_NOT_FOUND"
+  | "ORDER_NOT_PAID"
+  | "PAYMENT_NOT_CONFIGURED"
+  | "PAYMENT_PROVIDER_ERROR"
+  | "PAYMENT_WEBHOOK_INVALID";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

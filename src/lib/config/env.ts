@@ -1,31 +1,35 @@
 import { z } from "zod";
 
 /**
- * All required/optional environment variables for the app are declared and
- * validated here. Importing this module fails fast with a readable error if
- * the runtime environment is misconfigured, instead of failing later with a
- * confusing runtime error deep inside a request handler.
+ * Environment for Lemuria Park on Yandex Cloud / local.
+ * Payment and email never invent success when credentials are missing.
  */
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
-  /** PostgreSQL connection string used by Prisma. */
   DATABASE_URL: z
     .string({ required_error: "DATABASE_URL is required" })
-    .url({ message: "DATABASE_URL must be a valid connection string" }),
+    .min(1, "DATABASE_URL is required"),
 
-  /** Public base URL of the app, used to build absolute links (tickets, QR, etc). */
   NEXT_PUBLIC_APP_URL: z
     .string({ required_error: "NEXT_PUBLIC_APP_URL is required" })
     .url({ message: "NEXT_PUBLIC_APP_URL must be a valid URL" }),
 
-  // The following are reserved for future sprints (payments/email/QR) and are
-  // intentionally optional here — this stage does not wire them up yet.
-  YUKASSA_SHOP_ID: z.string().optional(),
-  YUKASSA_SECRET_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(),
-  EMAIL_API_KEY: z.string().optional(),
-  QR_SIGNING_SECRET: z.string().optional(),
+  /** ЮKassa (Russian acquiring — works without VPN). */
+  YUKASSA_SHOP_ID: z.string().optional().default(""),
+  YUKASSA_SECRET_KEY: z.string().optional().default(""),
+
+  /** Yandex Cloud Postbox / SMTP bridge. */
+  EMAIL_PROVIDER: z.enum(["none", "yandex_postbox"]).default("none"),
+  EMAIL_FROM: z.string().optional().default(""),
+  EMAIL_SMTP_HOST: z.string().optional().default(""),
+  EMAIL_SMTP_USER: z.string().optional().default(""),
+  EMAIL_SMTP_PASSWORD: z.string().optional().default(""),
+  EMAIL_API_ENDPOINT: z.string().optional().default(""),
+  EMAIL_API_KEY: z.string().optional().default(""),
+
+  QR_SIGNING_SECRET: z.string().min(8).default("dev-qr-signing-secret-change-me"),
+  AUTH_SECRET: z.string().min(16).default("dev-only-auth-secret-change-me"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -38,7 +42,26 @@ function loadEnv(): Env {
       .join("\n");
     throw new Error(`Invalid environment variables:\n${issues}`);
   }
-  return parsed.data;
+
+  const data = parsed.data;
+  const isProductionRuntime =
+    data.NODE_ENV === "production" &&
+    process.env.NEXT_PHASE !== "phase-production-build" &&
+    process.env.npm_lifecycle_event !== "build";
+  const isLocalhostApp =
+    data.NEXT_PUBLIC_APP_URL.includes("localhost") ||
+    data.NEXT_PUBLIC_APP_URL.includes("127.0.0.1");
+
+  if (isProductionRuntime && !isLocalhostApp) {
+    if (data.AUTH_SECRET.includes("dev-only") || data.AUTH_SECRET.length < 32) {
+      throw new Error("Production requires a strong AUTH_SECRET (min 32 chars).");
+    }
+    if (data.QR_SIGNING_SECRET.includes("dev-qr") || data.QR_SIGNING_SECRET.length < 32) {
+      throw new Error("Production requires a strong QR_SIGNING_SECRET (min 32 chars).");
+    }
+  }
+
+  return data;
 }
 
 export const env = loadEnv();
