@@ -26,14 +26,14 @@ export default function Location() {
               {SITE.phone}
             </p>
             <p className="text-sm text-muted-foreground">
-              Перед публикацией нужно указать точный адрес и ссылку на Яндекс Карты.
+              МегаЦентр «Красная площадь», 2 этаж — ориентир магазин Kari.
             </p>
           </Card>
           <Card
             variant="soft"
             className="grid min-h-[420px] place-items-center text-center text-muted-foreground"
           >
-            Интерактивная карта будет подключена после получения адреса
+            Интерактивная карта — скоро
           </Card>
         </div>
       </Container>

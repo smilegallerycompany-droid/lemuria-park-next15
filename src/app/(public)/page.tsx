@@ -1,10 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Camera, Leaf, MapPin, Sparkles } from "lucide-react";
+import { Clock3, Leaf, MapPin, Sparkles, Ticket, Users } from "lucide-react";
 import { BookingAwwwards as Booking } from "@/components/booking/BookingAwwwards";
+
+const ADDRESS =
+  "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari";
 
 /**
  * Approved awwwards home composition — visual source of truth.
@@ -26,7 +28,7 @@ export default function HomePage() {
           <nav className="nav">
             <a href="#booking">Билеты</a>
             <a href="#about">О зоотеатре</a>
-            <a href="#gallery">Галерея</a>
+            <a href="#visit">Визит</a>
             <a href="#faq">Вопросы</a>
           </nav>
 
@@ -54,14 +56,15 @@ export default function HomePage() {
             </h1>
             <div className="hero-subtitle">Зоотеатр лемуров</div>
             <p>
-              Пространство живого общения, ярких впечатлений и добрых эмоций для всей семьи.
+              Семейный зоотеатр с яркими впечатлениями и добрыми эмоциями — билеты на удобное время
+              онлайн.
             </p>
             <div className="hero-actions">
               <a className="button button-orange" href="#booking">
                 Купить билет
               </a>
               <span className="button button-ghost">
-                <Leaf size={18} /> Живое общение
+                <Leaf size={18} /> Сеансы по расписанию
               </span>
             </div>
           </motion.div>
@@ -81,8 +84,8 @@ export default function HomePage() {
             </h2>
           </div>
           <p>
-            Небольшие группы, спокойный формат посещения и атмосфера, в которой каждый гость
-            успевает почувствовать настоящий контакт с животными.
+            Небольшие группы, спокойный формат посещения и атмосфера, в которой каждый гость успевает
+            рассмотреть лемуров и насладиться шоу зоотеатра.
           </p>
         </div>
 
@@ -91,13 +94,13 @@ export default function HomePage() {
             <span className="trust-icon">
               <Leaf />
             </span>
-            <strong>Живое общение</strong>
+            <strong>Зоотеатр для семьи</strong>
           </div>
           <div className="trust-item">
             <span className="trust-icon">
-              <Camera />
+              <Clock3 />
             </span>
-            <strong>Яркие фотографии</strong>
+            <strong>Сеансы каждые 30 минут</strong>
           </div>
           <div className="trust-item">
             <span className="trust-icon">
@@ -109,47 +112,59 @@ export default function HomePage() {
             <span className="trust-icon">
               <MapPin />
             </span>
-            <strong>Удобное расположение</strong>
+            <strong>МегаЦентр, 2 этаж</strong>
           </div>
         </div>
       </section>
 
-      <section id="gallery" className="section container">
+      <section id="visit" className="section container">
         <div className="section-head">
           <div>
-            <span className="kicker">Галерея</span>
+            <span className="kicker">Перед визитом</span>
             <h2>
-              Моменты, которые
+              Как проходит
               <br />
-              хочется сохранить
+              посещение
             </h2>
           </div>
-          <p>Минимум постановки — максимум живых эмоций и настоящего интереса.</p>
+          <p>
+            Короткий понятный маршрут: выберите сеанс, приходите вовремя — и наслаждайтесь
+            программой зоотеатра.
+          </p>
         </div>
 
-        <div className="gallery">
-          <figure>
-            <Image src="/gallery-1.png" alt="Лемур" width={1200} height={900} />
-          </figure>
-          <figure>
-            <Image src="/gallery-2.png" alt="Лемур" width={800} height={600} />
-          </figure>
-          <figure>
-            <Image src="/hero-lemur.png" alt="Лемур" width={800} height={600} />
-          </figure>
-          <figure>
-            <Image src="/gallery-2.png" alt="Лемур" width={800} height={600} />
-          </figure>
-          <figure>
-            <Image src="/gallery-1.png" alt="Лемур" width={800} height={600} />
-          </figure>
+        <div className="visit-grid">
+          <article className="visit-card">
+            <span className="visit-num">01</span>
+            <Ticket className="visit-icon" size={22} aria-hidden />
+            <h3>Купите билет онлайн</h3>
+            <p>Выберите дату и ближайшее время — места резервируются сразу после оплаты.</p>
+          </article>
+          <article className="visit-card">
+            <span className="visit-num">02</span>
+            <Clock3 className="visit-icon" size={22} aria-hidden />
+            <h3>Приходите к началу сеанса</h3>
+            <p>Сеансы идут каждые 30 минут. Лучше быть на месте за 10 минут до старта.</p>
+          </article>
+          <article className="visit-card">
+            <span className="visit-num">03</span>
+            <Users className="visit-icon" size={22} aria-hidden />
+            <h3>Небольшие группы</h3>
+            <p>До 15 гостей на сеанс — всем комфортно смотреть программу и фотографировать.</p>
+          </article>
+          <article className="visit-card visit-card-accent">
+            <span className="visit-num">04</span>
+            <MapPin className="visit-icon" size={22} aria-hidden />
+            <h3>Где мы находимся</h3>
+            <p>{ADDRESS}</p>
+          </article>
         </div>
       </section>
 
       <section id="faq" className="section container">
         <div className="section-head">
           <div>
-            <span className="kicker">Перед визитом</span>
+            <span className="kicker">FAQ</span>
             <h2>Ответы на частые вопросы</h2>
           </div>
         </div>
@@ -185,7 +200,7 @@ export default function HomePage() {
           </div>
           <div>
             <small>Адрес</small>
-            <p>Москва, ВДНХ</p>
+            <p>{ADDRESS}</p>
           </div>
           <div>
             <small>Документы</small>

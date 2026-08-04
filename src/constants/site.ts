@@ -7,7 +7,8 @@ export const SITE = {
   capacity: 15,
   sessionMinutes: 30,
   visitMinutes: 20,
-  address: "Адрес текущей площадки уточняется",
+  address:
+    "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
 } as const;
 
 /** Primary CTA scrolls to the booking cashier on the home page. */

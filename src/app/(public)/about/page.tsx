@@ -22,12 +22,12 @@ export default function About() {
           <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">О нас</p>
           <H1 className="mt-2 font-display text-4xl font-semibold md:text-5xl">О Лемурии Парке</H1>
           <Body className="mt-6 leading-8 text-muted-foreground">
-            Зоотеатр для живого общения с кольцехвостыми лемурами. Посещение организовано по сеансам
-            — не более {SITE.capacity} гостей одновременно.
+            Семейный зоотеатр с кольцехвостыми лемурами. Посещение организовано по сеансам — не более{" "}
+            {SITE.capacity} гостей одновременно.
           </Body>
           <Body className="mt-4 leading-8 text-muted-foreground">
-            Сотрудники расскажут о животных, помогут с общением и фотографиями. Проект
-            позиционируется как зоотеатр.
+            Сотрудники расскажут о животных и помогут с фотографиями. Проект позиционируется как
+            зоотеатр.
           </Body>
         </div>
       </Container>

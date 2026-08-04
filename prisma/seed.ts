@@ -141,12 +141,19 @@ async function seedTicketTypes() {
 async function seedLocation() {
   return prisma.location.upsert({
     where: { slug: "moscow-vdnh" },
-    update: {},
+    update: {
+      name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
+      city: "Краснодар",
+      address:
+        "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
+      phone: "+7 920 971-40-22",
+    },
     create: {
       slug: "moscow-vdnh",
-      name: "Лемурия Парк — Москва, ВДНХ",
-      city: "Москва",
-      address: "Адрес текущей площадки уточняется",
+      name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
+      city: "Краснодар",
+      address:
+        "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
       timezone: DEMO_LOCATION_TIMEZONE,
       status: "ACTIVE",
       defaultCapacity: 15,

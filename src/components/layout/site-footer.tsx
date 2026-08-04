@@ -8,7 +8,7 @@ export function SiteFooter() {
         <div>
           <h3 className="font-display text-xl font-semibold text-forest">Лемурия Парк</h3>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Живое общение, яркие эмоции и фотографии, которые хочется сохранить.
+            Семейный зоотеатр лемуров и удобная онлайн-покупка билетов по сеансам.
           </p>
         </div>
         <div>
@@ -38,7 +38,7 @@ export function SiteFooter() {
           </p>
         </div>
         <div>
-          <h4 className="text-sm font-extrabold uppercase tracking-wide text-forest">Контакты</h4>
+          <h4 className="text-sm font-extrabold uppercase tracking-wide text-forest">Телефоны</h4>
           <p className="mt-3 text-sm text-muted-foreground">
             {SITE.phone}
             <br />

@@ -2,6 +2,7 @@
 
 import {
   CalendarDays,
+  ChevronDown,
   Clock3,
   Gift,
   Loader2,
@@ -24,23 +25,34 @@ import type { PublicSessionDto } from "@/types/dto/session";
 
 type QtyMap = Record<string, number>;
 
-function monthLabel(year: number, monthIndex: number) {
-  return new Intl.DateTimeFormat("ru-RU", { month: "long", year: "numeric" }).format(
-    new Date(Date.UTC(year, monthIndex, 1)),
-  );
-}
+const NEAREST_DATES_LIMIT = 14;
+const NEAREST_SESSIONS_LIMIT = 8;
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
-function toDateKey(year: number, monthIndex: number, day: number) {
-  return `${year}-${pad(monthIndex + 1)}-${pad(day)}`;
+function eachDateKey(from: string, to: string, limit: number): string[] {
+  const out: string[] = [];
+  const cursor = new Date(`${from}T12:00:00`);
+  const end = new Date(`${to}T12:00:00`);
+  while (cursor.getTime() <= end.getTime() && out.length < limit) {
+    out.push(
+      `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}-${pad(cursor.getDate())}`,
+    );
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return out;
 }
 
-function parseDateKey(key: string) {
-  const [y, m, d] = key.split("-").map(Number);
-  return { year: y, monthIndex: m - 1, day: d };
+function formatDateOption(dateKey: string) {
+  const date = new Date(`${dateKey}T12:00:00`);
+  const weekday = new Intl.DateTimeFormat("ru-RU", { weekday: "short" }).format(date);
+  const dayMonth = new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+  }).format(date);
+  return `${dayMonth}, ${weekday}`;
 }
 
 export function BookingAwwwards() {
@@ -53,10 +65,6 @@ export function BookingAwwwards() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [qty, setQty] = useState<QtyMap>({});
   const [submitting, setSubmitting] = useState(false);
-  const [viewMonth, setViewMonth] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), monthIndex: now.getMonth() };
-  });
 
   useEffect(() => {
     let cancelled = false;
@@ -74,8 +82,6 @@ export function BookingAwwwards() {
           else initial[t.code] = 0;
         }
         setQty(initial);
-        const from = parseDateKey(cfg.availableDateRange.from);
-        setViewMonth({ year: from.year, monthIndex: from.monthIndex });
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof ApiClientError ? e.message : "Не удалось загрузить конфигурацию");
@@ -89,14 +95,21 @@ export function BookingAwwwards() {
     };
   }, []);
 
+  const dateOptions = useMemo(() => {
+    if (!config) return [];
+    return eachDateKey(
+      config.availableDateRange.from,
+      config.availableDateRange.to,
+      NEAREST_DATES_LIMIT,
+    );
+  }, [config]);
+
   const loadSessions = useCallback(async (date: string, locationSlug?: string) => {
     setLoadingSessions(true);
     setError(null);
     try {
       const data = await getPublicSessions({ date, locationSlug });
       setSessions(data.sessions);
-      const firstOpen = data.sessions.find((s) => !s.soldOut);
-      setActiveSessionId(firstOpen?.publicId ?? data.sessions[0]?.publicId ?? "");
     } catch (e) {
       setSessions([]);
       setActiveSessionId("");
@@ -111,7 +124,26 @@ export function BookingAwwwards() {
     void loadSessions(selectedDate, config.location.slug);
   }, [selectedDate, config, loadSessions]);
 
-  const activeSession = sessions.find((s) => s.publicId === activeSessionId) ?? null;
+  /** Only upcoming (not past) and not sold-out — nearest N times. */
+  const nearestSessions = useMemo(() => {
+    const now = Date.now();
+    return sessions
+      .filter((s) => !s.soldOut && new Date(s.startsAt).getTime() > now)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
+      .slice(0, NEAREST_SESSIONS_LIMIT);
+  }, [sessions]);
+
+  useEffect(() => {
+    if (nearestSessions.length === 0) {
+      setActiveSessionId("");
+      return;
+    }
+    if (!nearestSessions.some((s) => s.publicId === activeSessionId)) {
+      setActiveSessionId(nearestSessions[0].publicId);
+    }
+  }, [nearestSessions, activeSessionId]);
+
+  const activeSession = nearestSessions.find((s) => s.publicId === activeSessionId) ?? null;
 
   const priceByCode = useMemo(() => {
     const map = new Map<string, number>();
@@ -133,25 +165,6 @@ export function BookingAwwwards() {
     }
     return sum;
   }, [qty, priceByCode]);
-
-  const calendarCells = useMemo(() => {
-    const { year, monthIndex } = viewMonth;
-    const first = new Date(year, monthIndex, 1);
-    const startOffset = (first.getDay() + 6) % 7; // Monday-first
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const cells: Array<{ day: number | null; key: string; disabled: boolean }> = [];
-    for (let i = 0; i < startOffset; i += 1) {
-      cells.push({ day: null, key: `e-${i}`, disabled: true });
-    }
-    const from = config?.availableDateRange.from ?? "";
-    const to = config?.availableDateRange.to ?? "";
-    for (let day = 1; day <= daysInMonth; day += 1) {
-      const key = toDateKey(year, monthIndex, day);
-      const disabled = !from || !to || key < from || key > to;
-      cells.push({ day, key, disabled });
-    }
-    return cells;
-  }, [viewMonth, config]);
 
   async function handleCheckout() {
     if (!activeSession || totalGuests <= 0 || activeSession.soldOut) return;
@@ -176,73 +189,76 @@ export function BookingAwwwards() {
 
   return (
     <section id="booking" className="booking-section container">
-      <div className="booking-card">
-        <div className="booking-column">
+      <div className="booking-card booking-card-compact">
+        <div className="booking-column booking-pick">
           <div className="booking-heading">
-            <span className="step">1</span>
-            Выберите дату
+            <span className="step">1–2</span>
+            Дата и время
           </div>
 
-          <div className="calendar-box">
-            <div className="calendar-head">
-              <button
-                type="button"
-                aria-label="Предыдущий месяц"
-                onClick={() =>
-                  setViewMonth((m) => {
-                    const monthIndex = m.monthIndex - 1;
-                    return monthIndex < 0
-                      ? { year: m.year - 1, monthIndex: 11 }
-                      : { year: m.year, monthIndex };
-                  })
-                }
+          <label className="field-select">
+            <span className="field-select-label">
+              <CalendarDays size={16} /> Дата
+            </span>
+            <div className="select-shell">
+              <select
+                className="booking-select"
+                value={selectedDate}
+                disabled={loadingConfig || dateOptions.length === 0}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                aria-label="Выберите дату"
               >
-                ‹
-              </button>
-              <span style={{ textTransform: "capitalize" }}>
-                {monthLabel(viewMonth.year, viewMonth.monthIndex)}
-              </span>
-              <button
-                type="button"
-                aria-label="Следующий месяц"
-                onClick={() =>
-                  setViewMonth((m) => {
-                    const monthIndex = m.monthIndex + 1;
-                    return monthIndex > 11
-                      ? { year: m.year + 1, monthIndex: 0 }
-                      : { year: m.year, monthIndex };
-                  })
-                }
+                {dateOptions.map((key) => (
+                  <option key={key} value={key}>
+                    {formatDateOption(key)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="select-chevron" size={18} aria-hidden />
+            </div>
+          </label>
+
+          <label className="field-select">
+            <span className="field-select-label">
+              <Clock3 size={16} /> Ближайшее время
+            </span>
+            <div className="select-shell">
+              <select
+                className="booking-select"
+                value={activeSessionId}
+                disabled={loadingSessions || nearestSessions.length === 0}
+                onChange={(e) => setActiveSessionId(e.target.value)}
+                aria-label="Выберите время сеанса"
               >
-                ›
-              </button>
-            </div>
-            <div className="calendar-days">
-              {["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"].map((day) => (
-                <span key={day}>{day}</span>
-              ))}
-            </div>
-            <div className="calendar-grid">
-              {calendarCells.map((cell) =>
-                cell.day === null ? (
-                  <span key={cell.key} />
+                {nearestSessions.length === 0 ? (
+                  <option value="">
+                    {loadingSessions ? "Загрузка…" : "Нет ближайших сеансов"}
+                  </option>
                 ) : (
-                  <button
-                    key={cell.key}
-                    type="button"
-                    disabled={cell.disabled}
-                    className={selectedDate === cell.key ? "selected" : ""}
-                    onClick={() => !cell.disabled && setSelectedDate(cell.key)}
-                    style={cell.disabled ? { opacity: 0.35, cursor: "not-allowed" } : undefined}
-                  >
-                    {cell.day}
-                  </button>
-                ),
-              )}
+                  nearestSessions.map((item) => (
+                    <option key={item.publicId} value={item.publicId}>
+                      {item.localTime}
+                      {item.status === "LOW_AVAILABILITY"
+                        ? ` · осталось ${item.remainingSeats}`
+                        : ` · свободно ${item.remainingSeats}`}
+                    </option>
+                  ))
+                )}
+              </select>
+              <ChevronDown className="select-chevron" size={18} aria-hidden />
             </div>
-          </div>
+          </label>
+
+          {loadingSessions && (
+            <p className="booking-hint">
+              <Loader2 className="animate-spin" size={16} /> Обновляем сеансы…
+            </p>
+          )}
+          {!loadingSessions && nearestSessions.length > 0 && (
+            <p className="booking-hint">Показаны ближайшие свободные сеансы на выбранный день</p>
+          )}
           {config && (
-            <p style={{ marginTop: 12, color: "var(--muted)", fontSize: 13 }}>
+            <p className="booking-hint muted">
               {config.location.city} · {config.location.venue}
             </p>
           )}
@@ -250,44 +266,8 @@ export function BookingAwwwards() {
 
         <div className="booking-column">
           <div className="booking-heading">
-            <span className="step">2</span>
-            Выберите сеанс
-          </div>
-          <div className="session-list">
-            {loadingConfig || loadingSessions ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--muted)" }}>
-                <Loader2 className="animate-spin" size={18} /> Загрузка сеансов…
-              </div>
-            ) : sessions.length === 0 ? (
-              <p style={{ color: "var(--muted)" }}>На выбранную дату сеансов нет</p>
-            ) : (
-              sessions.map((item) => (
-                <button
-                  key={item.publicId}
-                  type="button"
-                  disabled={item.soldOut}
-                  className={`session ${activeSessionId === item.publicId ? "active" : ""}`}
-                  onClick={() => setActiveSessionId(item.publicId)}
-                  style={item.soldOut ? { opacity: 0.55 } : undefined}
-                >
-                  <strong>{item.localTime}</strong>
-                  <small className={item.status === "LOW_AVAILABILITY" || item.soldOut ? "few" : ""}>
-                    {item.soldOut
-                      ? "нет мест"
-                      : item.status === "LOW_AVAILABILITY"
-                        ? `осталось ${item.remainingSeats} мест`
-                        : `осталось ${item.remainingSeats} мест`}
-                  </small>
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="booking-column">
-          <div className="booking-heading">
             <span className="step">3</span>
-            Количество билетов
+            Билеты
           </div>
           <div className="ticket-list">
             {(config?.ticketTypes ?? [])
@@ -299,12 +279,18 @@ export function BookingAwwwards() {
                   title={t.name}
                   note={
                     priceByCode.has(t.code)
-                      ? `${t.description ?? t.name} · ${formatMoneyFromKopecks(priceByCode.get(t.code) ?? 0)}`
+                      ? `${t.description ?? ""} · ${formatMoneyFromKopecks(priceByCode.get(t.code) ?? 0)}`.replace(
+                          /^ · /,
+                          "",
+                        )
                       : (t.description ?? "")
                   }
                   value={qty[t.code] ?? 0}
                   setValue={(value) => setQty((prev) => ({ ...prev, [t.code]: value }))}
-                  max={Math.max(0, (activeSession?.remainingSeats ?? 0) - (totalGuests - (qty[t.code] ?? 0)))}
+                  max={Math.max(
+                    0,
+                    (activeSession?.remainingSeats ?? 0) - (totalGuests - (qty[t.code] ?? 0)),
+                  )}
                 />
               ))}
             {freeType && (
@@ -375,15 +361,15 @@ export function BookingAwwwards() {
               {submitting ? "Резервируем…" : "Перейти к оплате"}
             </button>
             <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-              Места резервируются на 15 минут. Итог пересчитает сервер.
+              Места резервируются на 15 минут
             </p>
           </div>
         </aside>
       </div>
 
       <div className="trust-strip">
-        <Trust icon={<ShieldCheck />} text="Живое общение с лемурами" />
-        <Trust icon={<Clock3 />} text="Сеансы каждые 30 минут" />
+        <Trust icon={<ShieldCheck />} text="Онлайн-оплата билетов" />
+        <Trust icon={<Clock3 />} text="Только ближайшие сеансы" />
         <Trust icon={<Users />} text="До 15 гостей на сеанс" />
         <Trust icon={<CalendarDays />} text="Удобная онлайн-покупка" />
       </div>
