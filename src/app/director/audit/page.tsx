@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelRole } from "@/lib/director/labels";
 
 type AuditRow = {
   id: string;
@@ -25,7 +26,7 @@ export default function DirectorAuditPage() {
 
   return (
     <>
-      <PageHeader title="Audit" description="Журнал действий staff/director с фильтрами через API." />
+      <PageHeader title="Журнал" description="Журнал действий сотрудников и директоров." />
       {error ? <div className="director-alert error">{error}</div> : null}
 
       <section className="director-panel">
@@ -34,9 +35,9 @@ export default function DirectorAuditPage() {
             <thead>
               <tr>
                 <th>Время</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Entity</th>
+                <th>Кто</th>
+                <th>Действие</th>
+                <th>Объект</th>
               </tr>
             </thead>
             <tbody>
@@ -47,10 +48,12 @@ export default function DirectorAuditPage() {
                     {log.actor ? (
                       <>
                         {log.actor.name}
-                        <div style={{ fontSize: 12, color: "var(--dir-muted)" }}>{log.actor.role}</div>
+                        <div style={{ fontSize: 12, color: "var(--dir-muted)" }}>
+                          {labelRole(log.actor.role)}
+                        </div>
                       </>
                     ) : (
-                      "system"
+                      "система"
                     )}
                   </td>
                   <td>

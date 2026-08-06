@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 
 type LocationOption = { id: string; name: string };
 type SessionRow = {
@@ -72,8 +73,8 @@ export default function DirectorSessionsPage() {
   return (
     <>
       <PageHeader
-        title="Sessions"
-        description="Сеансы на ближайшие недели и rolling generation из расписания."
+        title="Сеансы"
+        description="Сеансы на ближайшие недели и генерация по недельному расписанию."
         actions={
           <select value={locationId} onChange={(e) => setLocationId(e.target.value)}>
             {locations.map((location) => (
@@ -95,7 +96,7 @@ export default function DirectorSessionsPage() {
           <ConfirmCheckbox
             checked={confirmGenerate}
             onChange={setConfirmGenerate}
-            label="Подтверждаю генерацию сеансов на rolling window (существующие startsAt не перезаписываются)."
+            label="Подтверждаю генерацию сеансов на скользящее окно (уже созданные сеансы не перезаписываются)."
           />
           <button
             type="button"
@@ -116,9 +117,9 @@ export default function DirectorSessionsPage() {
                 <th>Начало</th>
                 <th>Окончание</th>
                 <th>Статус</th>
-                <th>Capacity</th>
-                <th>Orders</th>
-                <th>Tickets</th>
+                <th>Вместимость</th>
+                <th>Заказы</th>
+                <th>Билеты</th>
               </tr>
             </thead>
             <tbody>
@@ -127,7 +128,7 @@ export default function DirectorSessionsPage() {
                   <td>{formatDateTime(session.startsAt)}</td>
                   <td>{formatDateTime(session.endsAt)}</td>
                   <td>
-                    <span className="director-badge neutral">{session.status}</span>
+                    <span className="director-badge neutral">{labelStatus(session.status)}</span>
                   </td>
                   <td>{session.capacity}</td>
                   <td>{session._count.orders}</td>

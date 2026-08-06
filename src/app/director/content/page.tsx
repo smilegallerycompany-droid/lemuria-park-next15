@@ -60,8 +60,8 @@ export default function DirectorContentPage() {
   return (
     <>
       <PageHeader
-        title="Content"
-        description="Site settings, contacts, FAQ и gallery для публичного сайта."
+        title="Контент"
+        description="Настройки сайта, контакты, FAQ и галерея для публичной страницы."
         actions={
           <button type="button" className="director-btn primary" onClick={save}>
             Сохранить
@@ -74,11 +74,11 @@ export default function DirectorContentPage() {
       {content?.siteSettings ? (
         <section className="director-panel" style={{ marginBottom: 18 }}>
           <div className="director-panel-head">
-            <h2>Site settings</h2>
+            <h2>Настройки сайта</h2>
           </div>
           <div className="director-form-grid">
             <div className="director-field">
-              <label>Site name</label>
+              <label>Название сайта</label>
               <input
                 value={content.siteSettings.siteName}
                 onChange={(e) =>
@@ -90,7 +90,7 @@ export default function DirectorContentPage() {
               />
             </div>
             <div className="director-field">
-              <label>Subtitle</label>
+              <label>Подзаголовок</label>
               <input
                 value={content.siteSettings.siteSubtitle}
                 onChange={(e) =>
@@ -102,7 +102,7 @@ export default function DirectorContentPage() {
               />
             </div>
             <div className="director-field">
-              <label>Session generation days</label>
+              <label>Дней генерации сеансов</label>
               <input
                 type="number"
                 value={content.siteSettings.sessionGenerationDays}
@@ -118,7 +118,7 @@ export default function DirectorContentPage() {
               />
             </div>
             <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-              <label>Hero title</label>
+              <label>Заголовок героя</label>
               <input
                 value={content.siteSettings.heroTitle ?? ""}
                 onChange={(e) =>
@@ -130,7 +130,7 @@ export default function DirectorContentPage() {
               />
             </div>
             <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-              <label>Hero description</label>
+              <label>Описание героя</label>
               <textarea
                 value={content.siteSettings.heroDescription ?? ""}
                 onChange={(e) =>
@@ -148,11 +148,11 @@ export default function DirectorContentPage() {
       {content?.contactSettings ? (
         <section className="director-panel" style={{ marginBottom: 18 }}>
           <div className="director-panel-head">
-            <h2>Contact</h2>
+            <h2>Контакты</h2>
           </div>
           <div className="director-form-grid">
             <div className="director-field">
-              <label>Phone</label>
+              <label>Телефон</label>
               <input
                 value={content.contactSettings.phone}
                 onChange={(e) =>
@@ -164,7 +164,7 @@ export default function DirectorContentPage() {
               />
             </div>
             <div className="director-field">
-              <label>Email</label>
+              <label>Эл. почта</label>
               <input
                 value={content.contactSettings.email ?? ""}
                 onChange={(e) =>
@@ -182,9 +182,11 @@ export default function DirectorContentPage() {
       {content ? (
         <section className="director-panel">
           <div className="director-panel-head">
-            <h2>FAQ ({content.faq.length}) · Gallery ({content.gallery.length})</h2>
+            <h2>Вопросы ({content.faq.length}) · Галерея ({content.gallery.length})</h2>
           </div>
-          <div className="director-empty">Редактирование списков FAQ/Gallery доступно через API PATCH (bulk).</div>
+          <div className="director-empty">
+            Редактирование списков вопросов и галереи доступно через пакетное обновление.
+          </div>
         </section>
       ) : null}
     </>

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 
 type LocationDetail = {
   id: string;
@@ -100,13 +101,13 @@ export default function DirectorLocationDetailPage() {
             >
               {["UPCOMING", "ACTIVE", "PAUSED", "CLOSED"].map((status) => (
                 <option key={status} value={status}>
-                  {status}
+                  {labelStatus(status)}
                 </option>
               ))}
             </select>
           </div>
           <div className="director-field">
-            <label>Timezone</label>
+            <label>Часовой пояс</label>
             <input value={location.timezone} readOnly />
           </div>
           <div className="director-field">
@@ -138,7 +139,7 @@ export default function DirectorLocationDetailPage() {
             <input value={location.phone ?? ""} onChange={(e) => setLocation({ ...location, phone: e.target.value })} />
           </div>
           <div className="director-field">
-            <label>Email</label>
+            <label>Эл. почта</label>
             <input value={location.email ?? ""} onChange={(e) => setLocation({ ...location, email: e.target.value })} />
           </div>
           <div className="director-field" style={{ gridColumn: "1 / -1" }}>

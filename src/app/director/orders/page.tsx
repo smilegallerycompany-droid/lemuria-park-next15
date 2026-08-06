@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelSource, labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type OrderRow = {
@@ -37,7 +38,7 @@ export default function DirectorOrdersPage() {
   return (
     <>
       <PageHeader
-        title="Orders"
+        title="Заказы"
         description="Заказы всех каналов. Суммы хранятся в копейках."
         actions={
           <>
@@ -79,10 +80,10 @@ export default function DirectorOrdersPage() {
                   <td>{formatMoneyFromKopecks(order.totalAmount)}</td>
                   <td>
                     <span className={`director-badge ${order.source === "ONLINE" ? "green" : "orange"}`}>
-                      {order.source}
+                      {labelSource(order.source)}
                     </span>
                   </td>
-                  <td>{order.status}</td>
+                  <td>{labelStatus(order.status)}</td>
                   <td>
                     <Link href={`/director/orders/${order.number}`} className="director-link">
                       Детали ({order._count.tickets})

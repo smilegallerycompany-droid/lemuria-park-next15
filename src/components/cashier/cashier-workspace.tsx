@@ -34,6 +34,7 @@ import {
   type CashierSessionsResponse,
   type CashierUser,
 } from "@/lib/api/cashier";
+import { labelStatus } from "@/lib/director/labels";
 
 type Filter = "today" | "all" | "paid" | "cancelled";
 
@@ -90,7 +91,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (user: CashierUser) => void }) 
         <form className="mt-6 grid gap-4" onSubmit={submit}>
           <div className="grid gap-1.5">
             <label htmlFor="cashier-email" className="text-sm font-bold">
-              Email
+              Эл. почта
             </label>
             <Input
               id="cashier-email"
@@ -409,7 +410,7 @@ export function CashierWorkspace() {
                   <div className="text-right">
                     <p className="font-extrabold">{formatMoneyFromKopecks(order.totalAmount)}</p>
                     <Badge variant={order.status === "PAID" ? "success" : "muted"}>
-                      {order.status}
+                      {labelStatus(order.status)}
                     </Badge>
                   </div>
                 </div>

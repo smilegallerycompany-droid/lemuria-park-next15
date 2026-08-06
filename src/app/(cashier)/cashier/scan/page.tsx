@@ -134,7 +134,7 @@ export default function CashierScanPage() {
     <>
       <h1 className="cashier-page-title">Сканер</h1>
       <p className="cashier-page-sub">
-        Камера (BarcodeDetector), USB-сканер или ручной ввод → `/api/cashier/check-in`
+        Камера, USB-сканер или ручной ввод кода билета
       </p>
 
       <div className="cashier-panel">

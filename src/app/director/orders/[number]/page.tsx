@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelSource, labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type OrderDetail = {
@@ -70,7 +71,7 @@ export default function DirectorOrderDetailPage() {
         method: "POST",
         body: JSON.stringify({ confirm: true, reason: reason.trim() }),
       });
-      setMessage("Возврат оформлен (manual refund + audit).");
+      setMessage("Возврат оформлен и записан в журнал.");
       setConfirmRefund(false);
       setReason("");
       await load();
@@ -86,7 +87,10 @@ export default function DirectorOrderDetailPage() {
 
   return (
     <>
-      <PageHeader title={`Order ${order.number}`} description={`${order.status} · ${order.source}`} />
+      <PageHeader
+        title={`Заказ ${order.number}`}
+        description={`${labelStatus(order.status)} · ${labelSource(order.source)}`}
+      />
       {error ? <div className="director-alert error">{error}</div> : null}
       {message ? <div className="director-alert success">{message}</div> : null}
 
@@ -122,9 +126,9 @@ export default function DirectorOrderDetailPage() {
             <thead>
               <tr>
                 <th>Тип</th>
-                <th>Qty</th>
-                <th>Unit</th>
-                <th>Subtotal</th>
+                <th>Кол-во</th>
+                <th>Цена</th>
+                <th>Сумма</th>
               </tr>
             </thead>
             <tbody>
@@ -149,7 +153,7 @@ export default function DirectorOrderDetailPage() {
           <table className="director-table">
             <thead>
               <tr>
-                <th>Public ID</th>
+                <th>ID билета</th>
                 <th>Тип</th>
                 <th>Статус</th>
               </tr>
@@ -159,7 +163,7 @@ export default function DirectorOrderDetailPage() {
                 <tr key={ticket.publicId}>
                   <td>{ticket.publicId}</td>
                   <td>{ticket.ticketType.name}</td>
-                  <td>{ticket.status}</td>
+                  <td>{labelStatus(ticket.status)}</td>
                 </tr>
               ))}
             </tbody>
@@ -170,7 +174,7 @@ export default function DirectorOrderDetailPage() {
       {order.status === "PAID" ? (
         <section className="director-panel">
           <div className="director-panel-head">
-            <h2>Manual refund</h2>
+            <h2>Ручной возврат</h2>
           </div>
           <div style={{ padding: 18 }}>
             <div className="director-field">
@@ -180,7 +184,7 @@ export default function DirectorOrderDetailPage() {
             <ConfirmCheckbox
               checked={confirmRefund}
               onChange={setConfirmRefund}
-              label="Подтверждаю ручной возврат оплаченного заказа (действие попадёт в audit log)."
+              label="Подтверждаю ручной возврат оплаченного заказа (действие попадёт в журнал)."
             />
             <button
               type="button"
@@ -214,7 +218,7 @@ export default function DirectorOrderDetailPage() {
                   <tr key={`${refund.createdAt}-${index}`}>
                     <td>{formatDateTime(refund.createdAt)}</td>
                     <td>{formatMoneyFromKopecks(refund.amount)}</td>
-                    <td>{refund.status}</td>
+                    <td>{labelStatus(refund.status)}</td>
                     <td>{refund.reason ?? "—"}</td>
                   </tr>
                 ))}

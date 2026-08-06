@@ -37,12 +37,12 @@ export default function DirectorLoginPage() {
   return (
     <div className="director-login-page">
       <div className="director-login-card">
-        <h1>Director</h1>
+        <h1>Директор</h1>
         <p>Панель управления билетной платформой Лемурия Парк.</p>
         {error ? <div className="director-alert error">{error}</div> : null}
         <form onSubmit={onSubmit}>
           <div className="director-field">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">Эл. почта</label>
             <input
               id="email"
               type="email"

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
 import { directorFetch } from "@/lib/director/client";
+import { labelRole, labelStatus } from "@/lib/director/labels";
 
 type LocationOption = { id: string; name: string };
 
@@ -77,7 +78,7 @@ export default function DirectorStaffPage() {
 
   return (
     <>
-      <PageHeader title="Staff" description="Кассиры и директора: доступы, локации, блокировка." />
+      <PageHeader title="Сотрудники" description="Кассиры и директора: доступы, локации, блокировка." />
       {error ? <div className="director-alert error">{error}</div> : null}
       {message ? <div className="director-alert success">{message}</div> : null}
 
@@ -87,7 +88,7 @@ export default function DirectorStaffPage() {
         </div>
         <div className="director-form-grid">
           <div className="director-field">
-            <label>Email</label>
+            <label>Эл. почта</label>
             <input value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
           </div>
           <div className="director-field">
@@ -105,8 +106,8 @@ export default function DirectorStaffPage() {
           <div className="director-field">
             <label>Роль</label>
             <select value={createForm.role} onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}>
-              <option value="CASHIER">CASHIER</option>
-              <option value="ADMIN">ADMIN</option>
+              <option value="CASHIER">Кассир</option>
+              <option value="ADMIN">Администратор</option>
             </select>
           </div>
           <div className="director-field" style={{ gridColumn: "1 / -1" }}>
@@ -158,9 +159,9 @@ export default function DirectorStaffPage() {
                       <strong>{user.name}</strong>
                       <div style={{ fontSize: 12, color: "var(--dir-muted)" }}>{user.email}</div>
                     </td>
-                    <td>{user.role}</td>
+                    <td>{labelRole(user.role)}</td>
                     <td>{user.locations.map((item) => item.location.name).join(", ") || "—"}</td>
-                    <td>{user.status}</td>
+                    <td>{labelStatus(user.status)}</td>
                     <td style={{ minWidth: 280 }}>
                       <ConfirmCheckbox
                         id={`confirm-${user.id}`}
@@ -180,7 +181,7 @@ export default function DirectorStaffPage() {
                             })
                           }
                         >
-                          Reset password
+                          Сбросить пароль
                         </button>
                         <button
                           type="button"
@@ -188,7 +189,7 @@ export default function DirectorStaffPage() {
                           disabled={!confirmed || user.status === "DISABLED"}
                           onClick={() => patchStaff(user.id, { confirm: true, status: "DISABLED" })}
                         >
-                          Disable
+                          Отключить
                         </button>
                         <button
                           type="button"
@@ -201,7 +202,7 @@ export default function DirectorStaffPage() {
                             })
                           }
                         >
-                          Assign 1st location
+                          Назначить 1-ю локацию
                         </button>
                       </div>
                     </td>

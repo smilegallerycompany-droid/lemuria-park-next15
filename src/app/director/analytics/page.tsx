@@ -41,8 +41,8 @@ export default function DirectorAnalyticsPage() {
   return (
     <>
       <PageHeader
-        title="Analytics"
-        description="Paid-only revenue, refunds, channel split и occupancy."
+        title="Аналитика"
+        description="Выручка только по оплаченным заказам, возвраты, каналы продаж и заполненность."
         actions={
           <>
             <input type="datetime-local" value={from.slice(0, 16)} onChange={(e) => setFrom(new Date(e.target.value).toISOString())} />
@@ -66,57 +66,57 @@ export default function DirectorAnalyticsPage() {
       {data ? (
         <div className="director-card-grid">
           <div className="director-kpi">
-            <div className="director-kpi-label">Gross revenue</div>
+            <div className="director-kpi-label">Валовая выручка</div>
             <div className="director-kpi-value accent-green">{formatMoneyFromKopecks(data.revenueKopecks)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Refunds</div>
+            <div className="director-kpi-label">Возвраты</div>
             <div className="director-kpi-value accent-orange">{formatMoneyFromKopecks(data.refundsKopecks)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Net revenue</div>
+            <div className="director-kpi-label">Чистая выручка</div>
             <div className="director-kpi-value">{formatMoneyFromKopecks(data.netRevenueKopecks)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Online</div>
+            <div className="director-kpi-label">Онлайн</div>
             <div className="director-kpi-value">{formatMoneyFromKopecks(data.revenueBySource.ONLINE)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Cashier</div>
+            <div className="director-kpi-label">Касса</div>
             <div className="director-kpi-value">{formatMoneyFromKopecks(data.revenueBySource.CASHIER)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Orders / Tickets</div>
+            <div className="director-kpi-label">Заказы / билеты</div>
             <div className="director-kpi-value">
               {data.orderCount} / {data.ticketCount}
             </div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">AOV</div>
+            <div className="director-kpi-label">Средний чек</div>
             <div className="director-kpi-value">{formatMoneyFromKopecks(data.averageOrderValueKopecks)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Occupancy</div>
+            <div className="director-kpi-label">Заполненность</div>
             <div className="director-kpi-value">{formatPercent(data.occupancyRate)}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Cash</div>
+            <div className="director-kpi-label">Наличные</div>
             <div className="director-kpi-value">
               {formatMoneyFromKopecks(data.revenueByPaymentMethod.cash)}
             </div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Card</div>
+            <div className="director-kpi-label">Карта</div>
             <div className="director-kpi-value">
               {formatMoneyFromKopecks(data.revenueByPaymentMethod.card)}
             </div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Check-ins</div>
+            <div className="director-kpi-label">Проходы</div>
             <div className="director-kpi-value">{data.checkInCount}</div>
           </div>
           <div className="director-kpi">
-            <div className="director-kpi-label">Cancellations / Refunds</div>
+            <div className="director-kpi-label">Отмены / возвраты</div>
             <div className="director-kpi-value">
               {data.cancellationCount} / {data.refundCount}
             </div>
@@ -125,15 +125,15 @@ export default function DirectorAnalyticsPage() {
       ) : null}
       {data?.dailySeries?.length ? (
         <section className="director-panel" style={{ marginTop: "1.25rem" }}>
-          <h2 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>Daily series (PAID only)</h2>
+          <h2 style={{ margin: "0 0 0.75rem", fontSize: "1rem" }}>По дням (только оплаченные)</h2>
           <div className="director-table-wrap">
             <table className="director-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Revenue</th>
-                  <th>Orders</th>
-                  <th>Check-ins</th>
+                  <th>Дата</th>
+                  <th>Выручка</th>
+                  <th>Заказы</th>
+                  <th>Проходы</th>
                 </tr>
               </thead>
               <tbody>

@@ -93,7 +93,7 @@ export default function DirectorSchedulePage() {
   return (
     <>
       <PageHeader
-        title="Schedule"
+        title="Расписание"
         description="Недельное расписание локации (основа генерации сеансов)."
         actions={
           <>
@@ -139,7 +139,7 @@ export default function DirectorSchedulePage() {
                   <td>
                     <input
                       type="number"
-                      placeholder="default"
+                      placeholder="по умолч."
                       value={row.sessionIntervalMinutes ?? ""}
                       onChange={(e) =>
                         updateRow(index, {

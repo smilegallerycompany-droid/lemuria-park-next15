@@ -20,11 +20,11 @@ export default function DirectorDashboardPage() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Ключевые показатели за сегодня (оплаченные заказы, копейки → рубли в UI)."
+        title="Дашборд"
+        description="Ключевые показатели за сегодня (только оплаченные заказы)."
       />
       {error ? <div className="director-alert error">{error}</div> : null}
-      {!data && !error ? <div className="director-empty">Загрузка KPI…</div> : null}
+      {!data && !error ? <div className="director-empty">Загрузка показателей…</div> : null}
       {data ? (
         <>
           <div className="director-card-grid">
@@ -34,7 +34,7 @@ export default function DirectorDashboardPage() {
               <div className="director-kpi-sub">Возвраты: {formatMoneyFromKopecks(data.refundsKopecks)}</div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">Online / Cashier</div>
+              <div className="director-kpi-label">Онлайн / Касса</div>
               <div className="director-kpi-value accent-orange">
                 {formatMoneyFromKopecks(data.revenueBySource.ONLINE)}
               </div>
@@ -46,12 +46,12 @@ export default function DirectorDashboardPage() {
               <div className="director-kpi-sub">Билетов: {data.ticketCount}</div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">AOV</div>
+              <div className="director-kpi-label">Средний чек</div>
               <div className="director-kpi-value">{formatMoneyFromKopecks(data.averageOrderValueKopecks)}</div>
-              <div className="director-kpi-sub">Средний чек</div>
+              <div className="director-kpi-sub">По оплаченным заказам</div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">Occupancy</div>
+              <div className="director-kpi-label">Заполненность</div>
               <div className="director-kpi-value">{formatPercent(data.occupancyRate)}</div>
               <div className="director-kpi-sub">Заполненность сеансов за период</div>
             </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 
 type TicketRow = {
   publicId: string;
@@ -34,11 +35,15 @@ export default function DirectorTicketsPage() {
   return (
     <>
       <PageHeader
-        title="Tickets"
-        description="Выданные билеты и статусы check-in / refund."
+        title="Билеты"
+        description="Выданные билеты и статусы прохода / возврата."
         actions={
           <>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="publicId, order, QR" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ID билета, заказ, QR"
+            />
             <button type="button" className="director-btn secondary" onClick={() => load(search)}>
               Найти
             </button>
@@ -52,8 +57,8 @@ export default function DirectorTicketsPage() {
           <table className="director-table">
             <thead>
               <tr>
-                <th>Public ID</th>
-                <th>Order</th>
+                <th>ID билета</th>
+                <th>Заказ</th>
                 <th>Тип</th>
                 <th>Локация</th>
                 <th>Сеанс</th>
@@ -69,7 +74,7 @@ export default function DirectorTicketsPage() {
                   <td>{ticket.location.name}</td>
                   <td>{formatDateTime(ticket.session.startsAt)}</td>
                   <td>
-                    <span className="director-badge neutral">{ticket.status}</span>
+                    <span className="director-badge neutral">{labelStatus(ticket.status)}</span>
                   </td>
                 </tr>
               ))}

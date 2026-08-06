@@ -6,19 +6,19 @@ import { useEffect, useState } from "react";
 import { directorFetch } from "@/lib/director/client";
 
 const NAV = [
-  { href: "/director", label: "Dashboard" },
-  { href: "/director/locations", label: "Locations" },
-  { href: "/director/schedule", label: "Schedule" },
-  { href: "/director/sessions", label: "Sessions" },
-  { href: "/director/prices", label: "Prices" },
-  { href: "/director/ticket-types", label: "Ticket types" },
-  { href: "/director/orders", label: "Orders" },
-  { href: "/director/tickets", label: "Tickets" },
-  { href: "/director/staff", label: "Staff" },
-  { href: "/director/analytics", label: "Analytics" },
-  { href: "/director/content", label: "Content" },
-  { href: "/director/audit", label: "Audit" },
-  { href: "/director/settings", label: "Settings" },
+  { href: "/director", label: "Дашборд" },
+  { href: "/director/locations", label: "Локации" },
+  { href: "/director/schedule", label: "Расписание" },
+  { href: "/director/sessions", label: "Сеансы" },
+  { href: "/director/prices", label: "Цены" },
+  { href: "/director/ticket-types", label: "Типы билетов" },
+  { href: "/director/orders", label: "Заказы" },
+  { href: "/director/tickets", label: "Билеты" },
+  { href: "/director/staff", label: "Сотрудники" },
+  { href: "/director/analytics", label: "Аналитика" },
+  { href: "/director/content", label: "Контент" },
+  { href: "/director/audit", label: "Журнал" },
+  { href: "/director/settings", label: "Настройки" },
 ];
 
 type MeResponse = {
@@ -57,11 +57,11 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
           <div className="director-brand">
             <div className="director-brand-mark">L</div>
             <div className="director-brand-copy">
-              <strong>Director</strong>
-              <small>Lemuria Park</small>
+              <strong>Директор</strong>
+              <small>Лемурия Парк</small>
             </div>
           </div>
-          <nav className="director-nav" aria-label="Director navigation">
+          <nav className="director-nav" aria-label="Навигация директора">
             {NAV.map((item) => {
               const active =
                 item.href === "/director"

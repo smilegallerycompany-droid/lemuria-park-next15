@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 
 type LocationRow = {
   id: string;
@@ -54,7 +55,7 @@ export default function DirectorLocationsPage() {
 
   return (
     <>
-      <PageHeader title="Locations" description="Локации парка, статус и базовые параметры сеансов." />
+      <PageHeader title="Локации" description="Локации парка, статус и базовые параметры сеансов." />
       {error ? <div className="director-alert error">{error}</div> : null}
 
       <section className="director-panel" style={{ marginBottom: 18 }}>
@@ -63,7 +64,7 @@ export default function DirectorLocationsPage() {
         </div>
         <div className="director-form-grid">
           <div className="director-field">
-            <label>Slug</label>
+            <label>Код (slug)</label>
             <input value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
           </div>
           <div className="director-field">
@@ -111,7 +112,7 @@ export default function DirectorLocationsPage() {
                   </td>
                   <td>{location.city}</td>
                   <td>
-                    <span className="director-badge green">{location.status}</span>
+                    <span className="director-badge green">{labelStatus(location.status)}</span>
                   </td>
                   <td>{location._count.sessions}</td>
                   <td>{location._count.orders}</td>

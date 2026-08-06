@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { ApiClientError, apiGet, apiPost } from "@/lib/api/client";
 import { getCashierOrders, type CashierOrderRow } from "@/lib/api/cashier";
+import { labelSource, labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type Filter = "today" | "all" | "paid" | "cancelled";
@@ -50,13 +51,13 @@ const FILTERS: { id: Filter; label: string }[] = [
 function emailStatusLabel(status: string | undefined) {
   switch (status) {
     case "SENT":
-      return "Email отправлен";
+      return "Письмо отправлено";
     case "FAILED":
-      return "Email ошибка";
+      return "Ошибка отправки письма";
     case "NOT_CONFIGURED":
-      return "Email не настроен";
+      return "Почта не настроена";
     default:
-      return "Email: нет записи";
+      return "Письмо: нет записи";
   }
 }
 
@@ -116,7 +117,7 @@ export default function CashierOrdersPage() {
   return (
     <>
       <h1 className="cashier-page-title">Заказы</h1>
-      <p className="cashier-page-sub">Список из `/api/cashier/orders` · печать в браузере</p>
+      <p className="cashier-page-sub">Список заказов · печать в браузере</p>
 
       <div className="cashier-filters">
         {FILTERS.map((item) => (
@@ -169,7 +170,8 @@ export default function CashierOrdersPage() {
                 <span>{formatMoneyFromKopecks(order.totalAmount)}</span>
               </div>
               <div style={{ color: "rgba(32,53,16,0.65)", fontSize: "0.9rem" }}>
-                {order.status} · {order.source} · {order.sessionTime} · {order.customerName}
+                {labelStatus(order.status)} · {labelSource(order.source)} · {order.sessionTime} ·{" "}
+                {order.customerName}
               </div>
             </button>
           ))}
@@ -193,7 +195,7 @@ export default function CashierOrdersPage() {
             {detail.customerName} · {detail.customerPhone} · {detail.customerEmail}
           </p>
           <p style={{ margin: "0.25rem 0", fontWeight: 700 }}>
-            {formatMoneyFromKopecks(detail.totalAmount)} · {detail.status}
+            {formatMoneyFromKopecks(detail.totalAmount)} · {labelStatus(detail.status)}
           </p>
           <p style={{ margin: "0.5rem 0", color: "rgba(32,53,16,0.7)" }}>
             {emailStatusLabel(detail.emailDelivery?.status)}
