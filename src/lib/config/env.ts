@@ -5,13 +5,18 @@ import { z } from "zod";
  * Payment and email never invent success when credentials are missing.
  *
  * Seed passwords such as ChangeMe123! are demo-only — never use them in
- * production. `prisma/seed.ts` refuses to run when NODE_ENV=production.
+ * production/staging. `prisma/seed.ts` refuses to run when NODE_ENV=production.
  */
 const DEFAULT_AUTH_SECRET = "dev-only-auth-secret-change-me";
 const DEFAULT_QR_SECRET = "dev-qr-signing-secret-change-me";
 
+const FORBIDDEN_PASSWORD_FRAGMENTS = ["changeme123", "change-me", "changeme", "password123"];
+
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+
+  /** `staging` | `production` | empty/local. Staging forces site-wide noindex. */
+  DEPLOY_ENV: z.string().optional().default(""),
 
   DATABASE_URL: z
     .string({ required_error: "DATABASE_URL is required" })
@@ -20,6 +25,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z
     .string({ required_error: "NEXT_PUBLIC_APP_URL is required" })
     .url({ message: "NEXT_PUBLIC_APP_URL must be a valid URL" }),
+
+  /** Payment provider selector. Empty/none = honest AWAITING_PAYMENT path. */
+  PAYMENT_PROVIDER: z.enum(["", "none", "yookassa"]).optional().default(""),
 
   /** ЮKassa (Russian acquiring — works without VPN). */
   YUKASSA_SHOP_ID: z.string().optional().default(""),
@@ -36,6 +44,9 @@ const envSchema = z.object({
 
   QR_SIGNING_SECRET: z.string().min(8).default(DEFAULT_QR_SECRET),
   AUTH_SECRET: z.string().min(16).default(DEFAULT_AUTH_SECRET),
+
+  /** Bearer secret for /api/cron/* — required in staging/production runtime. */
+  CRON_SECRET: z.string().optional().default(""),
 
   /**
    * Optional DSN for a future error monitoring SDK (Sentry, etc.).
@@ -54,7 +65,26 @@ function isWeakSecret(value: string, defaults: string[]): boolean {
   if (lower.includes("dev-qr") || lower.includes("replace-with")) {
     return true;
   }
+  if (FORBIDDEN_PASSWORD_FRAGMENTS.some((frag) => lower.includes(frag))) {
+    return true;
+  }
   return false;
+}
+
+function isStrictRuntime(data: Env): boolean {
+  const deploy = data.DEPLOY_ENV || "";
+  const isProductionRuntime =
+    data.NODE_ENV === "production" &&
+    process.env.NEXT_PHASE !== "phase-production-build" &&
+    process.env.npm_lifecycle_event !== "build";
+  const isLocalhostApp =
+    data.NEXT_PUBLIC_APP_URL.includes("localhost") ||
+    data.NEXT_PUBLIC_APP_URL.includes("127.0.0.1");
+
+  if (deploy === "staging" || deploy === "production") {
+    return true;
+  }
+  return isProductionRuntime && !isLocalhostApp;
 }
 
 function loadEnv(): Env {
@@ -67,21 +97,22 @@ function loadEnv(): Env {
   }
 
   const data = parsed.data;
-  const isProductionRuntime =
-    data.NODE_ENV === "production" &&
-    process.env.NEXT_PHASE !== "phase-production-build" &&
-    process.env.npm_lifecycle_event !== "build";
-  const isLocalhostApp =
-    data.NEXT_PUBLIC_APP_URL.includes("localhost") ||
-    data.NEXT_PUBLIC_APP_URL.includes("127.0.0.1");
 
-  if (isProductionRuntime && !isLocalhostApp) {
+  if (isStrictRuntime(data)) {
     if (
-      isWeakSecret(data.AUTH_SECRET, [DEFAULT_AUTH_SECRET]) ||
-      data.AUTH_SECRET.length < 32
+      data.NEXT_PUBLIC_APP_URL.includes("localhost") ||
+      data.NEXT_PUBLIC_APP_URL.includes("127.0.0.1")
     ) {
       throw new Error(
-        "Production requires a strong AUTH_SECRET (min 32 chars, not a default/dev value).",
+        "Staging/production NEXT_PUBLIC_APP_URL must be a public HTTPS origin (not localhost).",
+      );
+    }
+    if (!data.NEXT_PUBLIC_APP_URL.startsWith("https://")) {
+      throw new Error("Staging/production NEXT_PUBLIC_APP_URL must use HTTPS.");
+    }
+    if (isWeakSecret(data.AUTH_SECRET, [DEFAULT_AUTH_SECRET]) || data.AUTH_SECRET.length < 32) {
+      throw new Error(
+        "Staging/production requires a strong AUTH_SECRET (min 32 chars, not a default/dev value).",
       );
     }
     if (
@@ -89,7 +120,12 @@ function loadEnv(): Env {
       data.QR_SIGNING_SECRET.length < 32
     ) {
       throw new Error(
-        "Production requires a strong QR_SIGNING_SECRET (min 32 chars, not a default/dev value).",
+        "Staging/production requires a strong QR_SIGNING_SECRET (min 32 chars, not a default/dev value).",
+      );
+    }
+    if (!data.CRON_SECRET || data.CRON_SECRET.length < 32 || isWeakSecret(data.CRON_SECRET, [])) {
+      throw new Error(
+        "Staging/production requires CRON_SECRET (min 32 chars, not a default/dev value).",
       );
     }
   }
@@ -98,3 +134,7 @@ function loadEnv(): Env {
 }
 
 export const env = loadEnv();
+
+export function isStagingDeploy(): boolean {
+  return env.DEPLOY_ENV === "staging";
+}

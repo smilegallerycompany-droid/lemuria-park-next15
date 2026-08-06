@@ -15,3 +15,6 @@ playwright-report/
 lemuria-park-next15/
 docs/screenshots/*.png
 !docs/screenshots/.gitkeep
+docs/qa-screenshots/
+.env.staging
+.env.production

@@ -17,7 +17,9 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "prisma:seed": "prisma db seed",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "staging:bootstrap": "tsx scripts/staging-bootstrap.ts",
+    "docker:build": "DOCKER_BUILD=1 docker build -t lemuria-park:rc1 --build-arg NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://stage.lemuriapark.ru} ."
   },
   "dependencies": {
     "@hookform/resolvers": "^4.1.0",
