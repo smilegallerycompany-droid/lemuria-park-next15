@@ -5,12 +5,15 @@
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | Postgres (Yandex Managed PG recommended) |
-| `NEXT_PUBLIC_APP_URL` | Public site URL (HTTPS in production) |
-| `AUTH_SECRET` | Staff session HMAC (≥32 chars; no defaults in production) |
-| `QR_SIGNING_SECRET` | QR / signing material (≥32 chars; no defaults in production) |
+| `DEPLOY_ENV` | `staging` \| `production` \| local — staging enables site-wide noindex |
+| `NEXT_PUBLIC_APP_URL` | Public site URL (HTTPS in staging/production) |
+| `AUTH_SECRET` | Staff session HMAC (≥32 chars; no defaults in staging/production) |
+| `QR_SIGNING_SECRET` | QR / signing material (≥32 chars; no defaults) |
+| `CRON_SECRET` | Bearer for `POST /api/cron/cleanup` (≥32 chars in staging/production) |
+| `PAYMENT_PROVIDER` | `none` \| `yookassa` |
 | `YUKASSA_SHOP_ID` / `YUKASSA_SECRET_KEY` | Online payments; empty → honest `AWAITING_PAYMENT` |
 | `EMAIL_*` / Postbox | Yandex Postbox SMTP; unset → email not faked |
-| `ERROR_MONITORING_DSN` | Optional; enables DSN-aware console reporter (Sentry-ready interface) |
+| `ERROR_MONITORING_DSN` | Optional; ConsoleErrorReporter until SDK wired |
 
 ## Deploy (Yandex Cloud / Docker)
 
@@ -61,10 +64,37 @@ Document restore RTO/RPO with the hosting team.
 - Weekly → keep 4–8 weeks.
 - Before major releases → named snapshot `pre-release-YYYYMMDD`.
 
+## Health checks
+
+```bash
+curl -fsS "$APP_URL/api/health/live"    # process up
+curl -fsS "$APP_URL/api/health/ready"   # Postgres + required env (no ЮKassa probe)
+```
+
+Responses never include secrets, connection strings, or stack traces.  
+Correlation: `X-Request-Id` on middleware responses and cron.
+
 ## Cron cleanup
 
-- Expired reservations / holds: ensure scheduled job or platform cron hits the existing cleanup path.
-- On failure: ErrorReporter `cron cleanup failures`; re-run manually; do not delete PAID orders.
+```bash
+curl -X POST "$APP_URL/api/cron/cleanup" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+- Expires stale reservations + `AWAITING_PAYMENT` orders (idempotent).
+- Without / wrong secret → 401.
+- On failure: ErrorReporter `CRON_CLEANUP_FAILED`; re-run manually; never delete PAID orders.
+- Schedule every 5 minutes in Cloud Scheduler.
+
+## Staging bootstrap (not seed)
+
+```bash
+# after migrate deploy on empty staging DB:
+DEPLOY_ENV=staging npm run staging:bootstrap
+```
+
+Passwords only via `STAGING_*_PASSWORD` env. Never `ChangeMe123!`. Never commit.  
+Rotate after first login. See `docs/staging-deploy.md`.
 
 ## Webhook health
 

@@ -24,7 +24,8 @@ docker push cr.yandex/<REGISTRY_ID>/lemuria-park:latest
 
 ```bash
 npx prisma migrate deploy
-npx prisma db seed   # только для первичного наполнения
+# Staging: npm run staging:bootstrap  (пароли только из env)
+# Production: НЕ запускать prisma db seed
 ```
 
 ## Переменные
