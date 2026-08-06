@@ -9,13 +9,25 @@ function isStaffPath(pathname: string): boolean {
   );
 }
 
+function createRequestId(): string {
+  // Edge-safe id (Web Crypto).
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 /**
- * Edge middleware: security headers for all responses + noindex for staff portals.
+ * Edge middleware: security headers, correlation id, noindex for staff / staging.
  * Does not rewrite public design or alter booking domain logic.
  */
 export function middleware(request: NextRequest) {
   const response = NextResponse.next();
   const { pathname } = request.nextUrl;
+
+  const incoming = request.headers.get("x-request-id");
+  const requestId =
+    incoming && /^[a-zA-Z0-9._-]{8,64}$/.test(incoming) ? incoming : createRequestId();
+  response.headers.set("X-Request-Id", requestId);
 
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
@@ -24,7 +36,6 @@ export function middleware(request: NextRequest) {
     "Permissions-Policy",
     "camera=(), microphone=(), geolocation=(), payment=()",
   );
-  // Basic CSP — allows self assets, inline styles from Next, and YooKassa checkout redirects.
   response.headers.set(
     "Content-Security-Policy",
     [
@@ -40,7 +51,10 @@ export function middleware(request: NextRequest) {
     ].join("; "),
   );
 
-  if (isStaffPath(pathname)) {
+  const deployEnv = process.env.DEPLOY_ENV ?? "";
+  const stagingNoindex = deployEnv === "staging";
+
+  if (stagingNoindex || isStaffPath(pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
 
@@ -49,10 +63,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Apply to all paths except Next internals and common static assets.
-     * robots.txt / favicon stay public without CSP noise.
-     */
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

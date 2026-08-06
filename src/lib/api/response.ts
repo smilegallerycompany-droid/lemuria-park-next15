@@ -114,6 +114,9 @@ export function handleApiError(error: unknown): NextResponse<ApiErrorBody> {
   }
 
   // Unexpected error — log server-side for diagnostics, but never leak details to the client.
-  console.error("Unhandled API error:", error);
+  console.error("Unhandled API error:", {
+    name: error instanceof Error ? error.name : "unknown",
+    message: error instanceof Error ? error.message.slice(0, 200) : "unknown",
+  });
   return apiError("INTERNAL_ERROR", "Внутренняя ошибка сервера", 500);
 }
