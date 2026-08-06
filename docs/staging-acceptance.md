@@ -4,7 +4,7 @@
 |-------|--------|
 | Release branch | `release/lemuria-staging-rc1` (from `release/lemuria-production-hardening`) |
 | Base SHA (hardening) | `25a854898bdd420ca6a5c58431e36f6e9b3ea4eb` |
-| Staging RC HEAD | `11e6df23a1459dcade94d277fac2a502d0ec30e5` |
+| Staging RC HEAD | `61070ed7d9aa54d32c758e4c013cfd3c3d862741` |
 | Tag | `rc-1` (hardening freeze on `25a8548`); image tag `lemuria-park:rc1` |
 | Target staging URL | `https://stage.lemuriapark.ru` (planned) |
 | Decision date | 2026-08-06 |
