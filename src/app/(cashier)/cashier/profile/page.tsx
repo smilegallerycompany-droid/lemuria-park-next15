@@ -4,7 +4,9 @@ import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ApiClientError, apiGet, apiPost } from "@/lib/api/client";
 import { cashierLogout } from "@/lib/api/cashier";
+import { ConfirmDialog, ErrorAlert, PageHeader, StatusBadge } from "@/components/internal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
+import { labelRole, labelStatus } from "@/lib/director/labels";
 
 type ProfileResponse = {
   profile: {
@@ -82,6 +84,8 @@ export default function CashierProfilePage() {
   const [passwordMsg, setPasswordMsg] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [revokeBusy, setRevokeBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,20 +143,26 @@ export default function CashierProfilePage() {
   }
 
   async function revokeOthers() {
+    setRevokeBusy(true);
     try {
       const result = await apiPost<{ revoked: number }>("/api/cashier/sessions/revoke-others", {});
       setPasswordMsg(`Завершено других сессий: ${result.revoked}`);
+      setConfirmRevoke(false);
     } catch (err) {
       setPasswordError(err instanceof ApiClientError ? err.message : "Не удалось завершить сессии");
+    } finally {
+      setRevokeBusy(false);
     }
   }
 
   return (
     <>
-      <h1 className="cashier-page-title">Профиль</h1>
-      <p className="cashier-page-sub">Личные данные, статистика и безопасность</p>
+      <PageHeader
+        title="Профиль"
+        description="Личные данные, собственная статистика продаж и безопасность."
+      />
 
-      {error ? <p className="cashier-error">{error}</p> : null}
+      {error ? <ErrorAlert message={error} /> : null}
       {!data && !error ? <div className="cashier-loading">Загрузка…</div> : null}
 
       {data ? (
@@ -170,11 +180,16 @@ export default function CashierProfilePage() {
               </div>
               <div>
                 <dt>Роль</dt>
-                <dd>{data.profile.role}</dd>
+                <dd>{labelRole(data.profile.role)}</dd>
               </div>
               <div>
                 <dt>Статус</dt>
-                <dd>{data.profile.status}</dd>
+                <dd>
+                  <StatusBadge
+                    status={data.profile.status}
+                    label={labelStatus(data.profile.status)}
+                  />
+                </dd>
               </div>
               <div>
                 <dt>Локация</dt>
@@ -311,19 +326,23 @@ export default function CashierProfilePage() {
                   autoComplete="new-password"
                 />
               </label>
-              {passwordError ? <p className="cashier-error">{passwordError}</p> : null}
-              {passwordMsg ? <p className="cashier-success">{passwordMsg}</p> : null}
-              <button type="submit" className="cashier-btn cashier-btn-primary" disabled={passwordBusy}>
+              {passwordError ? <ErrorAlert message={passwordError} /> : null}
+              {passwordMsg ? <div className="internal-alert info">{passwordMsg}</div> : null}
+              <button type="submit" className="internal-btn primary" disabled={passwordBusy}>
                 {passwordBusy ? "Сохранение…" : "Сменить пароль"}
               </button>
             </form>
             <div className="cashier-actions-row">
-              <button type="button" className="cashier-btn cashier-btn-ghost" onClick={revokeOthers}>
+              <button
+                type="button"
+                className="internal-btn secondary"
+                onClick={() => setConfirmRevoke(true)}
+              >
                 Завершить другие сессии
               </button>
               <button
                 type="button"
-                className="cashier-btn cashier-btn-ghost"
+                className="internal-btn secondary"
                 onClick={onLogout}
                 disabled={loggingOut}
               >
@@ -331,6 +350,17 @@ export default function CashierProfilePage() {
               </button>
             </div>
           </section>
+
+          <ConfirmDialog
+            open={confirmRevoke}
+            title="Завершить другие сессии?"
+            description="Текущая сессия останется активной. Остальные входы будут отозваны."
+            confirmLabel="Завершить"
+            danger
+            busy={revokeBusy}
+            onCancel={() => setConfirmRevoke(false)}
+            onConfirm={() => void revokeOthers()}
+          />
 
           <section className="cashier-panel">
             <h2 className="cashier-section-title">Настройки сканера и кассы</h2>

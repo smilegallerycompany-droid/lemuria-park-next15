@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { CashierShell } from "@/components/cashier/cashier-shell";
-import "@/styles/internal-tokens.css";
+import "@/styles/internal.css";
 import "./cashier.css";
 
 export const metadata: Metadata = {
