@@ -38,6 +38,8 @@ describe("analytics formulas", () => {
   });
 
   it("computes reservation conversion without division by zero", () => {
+    assert.equal(ratePercent(3, 10), 0.3);
+    assert.equal(ratePercent(5, 0), 0);
     assert.equal(reservationConversionRate(5, 10), 0.5);
     assert.equal(reservationConversionRate(3, 0), 0);
   });
