@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     if (!user || user.status !== "ACTIVE") {
       return apiError("NOT_FOUND", "Неверный email или пароль", 401);
     }
-    if (user.role !== "CASHIER" && user.role !== "ADMIN" && user.role !== "OWNER") {
+    if (user.role !== "CASHIER" && user.role !== "DIRECTOR" && user.role !== "ADMIN" && user.role !== "OWNER") {
       return apiError("NOT_FOUND", "Неверный email или пароль", 401);
     }
 

@@ -142,11 +142,16 @@ export async function requireStaffUser(allowedRoles: UserRole[]): Promise<StaffU
 }
 
 export async function requireCashier(): Promise<StaffUser> {
-  return requireStaffUser(["CASHIER", "ADMIN", "OWNER"]);
+  return requireStaffUser(["CASHIER", "DIRECTOR", "ADMIN", "OWNER"]);
 }
 
-/** Director panel: OWNER and ADMIN only (no DIRECTOR role in next15). */
+/** Business director panel: DIRECTOR + ADMIN + OWNER. */
 export async function requireDirector(): Promise<StaffUser> {
+  return requireStaffUser(["DIRECTOR", "ADMIN", "OWNER"]);
+}
+
+/** Platform admin panel: ADMIN + OWNER. */
+export async function requireAdmin(): Promise<StaffUser> {
   return requireStaffUser(["ADMIN", "OWNER"]);
 }
 

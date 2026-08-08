@@ -7,7 +7,7 @@ import { DomainError } from "@/server/domain/errors";
 const schema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
-  portal: z.enum(["cashier", "director"]).default("cashier"),
+  portal: z.enum(["cashier", "director", "admin"]).default("cashier"),
 });
 
 export async function POST(req: Request) {
@@ -28,9 +28,11 @@ export async function POST(req: Request) {
     }
 
     const allowedRoles =
-      input.portal === "director"
+      input.portal === "admin"
         ? (["ADMIN", "OWNER"] as const)
-        : (["CASHIER", "ADMIN", "OWNER"] as const);
+        : input.portal === "director"
+          ? (["DIRECTOR", "ADMIN", "OWNER"] as const)
+          : (["CASHIER", "DIRECTOR", "ADMIN", "OWNER"] as const);
 
     const user = await loginStaff({
       email: input.email,

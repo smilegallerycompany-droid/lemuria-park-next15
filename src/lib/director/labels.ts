@@ -3,6 +3,7 @@
 const ROLE_LABELS: Record<string, string> = {
   OWNER: "Владелец",
   ADMIN: "Администратор",
+  DIRECTOR: "Директор",
   CASHIER: "Кассир",
 };
 
