@@ -34,4 +34,15 @@ test.describe("Cashier profile", () => {
     });
     expect(res.status()).toBe(401);
   });
+
+  test("profile ignores foreign userId query and stays own", async ({ request }) => {
+    await cashierLogin(request);
+    const own = await expectOk<{ profile: { id: string; email: string } }>(
+      await request.get("/api/cashier/profile"),
+    );
+    const spoof = await expectOk<{ profile: { id: string } }>(
+      await request.get(`/api/cashier/profile?userId=someone-else-${Date.now()}`),
+    );
+    expect(spoof.profile.id).toBe(own.profile.id);
+  });
 });

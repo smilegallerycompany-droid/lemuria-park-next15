@@ -7,6 +7,7 @@ import {
   comparisonWindow,
   percentChange,
   ratePercent,
+  reservationConversionRate,
   safeDivide,
 } from "@/server/services/analytics-formulas";
 
@@ -36,8 +37,8 @@ describe("analytics formulas", () => {
     assert.equal(prev.to.getTime() - prev.from.getTime(), duration);
   });
 
-  it("computes attendance/occupancy rates safely as 0..1", () => {
-    assert.equal(ratePercent(3, 10), 0.3);
-    assert.equal(ratePercent(5, 0), 0);
+  it("computes reservation conversion without division by zero", () => {
+    assert.equal(reservationConversionRate(5, 10), 0.5);
+    assert.equal(reservationConversionRate(3, 0), 0);
   });
 });
