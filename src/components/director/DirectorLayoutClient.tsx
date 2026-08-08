@@ -4,21 +4,22 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { directorFetch } from "@/lib/director/client";
+import { labelRole } from "@/lib/director/labels";
 
 const NAV = [
-  { href: "/director", label: "Dashboard" },
-  { href: "/director/locations", label: "Locations" },
-  { href: "/director/schedule", label: "Schedule" },
-  { href: "/director/sessions", label: "Sessions" },
-  { href: "/director/prices", label: "Prices" },
-  { href: "/director/ticket-types", label: "Ticket types" },
-  { href: "/director/orders", label: "Orders" },
-  { href: "/director/tickets", label: "Tickets" },
-  { href: "/director/staff", label: "Staff" },
-  { href: "/director/analytics", label: "Analytics" },
-  { href: "/director/content", label: "Content" },
-  { href: "/director/audit", label: "Audit" },
-  { href: "/director/settings", label: "Settings" },
+  { href: "/director", label: "Обзор" },
+  { href: "/director/analytics", label: "Аналитика" },
+  { href: "/director/orders", label: "Заказы" },
+  { href: "/director/tickets", label: "Билеты" },
+  { href: "/director/schedule", label: "Расписание" },
+  { href: "/director/sessions", label: "Сеансы" },
+  { href: "/director/prices", label: "Цены" },
+  { href: "/director/ticket-types", label: "Типы билетов" },
+  { href: "/director/locations", label: "Локации" },
+  { href: "/director/staff", label: "Сотрудники" },
+  { href: "/director/content", label: "Контент" },
+  { href: "/director/audit", label: "Аудит" },
+  { href: "/director/settings", label: "Настройки" },
 ];
 
 type MeResponse = {
@@ -33,6 +34,7 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
   const router = useRouter();
   const isLogin = pathname === "/director/login";
   const [me, setMe] = useState<MeResponse | null>(null);
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     if (isLogin) return;
@@ -40,6 +42,10 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
       .then(setMe)
       .catch(() => router.replace("/director/login"));
   }, [isLogin, router]);
+
+  useEffect(() => {
+    setNavOpen(false);
+  }, [pathname]);
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -52,16 +58,16 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
 
   return (
     <div className="director-root">
-      <div className="director-shell">
-        <aside className="director-sidebar">
+      <div className={`director-shell ${navOpen ? "nav-open" : ""}`}>
+        <aside className="director-sidebar" aria-label="Боковое меню">
           <div className="director-brand">
             <div className="director-brand-mark">L</div>
             <div className="director-brand-copy">
-              <strong>Director</strong>
-              <small>Lemuria Park</small>
+              <strong>Директор</strong>
+              <small>Лемурия Парк</small>
             </div>
           </div>
-          <nav className="director-nav" aria-label="Director navigation">
+          <nav className="director-nav" aria-label="Навигация директора">
             {NAV.map((item) => {
               const active =
                 item.href === "/director"
@@ -80,7 +86,13 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
               <>
                 <div>{me.name}</div>
                 <div>{me.email}</div>
-                <button type="button" className="director-btn secondary" style={{ marginTop: 10, width: "100%" }} onClick={logout}>
+                <div className="director-role-badge">{labelRole(me.role)}</div>
+                <button
+                  type="button"
+                  className="director-btn secondary"
+                  style={{ marginTop: 10, width: "100%" }}
+                  onClick={logout}
+                >
                   Выйти
                 </button>
               </>
@@ -89,7 +101,29 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
             )}
           </div>
         </aside>
-        <main className="director-main">{children}</main>
+        <main className="director-main">
+          <div className="director-mobile-bar">
+            <button
+              type="button"
+              className="director-btn secondary"
+              aria-expanded={navOpen}
+              aria-controls="director-drawer"
+              onClick={() => setNavOpen((v) => !v)}
+            >
+              Меню
+            </button>
+            <strong>Лемурия · Директор</strong>
+          </div>
+          {children}
+        </main>
+        {navOpen ? (
+          <button
+            type="button"
+            className="director-nav-backdrop"
+            aria-label="Закрыть меню"
+            onClick={() => setNavOpen(false)}
+          />
+        ) : null}
       </div>
     </div>
   );

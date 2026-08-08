@@ -1,0 +1,31 @@
+/* Internal design system — cashier + director only (not public site). */
+:root {
+  --internal-bg: #f4f6f3;
+  --internal-surface: #ffffff;
+  --internal-elevated: #ffffff;
+  --internal-border: #d7ddd4;
+  --internal-text: #1c2a22;
+  --internal-text-secondary: #5b675f;
+  --internal-green: #1f6b45;
+  --internal-green-soft: #3d8f62;
+  --internal-orange: #d97706;
+  --internal-success: #1f6b45;
+  --internal-warning: #ca8a04;
+  --internal-danger: #b42318;
+  --internal-radius: 16px;
+  --internal-radius-sm: 10px;
+  --internal-space-1: 4px;
+  --internal-space-2: 8px;
+  --internal-space-3: 12px;
+  --internal-space-4: 16px;
+  --internal-space-5: 24px;
+  --internal-space-6: 32px;
+  --internal-shadow: 0 1px 2px rgba(28, 42, 34, 0.06), 0 4px 12px rgba(28, 42, 34, 0.04);
+  --internal-chart-1: #1f6b45;
+  --internal-chart-2: #3d8f62;
+  --internal-chart-3: #d97706;
+  --internal-chart-4: #8a9289;
+  --internal-chart-5: #b42318;
+  --internal-font: "Manrope", "Segoe UI", sans-serif;
+  --internal-tap: 44px;
+}
