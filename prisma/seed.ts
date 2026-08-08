@@ -212,9 +212,18 @@ async function seedLocation() {
     update: {
       name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
       city: "Краснодар",
-      address:
-        "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
+      address: "Мегацентр «Красная Площадь», ул. Дзержинского, 100",
+      addressLine2: "2 этаж, рядом с магазином Kari",
       phone: "+7 920 971-40-22",
+      email: "hello@lemuriapark.ru",
+      latitude: 45.01847,
+      longitude: 39.02691,
+      mapZoom: 16,
+      mapLabel: "Лемурия Парк",
+      routeUrl:
+        "https://yandex.ru/maps/?rtext=~45.01847%2C39.02691&rtt=auto&text=%D0%9C%D0%B5%D0%B3%D0%B0%D1%86%D0%B5%D0%BD%D1%82%D1%80%20%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%B0%D1%8F%20%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C",
+      mapUrl:
+        "https://yandex.ru/maps/?rtext=~45.01847%2C39.02691&rtt=auto&text=%D0%9C%D0%B5%D0%B3%D0%B0%D1%86%D0%B5%D0%BD%D1%82%D1%80%20%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%B0%D1%8F%20%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C",
       activeFrom,
       activeTo,
       status: "ACTIVE",
@@ -223,8 +232,8 @@ async function seedLocation() {
       slug: "moscow-vdnh",
       name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
       city: "Краснодар",
-      address:
-        "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari",
+      address: "Мегацентр «Красная Площадь», ул. Дзержинского, 100",
+      addressLine2: "2 этаж, рядом с магазином Kari",
       timezone: DEMO_LOCATION_TIMEZONE,
       status: "ACTIVE",
       defaultCapacity: 15,
@@ -233,6 +242,15 @@ async function seedLocation() {
       activeFrom,
       activeTo,
       phone: "+7 920 971-40-22",
+      email: "hello@lemuriapark.ru",
+      latitude: 45.01847,
+      longitude: 39.02691,
+      mapZoom: 16,
+      mapLabel: "Лемурия Парк",
+      routeUrl:
+        "https://yandex.ru/maps/?rtext=~45.01847%2C39.02691&rtt=auto&text=%D0%9C%D0%B5%D0%B3%D0%B0%D1%86%D0%B5%D0%BD%D1%82%D1%80%20%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%B0%D1%8F%20%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C",
+      mapUrl:
+        "https://yandex.ru/maps/?rtext=~45.01847%2C39.02691&rtt=auto&text=%D0%9C%D0%B5%D0%B3%D0%B0%D1%86%D0%B5%D0%BD%D1%82%D1%80%20%D0%9A%D1%80%D0%B0%D1%81%D0%BD%D0%B0%D1%8F%20%D0%9F%D0%BB%D0%BE%D1%89%D0%B0%D0%B4%D1%8C",
     },
   });
 }

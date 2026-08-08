@@ -746,3 +746,172 @@
   .public-awwwards .ticket { grid-template-columns: 1fr; }
   .public-awwwards .qr { border-left: 0; border-top: 1px dashed #ccd9c3; }
 }
+
+/* —— Where we are / map —— */
+.public-awwwards .location-where {
+  padding-top: 24px;
+}
+.public-awwwards .location-where-head {
+  align-items: end;
+}
+.public-awwwards .location-where-sub {
+  margin: 10px 0 0;
+  color: #4f5b49;
+  font-size: 18px;
+}
+.public-awwwards .location-switcher {
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #5a6754;
+}
+.public-awwwards .location-switcher select {
+  min-height: 48px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  padding: 0 14px;
+  background: #fff;
+  font: inherit;
+}
+.public-awwwards .location-where-grid {
+  display: grid;
+  grid-template-columns: 0.9fr 1.35fr;
+  gap: 28px;
+  margin-top: 28px;
+  align-items: stretch;
+}
+.public-awwwards .location-where-info {
+  padding: 28px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, #fbfef7, #f3f8eb);
+  border: 1px solid rgba(120, 150, 110, 0.18);
+  box-shadow: var(--shadow);
+}
+.public-awwwards .location-where-info h3 {
+  margin: 0 0 4px;
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+.public-awwwards .location-where-city {
+  margin: 0 0 22px;
+  color: var(--orange);
+  font-weight: 800;
+}
+.public-awwwards .location-where-row {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+  color: var(--ink);
+}
+.public-awwwards .location-where-row strong {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6b7a64;
+  margin-bottom: 4px;
+}
+.public-awwwards .location-where-row p {
+  margin: 0;
+  line-height: 1.5;
+}
+.public-awwwards .location-where-sessions {
+  margin: 18px 0 8px;
+}
+.public-awwwards .location-where-sessions ul {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.public-awwwards .location-where-sessions li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 14px;
+}
+.public-awwwards .location-where-sessions li span {
+  color: #5f8a4b;
+  font-weight: 700;
+}
+.public-awwwards .location-where-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+.public-awwwards .location-where-map,
+.public-awwwards .location-map-canvas,
+.public-awwwards .location-map-fallback {
+  border-radius: 28px;
+  overflow: hidden;
+  min-width: 0;
+  background: #e8f0df;
+  box-shadow: var(--shadow);
+}
+.public-awwwards .location-map-fallback-inner {
+  min-height: inherit;
+  height: 100%;
+  display: grid;
+  place-content: center;
+  gap: 10px;
+  padding: 28px;
+  text-align: center;
+}
+.public-awwwards .location-map-fallback-icon {
+  font-size: 34px;
+  color: var(--green-deep);
+}
+.public-awwwards .lemuria-map-pin {
+  width: 22px;
+  height: 22px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--green-deep), var(--orange));
+  box-shadow: 0 6px 16px rgba(40, 70, 30, 0.35);
+  cursor: pointer;
+}
+.public-awwwards .lemuria-map-balloon {
+  display: none;
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  width: 220px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: var(--shadow);
+  font-size: 13px;
+}
+.public-awwwards .lemuria-map-balloon.open { display: block; }
+.public-awwwards .lemuria-map-balloon a {
+  color: var(--orange);
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .public-awwwards .location-where-grid {
+    grid-template-columns: 1fr;
+  }
+  .public-awwwards .location-where-map,
+  .public-awwwards .location-map-canvas,
+  .public-awwwards .location-map-fallback {
+    height: 360px !important;
+    min-height: 360px;
+    border-radius: 22px;
+  }
+  .public-awwwards .location-where-info {
+    order: 0;
+  }
+  .public-awwwards .location-where-map {
+    order: 1;
+  }
+}
+

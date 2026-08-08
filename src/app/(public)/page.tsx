@@ -1,18 +1,42 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock3, Leaf, MapPin, Sparkles, Ticket, Users } from "lucide-react";
 import { BookingAwwwards as Booking } from "@/components/booking/BookingAwwwards";
-
-const ADDRESS =
-  "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari";
+import {
+  WhereWeAreSection,
+  type PublicLocationCard,
+} from "@/components/public/WhereWeAreSection";
 
 /**
  * Approved awwwards home composition — visual source of truth.
  * Booking widget talks to production `/api/public/*` (next15 services).
+ * Location map section loads from DB (with safe empty fallback).
  */
 export default function HomePage() {
+  const [locationPayload, setLocationPayload] = useState<{
+    sectionTitle: string;
+    locations: PublicLocationCard[];
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/public/locations")
+      .then((r) => r.json())
+      .then((body) => {
+        if (body?.ok && body.data) setLocationPayload(body.data);
+      })
+      .catch(() => {
+        /* keep page usable without map block data */
+      });
+  }, []);
+
+  const primaryAddress =
+    locationPayload?.locations[0]?.address ??
+    "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari";
+  const primaryPhone = locationPayload?.locations[0]?.phone ?? "+7 920 971-40-22";
+
   return (
     <main>
       <header className="site-header">
@@ -28,7 +52,7 @@ export default function HomePage() {
           <nav className="nav">
             <a href="#booking">Билеты</a>
             <a href="#about">О зоотеатре</a>
-            <a href="#visit">Визит</a>
+            <a href="#location">Где мы</a>
             <a href="#faq">Вопросы</a>
           </nav>
 
@@ -69,7 +93,7 @@ export default function HomePage() {
             </div>
             <p className="hero-address">
               <MapPin size={16} aria-hidden />
-              Краснодар, Мегацентр Красная площадь, второй этаж, рядом с магазином Kari
+              {primaryAddress}
             </p>
           </motion.div>
         </div>
@@ -132,11 +156,10 @@ export default function HomePage() {
             </h2>
           </div>
           <p>
-            Короткий понятный маршрут: выберите сеанс, приходите вовремя — и наслаждайтесь
-            программой зоотеатра.
+            Короткий понятный маршрут: выберите сеанс, приходите вовремя — и наслаждайтесь программой
+            зоотеатра.
           </p>
         </div>
-
         <div className="visit-grid">
           <article className="visit-card">
             <span className="visit-num">01</span>
@@ -156,14 +179,21 @@ export default function HomePage() {
             <h3>Небольшие группы</h3>
             <p>До 15 гостей на сеанс — всем комфортно смотреть программу и фотографировать.</p>
           </article>
-          <article className="visit-card visit-card-accent">
+          <article className="visit-card">
             <span className="visit-num">04</span>
             <MapPin className="visit-icon" size={22} aria-hidden />
             <h3>Где мы находимся</h3>
-            <p>{ADDRESS}</p>
+            <p>{primaryAddress}</p>
           </article>
         </div>
       </section>
+
+      {locationPayload && locationPayload.locations.length > 0 ? (
+        <WhereWeAreSection
+          sectionTitle={locationPayload.sectionTitle}
+          locations={locationPayload.locations}
+        />
+      ) : null}
 
       <section id="faq" className="section container">
         <div className="section-head">
@@ -204,11 +234,11 @@ export default function HomePage() {
           </div>
           <div>
             <small>Телефон</small>
-            <p>+7 920 971-40-22</p>
+            <p>{primaryPhone}</p>
           </div>
           <div>
             <small>Адрес</small>
-            <p>{ADDRESS}</p>
+            <p>{primaryAddress}</p>
           </div>
           <div>
             <small>Документы</small>

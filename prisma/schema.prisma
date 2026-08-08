@@ -14,6 +14,7 @@ datasource db {
 enum UserRole {
   OWNER
   ADMIN
+  DIRECTOR
   CASHIER
 }
 
@@ -207,6 +208,8 @@ model Location {
   name                   String
   city                   String
   address                String
+  /// Floor / landmark / extra orientation line for public map section.
+  addressLine2           String?
   timezone               String         @default("Europe/Moscow")
   status                 LocationStatus @default(UPCOMING)
   defaultCapacity        Int            @default(15)
@@ -216,9 +219,14 @@ model Location {
   activeFrom             DateTime?
   activeTo               DateTime?
   phone                  String?
+  email                  String?
+  /// External route deep-link (Yandex / 2GIS / Google). Prefer over inventing routes.
   mapUrl                 String?
+  routeUrl               String?
   latitude               Float?
   longitude              Float?
+  mapZoom                Int            @default(16)
+  mapLabel               String?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
@@ -572,6 +580,17 @@ model SiteSettings {
   maintenanceMode        Boolean  @default(false)
   metaTitle              String?
   metaDescription        String?
+  heroBadge              String?
+  heroTitle              String?
+  heroSubtitle           String?
+  heroDescription        String?
+  heroImageUrl           String?
+  aboutTitle             String?
+  aboutDescription       String?
+  locationSectionTitle   String?  @default("Где мы находимся?")
+  defaultTimezone        String   @default("Europe/Moscow")
+  supportPhone           String?
+  supportEmail           String?
   createdAt              DateTime @default(now())
   updatedAt              DateTime @updatedAt
 }
@@ -611,4 +630,33 @@ model GalleryItem {
 
   @@index([isPublished, sortOrder])
   @@index([locationId])
+}
+
+/// Operational signals for admin system health (no secrets).
+model OperationalEvent {
+  id        String   @id @default(cuid())
+  kind      String
+  status    String
+  message   String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([kind, createdAt])
+  @@index([createdAt])
+}
+
+/// Media metadata — store URL/key only, never base64 blobs in DB.
+model MediaObject {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  url       String
+  mimeType  String?
+  byteSize  Int?
+  width     Int?
+  height    Int?
+  altText   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
 }
