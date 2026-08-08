@@ -106,9 +106,25 @@ export function QrScanner() {
     syncOnline();
     window.addEventListener("online", syncOnline);
     window.addEventListener("offline", syncOnline);
+
+    function onVisibility() {
+      if (document.visibilityState === "hidden") {
+        stopCamera();
+        setPhase((current) => (current === "camera" ? "idle" : current));
+      }
+    }
+    function onPageHide() {
+      stopCamera();
+      setPhase((current) => (current === "camera" ? "idle" : current));
+    }
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", onPageHide);
+
     return () => {
       window.removeEventListener("online", syncOnline);
       window.removeEventListener("offline", syncOnline);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", onPageHide);
       stopCamera();
     };
   }, [stopCamera]);
@@ -209,8 +225,17 @@ export function QrScanner() {
         const track = stream.getVideoTracks()[0];
         const caps = track?.getCapabilities?.() as { torch?: boolean } | undefined;
         setTorchSupported(Boolean(caps?.torch));
-      } catch {
-        setError("Нет доступа к камере. Разрешите доступ или введите код вручную.");
+      } catch (err) {
+        const name = err instanceof DOMException ? err.name : "";
+        if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+          setError("Доступ к камере запрещён. Разрешите доступ или введите код вручную.");
+        } else if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+          setError("Камера не найдена. Используйте ручной ввод или USB-сканер.");
+        } else if (name === "NotReadableError" || name === "TrackStartError") {
+          setError("Камера занята другим приложением. Закройте его и попробуйте снова.");
+        } else {
+          setError("Нет доступа к камере. Разрешите доступ или введите код вручную.");
+        }
         setPhase("manual");
         stopCamera();
       }
