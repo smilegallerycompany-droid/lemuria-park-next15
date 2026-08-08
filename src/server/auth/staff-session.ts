@@ -76,6 +76,22 @@ export async function revokeAllUserSessions(userId: string): Promise<number> {
   return result.count;
 }
 
+/** Revoke all sessions for a user except the current cookie session (if any). */
+export async function revokeOtherUserSessions(userId: string): Promise<number> {
+  const jar = await cookies();
+  const token = jar.get(STAFF_COOKIE_NAME)?.value;
+  const keepHash = token ? hashToken(token) : null;
+  const result = await prisma.staffSession.updateMany({
+    where: {
+      userId,
+      revokedAt: null,
+      ...(keepHash ? { tokenHash: { not: keepHash } } : {}),
+    },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
+}
+
 async function loadUser(userId: string): Promise<StaffUser | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
