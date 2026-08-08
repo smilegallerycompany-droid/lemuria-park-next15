@@ -150,6 +150,7 @@
   position: relative;
   z-index: 3;
   padding-top: 210px;
+  padding-bottom: 56px;
 }
 .public-awwwards .hero-copy {
   max-width: 610px;
@@ -194,6 +195,8 @@
   font-size: 14px;
   font-weight: 650;
   line-height: 1.45;
+  position: relative;
+  z-index: 4;
 }
 .public-awwwards .hero-address svg {
   flex-shrink: 0;
@@ -204,7 +207,8 @@
 .public-awwwards .booking-section {
   position: relative;
   z-index: 12;
-  margin-top: -124px;
+  /* Pull card over hero art, but clear of .hero-address */
+  margin-top: -72px;
 }
 .public-awwwards .booking-card {
   display: grid;
@@ -697,7 +701,7 @@
     inset: 0;
     background: linear-gradient(180deg, rgba(248,250,244,.98) 0%, rgba(248,250,244,.82) 38%, rgba(248,250,244,.08) 66%);
   }
-  .public-awwwards .hero-content { padding-top: 116px; }
+  .public-awwwards .hero-content { padding-top: 116px; padding-bottom: 40px; }
   .public-awwwards .hero-copy { max-width: 100%; }
   .public-awwwards .hero h1 { font-size: 54px; max-width: 330px; }
   .public-awwwards .hero-subtitle { font-size: 21px; }
@@ -708,7 +712,7 @@
     font-size: 13px;
   }
 
-  .public-awwwards .booking-section { margin-top: -68px; }
+  .public-awwwards .booking-section { margin-top: -40px; }
   .public-awwwards .booking-card,
   .public-awwwards .booking-card-compact { grid-template-columns: 1fr; border-radius: 24px; }
   .public-awwwards .booking-select { min-height: 52px; font-size: 15px; }
