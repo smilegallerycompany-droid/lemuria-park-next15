@@ -7,7 +7,7 @@ Base code before staging hardening commits: `3d9d24a` (see git log for camera/he
 
 Ephemeral Cloudflare quick tunnel (local production `next start` + isolated Postgres):
 
-`https://wma-brokers-gain-pen.trycloudflare.com`
+`https://tagged-pete-desktop-elite.trycloudflare.com`
 
 Local origin: `http://127.0.0.1:3001`  
 DB: Docker `lemuria-staging-postgres` on `127.0.0.1:5433` / DB `lemuria_staging`  
@@ -15,7 +15,9 @@ Secrets: `.env.staging` (gitignored), strong random AUTH/QR secrets, **not** pro
 
 > Tunnel URL is ephemeral — restart with `/tmp/cloudflared tunnel --url http://127.0.0.1:3001` if expired.
 >
-> Current tunnel (this session): `https://wma-brokers-gain-pen.trycloudflare.com`
+> Current tunnel (this session): `https://tagged-pete-desktop-elite.trycloudflare.com`
+
+**Deployed runtime SHA** (from `/api/health/live`): `589f1880bf78fec0932378044deb7ec9e4aaeeb0`
 
 ## Health
 
