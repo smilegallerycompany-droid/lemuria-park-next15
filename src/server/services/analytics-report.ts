@@ -78,7 +78,6 @@ async function kpiBundle(params: AnalyticsReportParams) {
     bySource,
     payments,
     noShowTickets,
-    pastPaidTickets,
     reservationsCreated,
     paidFromReservations,
   ] = await Promise.all([
@@ -159,16 +158,6 @@ async function kpiBundle(params: AnalyticsReportParams) {
         checkIns: { none: { result: "SUCCESS" } },
       },
     }),
-    prisma.ticket.count({
-      where: {
-        status: { in: ["VALID", "USED"] },
-        order: where,
-        session: {
-          endsAt: { lt: params.now ?? new Date() },
-          ...(params.locationId ? { locationId: params.locationId } : {}),
-        },
-      },
-    }),
     prisma.reservation.count({
       where: {
         createdAt: { gte: params.from, lte: params.to },
@@ -221,7 +210,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
     if (row.source === "CASHIER") cashier = row._sum.totalAmount ?? 0;
   }
 
-  const attendanceRate = ratePercent(checkIns, pastPaidTickets || ticketsSold);
+  const attendanceRate = ratePercent(checkIns, ticketsSold);
   const occupancyRate = ratePercent(paidSeats, capacity);
 
   return {
