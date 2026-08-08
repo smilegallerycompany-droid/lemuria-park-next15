@@ -70,7 +70,7 @@ export function createCashierSale(
   input: {
     sessionPublicId: string;
     items: Array<{ ticketTypeCode: string; quantity: number }>;
-    paymentMethod: "CASH" | "CARD_TERMINAL";
+    paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE";
     customerName?: string;
   },
   idempotencyKey: string,

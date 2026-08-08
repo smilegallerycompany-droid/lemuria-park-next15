@@ -1,4 +1,4 @@
-import type { OrderSource, PaymentMethod } from "@prisma/client";
+import type { OrderSource } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { computeAvailability } from "@/server/domain/availability.domain";
 import { reservationRepository } from "@/server/repositories/reservation.repository";
@@ -24,8 +24,12 @@ export type DirectorAnalytics = {
   averageOrderValueKopecks: number;
   revenueBySource: Record<OrderSource, number>;
   revenueByPaymentMethod: {
+    /** Наличные (CASH). */
     cash: number;
+    /** Карта на терминале (CARD_TERMINAL). */
     card: number;
+    /** Оплата через сайт / ЮKassa (CARD_ONLINE) — онлайн-заказы и касса «Сайт». */
+    site: number;
     other: number;
   };
   checkInCount: number;
@@ -65,10 +69,6 @@ function orderWhere(params: DirectorAnalyticsParams) {
 
 function toDateKey(date: Date): string {
   return date.toISOString().slice(0, 10);
-}
-
-function isCardMethod(method: PaymentMethod): boolean {
-  return method === "CARD_ONLINE" || method === "CARD_TERMINAL";
 }
 
 export async function getDirectorAnalytics(
@@ -203,26 +203,30 @@ export async function getDirectorAnalytics(
     revenueBySource[row.source] = row._sum.totalAmount ?? 0;
   }
 
-  const revenueByPaymentMethod = { cash: 0, card: 0, other: 0 };
+  const revenueByPaymentMethod = { cash: 0, card: 0, site: 0, other: 0 };
   const dailyMap = new Map<string, { revenueKopecks: number; orderCount: number; checkIns: number }>();
 
   for (const order of paidOrders) {
     const key = toDateKey(order.createdAt);
     const bucket = dailyMap.get(key) ?? { revenueKopecks: 0, orderCount: 0, checkIns: 0 };
+    // Daily / gross series use Order.totalAmount once — never sum payments here.
     bucket.revenueKopecks += order.totalAmount;
     bucket.orderCount += 1;
     dailyMap.set(key, bucket);
 
-    const succeeded = order.payments.filter((p) => p.status === "SUCCEEDED" || p.status === "REFUNDED");
+    // Payment-method split: one SUCCEEDED row per sale; buckets are disjoint
+    // (cash | terminal card | site/online card) so they never double-count.
+    const succeeded = order.payments.filter((p) => p.status === "SUCCEEDED");
     if (succeeded.length === 0) {
       revenueByPaymentMethod.other += order.totalAmount;
       continue;
     }
-    for (const payment of succeeded) {
-      if (payment.method === "CASH") revenueByPaymentMethod.cash += payment.amount;
-      else if (isCardMethod(payment.method)) revenueByPaymentMethod.card += payment.amount;
-      else revenueByPaymentMethod.other += payment.amount;
-    }
+    // Prefer a single primary payment (cashier/online create exactly one).
+    const payment = succeeded[0];
+    if (payment.method === "CASH") revenueByPaymentMethod.cash += payment.amount;
+    else if (payment.method === "CARD_TERMINAL") revenueByPaymentMethod.card += payment.amount;
+    else if (payment.method === "CARD_ONLINE") revenueByPaymentMethod.site += payment.amount;
+    else revenueByPaymentMethod.other += payment.amount;
   }
 
   const checkInRows = await prisma.ticketCheckIn.findMany({
@@ -360,17 +364,21 @@ export function occupancyRate(booked: number, capacity: number): number {
   return booked / capacity;
 }
 
-/** Pure helper — split payment method buckets (cash / card / other). */
+/**
+ * Pure helper — disjoint payment buckets:
+ * cash = CASH, card = CARD_TERMINAL, site = CARD_ONLINE.
+ * Never puts the same payment into two buckets (no analytics double-count).
+ */
 export function classifyPaymentMethodRevenue(
   payments: Array<{ method: string; amount: number; status: string }>,
-): { cash: number; card: number; other: number } {
-  const out = { cash: 0, card: 0, other: 0 };
+): { cash: number; card: number; site: number; other: number } {
+  const out = { cash: 0, card: 0, site: 0, other: 0 };
   for (const payment of payments) {
-    if (payment.status !== "SUCCEEDED" && payment.status !== "REFUNDED") continue;
+    if (payment.status !== "SUCCEEDED") continue;
     if (payment.method === "CASH") out.cash += payment.amount;
-    else if (payment.method === "CARD_ONLINE" || payment.method === "CARD_TERMINAL") {
-      out.card += payment.amount;
-    } else out.other += payment.amount;
+    else if (payment.method === "CARD_TERMINAL") out.card += payment.amount;
+    else if (payment.method === "CARD_ONLINE") out.site += payment.amount;
+    else out.other += payment.amount;
   }
   return out;
 }

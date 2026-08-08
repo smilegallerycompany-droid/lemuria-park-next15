@@ -1,30 +1,65 @@
-import { apiSuccess, handleApiError } from "@/lib/api/response";
+import { apiSuccess, apiError, handleApiError } from "@/lib/api/response";
+import { analyticsQuerySchema } from "@/lib/validation/analytics";
 import { requireDirector } from "@/server/auth/staff-session";
-import { getDirectorAnalytics } from "@/server/services/analytics";
-import { parseIsoDateParam, endOfDayUtc } from "@/server/director/http";
-import { startOfLocalDateInTimezone, todayInTimezone } from "@/lib/datetime";
+import { getDirectorAnalyticsReport } from "@/server/services/analytics-report";
+import { resolveAnalyticsPeriod } from "@/server/services/analytics-period";
 
 export async function GET(req: Request) {
   try {
-    await requireDirector();
+    const user = await requireDirector();
     const url = new URL(req.url);
-    const locationId = url.searchParams.get("locationId") ?? undefined;
-    const timeZone = "Europe/Moscow";
+    const raw = Object.fromEntries(url.searchParams.entries());
+    const parsed = analyticsQuerySchema.safeParse(raw);
+    if (!parsed.success) {
+      return apiError("VALIDATION_ERROR", "Некорректные параметры аналитики", 400, {
+        issues: parsed.error.flatten(),
+      });
+    }
 
-    const todayKey = todayInTimezone(timeZone);
-    const defaultFrom = startOfLocalDateInTimezone(todayKey, timeZone);
-    const defaultTo = endOfDayUtc(defaultFrom);
+    const query = parsed.data;
+    if (query.locationId && user.locationIds.length > 0 && !user.locationIds.includes(query.locationId)) {
+      return apiError("FORBIDDEN", "Нет доступа к выбранной локации", 403);
+    }
 
-    const from = parseIsoDateParam(url.searchParams.get("from"), defaultFrom);
-    const to = parseIsoDateParam(url.searchParams.get("to"), defaultTo);
-
-    const analytics = await getDirectorAnalytics({
-      from,
-      to,
-      locationId,
+    const { from, to, preset } = resolveAnalyticsPeriod({
+      preset: query.preset,
+      from: query.from,
+      to: query.to,
+      timeZone: query.timezone,
     });
 
-    return apiSuccess(analytics);
+    if (from.getTime() > to.getTime()) {
+      return apiError("VALIDATION_ERROR", "Период «с» не может быть позже «по»", 400);
+    }
+
+    const maxRangeMs = 100 * 24 * 60 * 60 * 1000;
+    if (to.getTime() - from.getTime() > maxRangeMs) {
+      return apiError("VALIDATION_ERROR", "Период не может превышать 100 дней", 400);
+    }
+
+    const report = await getDirectorAnalyticsReport({
+      from,
+      to,
+      locationId: query.locationId,
+      source: query.source,
+      paymentMethod: query.paymentMethod,
+      ticketTypeId: query.ticketTypeId,
+      cashierId: query.cashierId,
+      timeZone: query.timezone,
+    });
+
+    return apiSuccess({
+      ...report,
+      filters: {
+        locationId: query.locationId ?? null,
+        source: query.source,
+        paymentMethod: query.paymentMethod,
+        ticketTypeId: query.ticketTypeId ?? null,
+        cashierId: query.cashierId ?? null,
+        timezone: query.timezone,
+        preset,
+      },
+    });
   } catch (error) {
     return handleApiError(error);
   }

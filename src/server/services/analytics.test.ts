@@ -60,16 +60,24 @@ describe("occupancyRate", () => {
 });
 
 describe("classifyPaymentMethodRevenue", () => {
-  it("splits cash/card/other with deterministic totals", () => {
+  it("splits cash / terminal card / site without overlap", () => {
     const buckets = classifyPaymentMethodRevenue([
       { method: "CASH", amount: 90_000, status: "SUCCEEDED" },
       { method: "CARD_ONLINE", amount: 110_000, status: "SUCCEEDED" },
       { method: "CARD_TERMINAL", amount: 80_000, status: "SUCCEEDED" },
+      // Cashier «Сайт» also uses CARD_ONLINE — still only in site, never card.
+      { method: "CARD_ONLINE", amount: 70_000, status: "SUCCEEDED" },
       { method: "CASH", amount: 50_000, status: "PENDING" },
       { method: "OTHER", amount: 20_000, status: "SUCCEEDED" },
     ]);
     assert.equal(buckets.cash, 90_000);
-    assert.equal(buckets.card, 190_000);
+    assert.equal(buckets.card, 80_000);
+    assert.equal(buckets.site, 180_000);
     assert.equal(buckets.other, 20_000);
+    // Disjoint: sum of buckets equals succeeded payment amounts only once.
+    assert.equal(
+      buckets.cash + buckets.card + buckets.site + buckets.other,
+      90_000 + 80_000 + 110_000 + 70_000 + 20_000,
+    );
   });
 });

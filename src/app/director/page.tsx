@@ -5,23 +5,68 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch, formatDateTime, formatPercent } from "@/lib/director/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
-import type { DirectorAnalytics } from "@/server/services/analytics";
+
+type AnalyticsSummary = {
+  kpis: {
+    netRevenueKopecks: number;
+    refundedAmountKopecks: number;
+    onlineRevenueKopecks: number;
+    cashierRevenueKopecks: number;
+    paidOrders: number;
+    ticketsSold: number;
+    averageOrderValueKopecks: number;
+    occupancyRate: number;
+    checkIns: number;
+    noShow: number;
+  };
+};
+
+type SessionRow = {
+  id: string;
+  startsAt: string;
+  capacity: number;
+  _count?: { tickets: number };
+  location?: { name: string };
+};
 
 export default function DirectorDashboardPage() {
-  const [data, setData] = useState<DirectorAnalytics | null>(null);
+  const [data, setData] = useState<AnalyticsSummary | null>(null);
+  const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    directorFetch<DirectorAnalytics>("/api/director/analytics")
-      .then(setData)
-      .catch((err) => setError(err instanceof Error ? err.message : "Ошибка загрузки"));
+    (async () => {
+      try {
+        const analytics = await directorFetch<AnalyticsSummary>(
+          "/api/director/analytics?preset=today",
+        );
+        setData(analytics);
+        const locs = await directorFetch<{ locations: Array<{ id: string }> }>(
+          "/api/director/locations",
+        );
+        const locationId = locs.locations[0]?.id;
+        if (locationId) {
+          const sessionsData = await directorFetch<{ sessions: SessionRow[] }>(
+            `/api/director/sessions?locationId=${locationId}`,
+          );
+          setSessions(sessionsData.sessions.slice(0, 8));
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Ошибка загрузки");
+      }
+    })();
   }, []);
 
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Ключевые показатели за сегодня (оплаченные заказы, копейки → рубли в UI)."
+        title="Обзор"
+        description="Ключевые показатели за сегодня (только PAID). Подробности — в Аналитике."
+        actions={
+          <Link href="/director/analytics" className="director-btn primary">
+            Открыть аналитику
+          </Link>
+        }
       />
       {error ? <div className="director-alert error">{error}</div> : null}
       {!data && !error ? <div className="director-empty">Загрузка KPI…</div> : null}
@@ -29,31 +74,40 @@ export default function DirectorDashboardPage() {
         <>
           <div className="director-card-grid">
             <div className="director-kpi">
-              <div className="director-kpi-label">Выручка сегодня</div>
-              <div className="director-kpi-value accent-green">{formatMoneyFromKopecks(data.netRevenueKopecks)}</div>
-              <div className="director-kpi-sub">Возвраты: {formatMoneyFromKopecks(data.refundsKopecks)}</div>
+              <div className="director-kpi-label">Чистая выручка</div>
+              <div className="director-kpi-value accent-green">
+                {formatMoneyFromKopecks(data.kpis.netRevenueKopecks)}
+              </div>
+              <div className="director-kpi-sub">
+                Возвраты: {formatMoneyFromKopecks(data.kpis.refundedAmountKopecks)}
+              </div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">Online / Cashier</div>
+              <div className="director-kpi-label">Онлайн / Касса</div>
               <div className="director-kpi-value accent-orange">
-                {formatMoneyFromKopecks(data.revenueBySource.ONLINE)}
+                {formatMoneyFromKopecks(data.kpis.onlineRevenueKopecks)}
               </div>
-              <div className="director-kpi-sub">Касса: {formatMoneyFromKopecks(data.revenueBySource.CASHIER)}</div>
+              <div className="director-kpi-sub">
+                Касса: {formatMoneyFromKopecks(data.kpis.cashierRevenueKopecks)}
+              </div>
             </div>
             <div className="director-kpi">
               <div className="director-kpi-label">Заказы</div>
-              <div className="director-kpi-value">{data.orderCount}</div>
-              <div className="director-kpi-sub">Билетов: {data.ticketCount}</div>
+              <div className="director-kpi-value">{data.kpis.paidOrders}</div>
+              <div className="director-kpi-sub">Билетов: {data.kpis.ticketsSold}</div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">AOV</div>
-              <div className="director-kpi-value">{formatMoneyFromKopecks(data.averageOrderValueKopecks)}</div>
-              <div className="director-kpi-sub">Средний чек</div>
+              <div className="director-kpi-label">Средний чек</div>
+              <div className="director-kpi-value">
+                {formatMoneyFromKopecks(data.kpis.averageOrderValueKopecks)}
+              </div>
             </div>
             <div className="director-kpi">
-              <div className="director-kpi-label">Occupancy</div>
-              <div className="director-kpi-value">{formatPercent(data.occupancyRate)}</div>
-              <div className="director-kpi-sub">Заполненность сеансов за период</div>
+              <div className="director-kpi-label">Загрузка</div>
+              <div className="director-kpi-value">{formatPercent(data.kpis.occupancyRate)}</div>
+              <div className="director-kpi-sub">
+                Check-in: {data.kpis.checkIns} · No-show: {data.kpis.noShow}
+              </div>
             </div>
           </div>
 
@@ -70,26 +124,24 @@ export default function DirectorDashboardPage() {
                   <tr>
                     <th>Локация</th>
                     <th>Начало</th>
-                    <th>Места</th>
-                    <th>Свободно</th>
+                    <th>Билеты</th>
+                    <th>Capacity</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.upcomingSessions.length === 0 ? (
+                  {sessions.length === 0 ? (
                     <tr>
                       <td colSpan={4} className="director-empty">
                         Нет предстоящих сеансов
                       </td>
                     </tr>
                   ) : (
-                    data.upcomingSessions.map((session) => (
+                    sessions.map((session) => (
                       <tr key={session.id}>
-                        <td>{session.locationName}</td>
+                        <td>{session.location?.name ?? "—"}</td>
                         <td>{formatDateTime(session.startsAt)}</td>
-                        <td>
-                          {session.booked}/{session.capacity}
-                        </td>
-                        <td>{session.available}</td>
+                        <td>{session._count?.tickets ?? 0}</td>
+                        <td>{session.capacity}</td>
                       </tr>
                     ))
                   )}

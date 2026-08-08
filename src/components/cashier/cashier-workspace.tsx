@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote,
   CreditCard,
+  Globe,
   LogOut,
   QrCode,
   RefreshCw,
@@ -195,7 +196,7 @@ export function CashierWorkspace() {
     );
   }, [sessionsData, quantities]);
 
-  const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL") => {
+  const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
     if (!selectedSession || totalQuantity <= 0 || selling) return;
     setSelling(true);
     setError(null);
@@ -516,6 +517,16 @@ export function CashierWorkspace() {
                       >
                         <CreditCard aria-hidden />
                         Карта
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="h-14 text-base"
+                        disabled={selling || totalQuantity === 0 || selectedSession.soldOut}
+                        onClick={() => void sell("CARD_ONLINE")}
+                      >
+                        <Globe aria-hidden />
+                        Сайт
                       </Button>
                     </div>
                   </>
