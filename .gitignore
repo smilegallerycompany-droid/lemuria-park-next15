@@ -16,3 +16,4 @@ lemuria-park-next15/
 docs/screenshots/*.png
 !docs/screenshots/.gitkeep
 docs/qa-screenshots/
+docs/qa-screenshots-rc2/

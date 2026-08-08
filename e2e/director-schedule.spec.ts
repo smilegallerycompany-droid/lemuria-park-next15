@@ -15,30 +15,62 @@ test.describe("Director schedule / sessions", () => {
   }) => {
     await directorLogin(request);
 
-    const locations = await expectOk<{ locations: Array<{ id: string }> }>(
+    const locations = await expectOk<{ locations: Array<{ id: string; slug?: string }> }>(
       await request.get("/api/director/locations"),
     );
-    const locationId = locations.locations[0]?.id;
-    expect(locationId).toBeTruthy();
+    expect(locations.locations.length).toBeGreaterThan(0);
 
     const from = new Date().toISOString();
     const to = new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString();
-    const sessions = await expectOk<{
-      sessions: Array<{
-        id: string;
-        publicId: string;
-        status: string;
-        _count: { orders: number };
-      }>;
-    }>(
-      await request.get(
-        `/api/director/sessions?locationId=${locationId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
-      ),
-    );
 
-    const empty = sessions.sessions.find(
+    async function loadSessions(locationId: string, toIso = to) {
+      return expectOk<{
+        sessions: Array<{
+          id: string;
+          publicId: string;
+          status: string;
+          _count: { orders: number };
+        }>;
+      }>(
+        await request.get(
+          `/api/director/sessions?locationId=${locationId}&from=${encodeURIComponent(from)}&to=${encodeURIComponent(toIso)}`,
+        ),
+      );
+    }
+
+    // Prefer a location that already has an empty SCHEDULED slot (avoid fixture-only locs).
+    let locationId = locations.locations[0]!.id;
+    let sessions = await loadSessions(locationId);
+    let empty = sessions.sessions.find(
       (s) => s.status === "SCHEDULED" && (s._count?.orders ?? 0) === 0,
     );
+    if (!empty) {
+      for (const loc of locations.locations.slice(1)) {
+        const candidate = await loadSessions(loc.id);
+        const found = candidate.sessions.find(
+          (s) => s.status === "SCHEDULED" && (s._count?.orders ?? 0) === 0,
+        );
+        if (found) {
+          locationId = loc.id;
+          sessions = candidate;
+          empty = found;
+          break;
+        }
+      }
+    }
+
+    // Dense / empty fixture DBs — mint schedule slots then re-query.
+    if (!empty) {
+      const gen = await request.post("/api/director/sessions/generate", {
+        data: { locationId, windowDays: 45 },
+      });
+      expect(gen.status()).toBe(200);
+      const farTo = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString();
+      sessions = await loadSessions(locationId, farTo);
+      empty = sessions.sessions.find(
+        (s) => s.status === "SCHEDULED" && (s._count?.orders ?? 0) === 0,
+      );
+    }
     expect(empty, "need an empty SCHEDULED session").toBeTruthy();
 
     const closeRes = await request.patch(`/api/director/sessions/${empty!.id}`, {
