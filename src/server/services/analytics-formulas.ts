@@ -30,6 +30,17 @@ export function ratePercent(part: number, whole: number): number {
   return part / whole;
 }
 
+/**
+ * Reservation Conversion = paid orders created from reservations /
+ * reservations created in the same period (0..1).
+ */
+export function reservationConversionRate(
+  paidOrdersFromReservations: number,
+  reservationsCreated: number,
+): number {
+  return ratePercent(paidOrdersFromReservations, reservationsCreated);
+}
+
 export function comparisonWindow(from: Date, to: Date): { from: Date; to: Date } {
   const durationMs = Math.max(0, to.getTime() - from.getTime());
   const prevTo = new Date(from.getTime() - 1);

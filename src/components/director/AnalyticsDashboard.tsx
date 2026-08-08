@@ -17,9 +17,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { KpiCard } from "@/components/internal/KpiCard";
-import { ChartCard } from "@/components/internal/ChartCard";
+import {
+  ChartCard,
+  EmptyState,
+  ErrorAlert,
+  KpiCard,
+  PageHeader,
+} from "@/components/internal";
 import { directorFetch } from "@/lib/director/client";
+import { sortRows, toggleSort, type SortDir } from "@/lib/director/analytics-table";
 import { CHART_COLORS, formatRubFromKopecks } from "@/lib/internal/chart-theme";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 import type { KpiComparison } from "@/server/services/analytics-formulas";
@@ -112,6 +118,17 @@ function toCsv(rows: Array<Record<string, string | number>>) {
   );
 }
 
+function downloadCsv(filename: string, rows: Array<Record<string, string | number>>) {
+  const csv = toCsv(rows);
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function AnalyticsDashboard() {
   const router = useRouter();
   const pathname = usePathname();
@@ -123,6 +140,22 @@ export function AnalyticsDashboard() {
   const [ticketTypes, setTicketTypes] = useState<Array<{ id: string; name: string }>>([]);
   const [staff, setStaff] = useState<Array<{ id: string; name: string }>>([]);
   const [sessionPage, setSessionPage] = useState(0);
+  const [sessionSort, setSessionSort] = useState<{ key: string | null; dir: SortDir }>({
+    key: "date",
+    dir: "asc",
+  });
+  const [cashierSort, setCashierSort] = useState<{ key: string | null; dir: SortDir }>({
+    key: "revenueKopecks",
+    dir: "desc",
+  });
+  const [ticketSort, setTicketSort] = useState<{ key: string | null; dir: SortDir }>({
+    key: "revenueKopecks",
+    dir: "desc",
+  });
+  const [locationSort, setLocationSort] = useState<{ key: string | null; dir: SortDir }>({
+    key: "revenueKopecks",
+    dir: "desc",
+  });
   const pageSize = 10;
 
   const queryString = searchParams.toString();
@@ -187,8 +220,9 @@ export function AnalyticsDashboard() {
 
   function exportSessionsCsv() {
     if (!data) return;
-    const csv = toCsv(
-      data.sessions.map((s) => ({
+    downloadCsv(
+      "sessions-analytics.csv",
+      sortedSessions.map((s) => ({
         date: s.date,
         time: s.time,
         capacity: s.capacity,
@@ -201,35 +235,111 @@ export function AnalyticsDashboard() {
         revenueRub: (s.revenueKopecks / 100).toFixed(2),
       })),
     );
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "sessions-analytics.csv";
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
-  const pagedSessions = data?.sessions.slice(sessionPage * pageSize, sessionPage * pageSize + pageSize) ?? [];
+  function exportCashiersCsv() {
+    if (!data) return;
+    downloadCsv(
+      "cashiers-analytics.csv",
+      sortedCashiers.map((c) => ({
+        name: c.name,
+        orders: c.orders,
+        tickets: c.tickets,
+        cashRub: (c.cashKopecks / 100).toFixed(2),
+        cardRub: (c.cardKopecks / 100).toFixed(2),
+        siteRub: (c.siteKopecks / 100).toFixed(2),
+        revenueRub: (c.revenueKopecks / 100).toFixed(2),
+        aovRub: (c.aovKopecks / 100).toFixed(2),
+      })),
+    );
+  }
+
+  function exportTicketTypesCsv() {
+    if (!data) return;
+    downloadCsv(
+      "ticket-types-analytics.csv",
+      sortedTickets.map((row) => ({
+        name: row.name,
+        quantity: row.quantity,
+        revenueRub: (row.revenueKopecks / 100).toFixed(2),
+        avgPriceRub: (row.avgPriceKopecks / 100).toFixed(2),
+        sharePct: (row.share * 100).toFixed(1),
+      })),
+    );
+  }
+
+  function exportLocationsCsv() {
+    if (!data) return;
+    downloadCsv(
+      "locations-analytics.csv",
+      sortedLocations.map((row) => ({
+        name: row.name,
+        orders: row.orders,
+        tickets: row.tickets,
+        checkIns: row.checkIns,
+        revenueRub: (row.revenueKopecks / 100).toFixed(2),
+        aovRub: (row.aovKopecks / 100).toFixed(2),
+      })),
+    );
+  }
+
+  const sortedSessions = useMemo(
+    () =>
+      sortRows(
+        data?.sessions ?? [],
+        sessionSort.key as keyof NonNullable<Report["sessions"]>[number] | null,
+        sessionSort.dir,
+      ),
+    [data?.sessions, sessionSort],
+  );
+  const sortedCashiers = useMemo(
+    () =>
+      sortRows(
+        data?.cashiers ?? [],
+        cashierSort.key as keyof NonNullable<Report["cashiers"]>[number] | null,
+        cashierSort.dir,
+      ),
+    [data?.cashiers, cashierSort],
+  );
+  const sortedTickets = useMemo(
+    () =>
+      sortRows(
+        data?.ticketTypeBreakdown ?? [],
+        ticketSort.key as keyof NonNullable<Report["ticketTypeBreakdown"]>[number] | null,
+        ticketSort.dir,
+      ),
+    [data?.ticketTypeBreakdown, ticketSort],
+  );
+  const sortedLocations = useMemo(
+    () =>
+      sortRows(
+        data?.locations ?? [],
+        locationSort.key as keyof NonNullable<Report["locations"]>[number] | null,
+        locationSort.dir,
+      ),
+    [data?.locations, locationSort],
+  );
+
+  const pagedSessions = sortedSessions.slice(
+    sessionPage * pageSize,
+    sessionPage * pageSize + pageSize,
+  );
 
   return (
     <div className="internal-analytics">
-      <header className="internal-page-header">
-        <div>
-          <h1>Аналитика</h1>
-          <p>
-            Только оплаченные заказы (PAID). Часовой пояс:{" "}
-            <strong>{data?.filters.timezone ?? "Europe/Moscow"}</strong>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="director-btn secondary"
-          onClick={() => router.replace(pathname)}
-        >
-          Сбросить
-        </button>
-      </header>
+      <PageHeader
+        title="Аналитика"
+        description={`Только оплаченные заказы (PAID). Часовой пояс: ${data?.filters.timezone ?? "Europe/Moscow"}. Все значения из БД.`}
+        actions={
+          <button
+            type="button"
+            className="internal-btn secondary"
+            onClick={() => router.replace(pathname)}
+          >
+            Сбросить
+          </button>
+        }
+      />
 
       <section className="internal-filter-bar" aria-label="Фильтры аналитики">
         <div className="internal-preset-row">
@@ -345,7 +455,7 @@ export function AnalyticsDashboard() {
         </div>
       </section>
 
-      {error ? <div className="director-alert error">{error}</div> : null}
+      {error ? <ErrorAlert message={error} /> : null}
 
       <section className="internal-kpi-grid" aria-label="KPI">
         <KpiCard
@@ -354,6 +464,7 @@ export function AnalyticsDashboard() {
           comparison={comparison?.grossRevenueKopecks}
           formula="Сумма PAID Order до возвратов"
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Возвраты"
@@ -362,6 +473,7 @@ export function AnalyticsDashboard() {
           formula="COMPLETED Refund"
           tone="danger"
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Чистая выручка"
@@ -369,6 +481,7 @@ export function AnalyticsDashboard() {
           comparison={comparison?.netRevenueKopecks}
           formula="Gross − Refunded"
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Оплаченные заказы"
@@ -388,6 +501,7 @@ export function AnalyticsDashboard() {
           comparison={comparison?.averageOrderValueKopecks}
           formula="Net / Paid Orders"
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Средняя цена билета"
@@ -395,6 +509,7 @@ export function AnalyticsDashboard() {
           comparison={comparison?.averageTicketPriceKopecks}
           formula="Net / Tickets Sold"
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Check-in"
@@ -408,6 +523,7 @@ export function AnalyticsDashboard() {
           comparison={comparison?.attendanceRate}
           formula="Check-in / действующие билеты"
           loading={loading}
+          deltaKind="percent"
         />
         <KpiCard
           label="Загрузка сеансов"
@@ -415,36 +531,42 @@ export function AnalyticsDashboard() {
           comparison={comparison?.occupancyRate}
           formula="Оплаченные места / capacity"
           loading={loading}
+          deltaKind="percent"
         />
         <KpiCard
           label="Онлайн-выручка"
           value={formatMoneyFromKopecks(kpis?.onlineRevenueKopecks ?? 0)}
           comparison={comparison?.onlineRevenueKopecks}
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Выручка кассы"
           value={formatMoneyFromKopecks(kpis?.cashierRevenueKopecks ?? 0)}
           comparison={comparison?.cashierRevenueKopecks}
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Наличные"
           value={formatMoneyFromKopecks(kpis?.cashKopecks ?? 0)}
           comparison={comparison?.cashKopecks}
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Карта"
           value={formatMoneyFromKopecks(kpis?.cardKopecks ?? 0)}
           comparison={comparison?.cardKopecks}
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="ЮKassa / Сайт"
           value={formatMoneyFromKopecks(kpis?.yookassaKopecks ?? 0)}
           comparison={comparison?.yookassaKopecks}
           loading={loading}
+          deltaKind="money"
         />
         <KpiCard
           label="Отменённые заказы"
@@ -467,6 +589,14 @@ export function AnalyticsDashboard() {
           formula="VALID билеты прошедших сеансов без SUCCESS check-in"
           loading={loading}
         />
+        <KpiCard
+          label="Конверсия reservation"
+          value={pct(kpis?.reservationConversionRate ?? 0)}
+          comparison={comparison?.reservationConversionRate}
+          formula="PAID из reservations / созданные reservations"
+          loading={loading}
+          deltaKind="percent"
+        />
       </section>
 
       <section className="internal-charts-grid">
@@ -478,9 +608,9 @@ export function AnalyticsDashboard() {
               <YAxis tickFormatter={(v) => `${Math.round(Number(v) / 100)}`} width={60} />
               <Tooltip formatter={(v) => formatRubFromKopecks(Number(v))} />
               <Legend />
-              <Line type="monotone" dataKey="total" name="Всего" stroke={CHART_COLORS.primary} strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="online" name="Онлайн" stroke={CHART_COLORS.secondary} strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="cashier" name="Касса" stroke={CHART_COLORS.accent} strokeWidth={2} dot={false} />
+              <Line isAnimationActive={false} type="monotone" dataKey="total" name="Всего" stroke={CHART_COLORS.primary} strokeWidth={2} dot={false} />
+              <Line isAnimationActive={false} type="monotone" dataKey="online" name="Онлайн" stroke={CHART_COLORS.secondary} strokeWidth={2} dot={false} />
+              <Line isAnimationActive={false} type="monotone" dataKey="cashier" name="Касса" stroke={CHART_COLORS.accent} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -493,8 +623,8 @@ export function AnalyticsDashboard() {
               <YAxis allowDecimals={false} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="orders" name="Заказы" fill={CHART_COLORS.primary} radius={4} />
-              <Bar dataKey="tickets" name="Билеты" fill={CHART_COLORS.accent} radius={4} />
+              <Bar isAnimationActive={false} dataKey="orders" name="Заказы" fill={CHART_COLORS.primary} radius={4} />
+              <Bar isAnimationActive={false} dataKey="tickets" name="Билеты" fill={CHART_COLORS.accent} radius={4} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -506,7 +636,7 @@ export function AnalyticsDashboard() {
         >
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie
+              <Pie isAnimationActive={false}
                 data={data?.sourceBreakdown ?? []}
                 dataKey="valueKopecks"
                 nameKey="label"
@@ -533,7 +663,7 @@ export function AnalyticsDashboard() {
         >
           <ResponsiveContainer width="100%" height={260}>
             <PieChart>
-              <Pie
+              <Pie isAnimationActive={false}
                 data={data?.paymentBreakdown ?? []}
                 dataKey="valueKopecks"
                 nameKey="label"
@@ -560,7 +690,7 @@ export function AnalyticsDashboard() {
               <XAxis dataKey="time" />
               <YAxis tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`} />
               <Tooltip formatter={(v) => `${(Number(v) * 100).toFixed(1)}%`} />
-              <Bar dataKey="occupancy" name="Загрузка" fill={CHART_COLORS.primary} radius={4} />
+              <Bar isAnimationActive={false} dataKey="occupancy" name="Загрузка" fill={CHART_COLORS.primary} radius={4} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -572,7 +702,7 @@ export function AnalyticsDashboard() {
               <XAxis dataKey="weekday" />
               <YAxis tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`} />
               <Tooltip formatter={(v) => `${(Number(v) * 100).toFixed(1)}%`} />
-              <Bar dataKey="occupancy" name="Загрузка" fill={CHART_COLORS.secondary} radius={4} />
+              <Bar isAnimationActive={false} dataKey="occupancy" name="Загрузка" fill={CHART_COLORS.secondary} radius={4} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -588,7 +718,7 @@ export function AnalyticsDashboard() {
               <XAxis type="number" />
               <YAxis type="category" dataKey="name" width={80} />
               <Tooltip />
-              <Bar dataKey="quantity" name="Кол-во" fill={CHART_COLORS.primary} radius={4} />
+              <Bar isAnimationActive={false} dataKey="quantity" name="Кол-во" fill={CHART_COLORS.primary} radius={4} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -605,7 +735,7 @@ export function AnalyticsDashboard() {
               <XAxis dataKey="name" />
               <YAxis allowDecimals={false} />
               <Tooltip />
-              <Bar dataKey="value" radius={4}>
+              <Bar isAnimationActive={false} dataKey="value" radius={4}>
                 <Cell fill={CHART_COLORS.primary} />
                 <Cell fill={CHART_COLORS.accent} />
               </Bar>
@@ -621,7 +751,7 @@ export function AnalyticsDashboard() {
                 <XAxis type="number" tickFormatter={(v) => String(Math.round(Number(v) / 100))} />
                 <YAxis type="category" dataKey="name" width={100} />
                 <Tooltip formatter={(v) => formatRubFromKopecks(Number(v))} />
-                <Bar dataKey="revenueKopecks" name="Выручка" fill={CHART_COLORS.primary} radius={4} />
+                <Bar isAnimationActive={false} dataKey="revenueKopecks" name="Выручка" fill={CHART_COLORS.primary} radius={4} />
               </BarChart>
             </ResponsiveContainer>
           </ChartCard>
@@ -634,7 +764,7 @@ export function AnalyticsDashboard() {
               <XAxis type="number" tickFormatter={(v) => String(Math.round(Number(v) / 100))} />
               <YAxis type="category" dataKey="name" width={100} />
               <Tooltip formatter={(v) => formatRubFromKopecks(Number(v))} />
-              <Bar dataKey="revenueKopecks" name="Выручка" fill={CHART_COLORS.accent} radius={4} />
+              <Bar isAnimationActive={false} dataKey="revenueKopecks" name="Выручка" fill={CHART_COLORS.accent} radius={4} />
             </BarChart>
           </ResponsiveContainer>
         </ChartCard>
@@ -684,7 +814,7 @@ export function AnalyticsDashboard() {
       <section className="internal-table-card">
         <div className="internal-table-head">
           <h3>Сеансы</h3>
-          <button type="button" className="director-btn secondary" onClick={exportSessionsCsv}>
+          <button type="button" className="internal-btn secondary" onClick={exportSessionsCsv}>
             CSV
           </button>
         </div>
@@ -692,16 +822,40 @@ export function AnalyticsDashboard() {
           <table className="internal-table">
             <thead>
               <tr>
-                <th>Дата</th>
-                <th>Время</th>
-                <th>Capacity</th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "date"))}>
+                    Дата
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "time"))}>
+                    Время
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "capacity"))}>
+                    Capacity
+                  </button>
+                </th>
                 <th>Онлайн</th>
                 <th>Касса</th>
-                <th>Всего</th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "totalSold"))}>
+                    Всего
+                  </button>
+                </th>
                 <th>Check-in</th>
                 <th>Свободно</th>
-                <th>Occupancy</th>
-                <th className="num">Выручка</th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "occupancy"))}>
+                    Occupancy
+                  </button>
+                </th>
+                <th className="num">
+                  <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "revenueKopecks"))}>
+                    Выручка
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -721,7 +875,9 @@ export function AnalyticsDashboard() {
               ))}
               {!pagedSessions.length && !loading ? (
                 <tr>
-                  <td colSpan={10}>Нет сеансов</td>
+                  <td colSpan={10}>
+                    <EmptyState title="Нет сеансов" description="За период сеансы не найдены." />
+                  </td>
                 </tr>
               ) : null}
             </tbody>
@@ -750,23 +906,44 @@ export function AnalyticsDashboard() {
       </section>
 
       <section className="internal-table-card">
-        <h3>Кассиры</h3>
+        <div className="internal-table-head">
+          <h3>Кассиры</h3>
+          <button type="button" className="internal-btn secondary" onClick={exportCashiersCsv}>
+            CSV
+          </button>
+        </div>
         <div className="internal-table-scroll">
           <table className="internal-table">
             <thead>
               <tr>
-                <th>Сотрудник</th>
-                <th>Заказы</th>
-                <th>Билеты</th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setCashierSort((s) => toggleSort(s.key, s.dir, "name"))}>
+                    Сотрудник
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setCashierSort((s) => toggleSort(s.key, s.dir, "orders"))}>
+                    Заказы
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setCashierSort((s) => toggleSort(s.key, s.dir, "tickets"))}>
+                    Билеты
+                  </button>
+                </th>
                 <th className="num">Наличные</th>
                 <th className="num">Карта</th>
                 <th className="num">Сайт</th>
-                <th className="num">Выручка</th>
+                <th className="num">
+                  <button type="button" className="internal-sort" onClick={() => setCashierSort((s) => toggleSort(s.key, s.dir, "revenueKopecks"))}>
+                    Выручка
+                  </button>
+                </th>
                 <th className="num">Средний чек</th>
               </tr>
             </thead>
             <tbody>
-              {(data?.cashiers ?? []).map((c) => (
+              {sortedCashiers.map((c) => (
                 <tr key={c.userId}>
                   <td>{c.name}</td>
                   <td>{c.orders}</td>
@@ -778,9 +955,11 @@ export function AnalyticsDashboard() {
                   <td className="num">{formatMoneyFromKopecks(c.aovKopecks)}</td>
                 </tr>
               ))}
-              {!data?.cashiers.length && !loading ? (
+              {!sortedCashiers.length && !loading ? (
                 <tr>
-                  <td colSpan={8}>Нет продаж кассиров</td>
+                  <td colSpan={8}>
+                    <EmptyState title="Нет продаж кассиров" />
+                  </td>
                 </tr>
               ) : null}
             </tbody>
@@ -789,20 +968,37 @@ export function AnalyticsDashboard() {
       </section>
 
       <section className="internal-table-card">
-        <h3>Типы билетов</h3>
+        <div className="internal-table-head">
+          <h3>Типы билетов</h3>
+          <button type="button" className="internal-btn secondary" onClick={exportTicketTypesCsv}>
+            CSV
+          </button>
+        </div>
         <div className="internal-table-scroll">
           <table className="internal-table">
             <thead>
               <tr>
-                <th>Название</th>
-                <th>Кол-во</th>
-                <th className="num">Выручка</th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setTicketSort((s) => toggleSort(s.key, s.dir, "name"))}>
+                    Название
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setTicketSort((s) => toggleSort(s.key, s.dir, "quantity"))}>
+                    Кол-во
+                  </button>
+                </th>
+                <th className="num">
+                  <button type="button" className="internal-sort" onClick={() => setTicketSort((s) => toggleSort(s.key, s.dir, "revenueKopecks"))}>
+                    Выручка
+                  </button>
+                </th>
                 <th className="num">Средняя цена</th>
                 <th>Доля</th>
               </tr>
             </thead>
             <tbody>
-              {(data?.ticketTypeBreakdown ?? []).map((row) => (
+              {sortedTickets.map((row) => (
                 <tr key={row.name}>
                   <td>{row.name}</td>
                   <td>{row.quantity}</td>
@@ -811,6 +1007,71 @@ export function AnalyticsDashboard() {
                   <td>{pct(row.share)}</td>
                 </tr>
               ))}
+              {!sortedTickets.length && !loading ? (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState title="Нет продаж по типам" />
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="internal-table-card">
+        <div className="internal-table-head">
+          <h3>Локации</h3>
+          <button type="button" className="internal-btn secondary" onClick={exportLocationsCsv}>
+            CSV
+          </button>
+        </div>
+        <div className="internal-table-scroll">
+          <table className="internal-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setLocationSort((s) => toggleSort(s.key, s.dir, "name"))}>
+                    Локация
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setLocationSort((s) => toggleSort(s.key, s.dir, "orders"))}>
+                    Заказы
+                  </button>
+                </th>
+                <th>
+                  <button type="button" className="internal-sort" onClick={() => setLocationSort((s) => toggleSort(s.key, s.dir, "tickets"))}>
+                    Билеты
+                  </button>
+                </th>
+                <th>Check-in</th>
+                <th className="num">
+                  <button type="button" className="internal-sort" onClick={() => setLocationSort((s) => toggleSort(s.key, s.dir, "revenueKopecks"))}>
+                    Выручка
+                  </button>
+                </th>
+                <th className="num">Средний чек</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedLocations.map((row) => (
+                <tr key={row.locationId}>
+                  <td>{row.name}</td>
+                  <td>{row.orders}</td>
+                  <td>{row.tickets}</td>
+                  <td>{row.checkIns}</td>
+                  <td className="num">{formatMoneyFromKopecks(row.revenueKopecks)}</td>
+                  <td className="num">{formatMoneyFromKopecks(row.aovKopecks)}</td>
+                </tr>
+              ))}
+              {!sortedLocations.length && !loading ? (
+                <tr>
+                  <td colSpan={6}>
+                    <EmptyState title="Нет данных по локациям" />
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

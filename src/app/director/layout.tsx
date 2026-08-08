@@ -1,4 +1,4 @@
-import "@/styles/internal-tokens.css";
+import "@/styles/internal.css";
 import "./director.css";
 import { DirectorLayoutClient } from "@/components/director/DirectorLayoutClient";
 

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/director/PageHeader";
+import { EmptyState, ErrorAlert, PageHeader, StatusBadge } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelSource, labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type OrderRow = {
@@ -22,48 +23,58 @@ export default function DirectorOrdersPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   async function load(query = "") {
-    const params = new URLSearchParams({ limit: "100" });
-    if (query) params.set("search", query);
-    const data = await directorFetch<{ orders: OrderRow[] }>(`/api/director/orders?${params}`);
-    setOrders(data.orders);
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ limit: "100" });
+      if (query) params.set("search", query);
+      const data = await directorFetch<{ orders: OrderRow[] }>(`/api/director/orders?${params}`);
+      setOrders(data.orders);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка");
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => {
-    load().catch((err) => setError(err instanceof Error ? err.message : "Ошибка"));
+    void load();
   }, []);
 
   return (
     <>
       <PageHeader
-        title="Orders"
-        description="Заказы всех каналов. Суммы хранятся в копейках."
+        title="Заказы"
+        description="Заказы всех каналов. Суммы хранятся в копейках, в интерфейсе — рубли."
         actions={
           <>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Поиск по номеру, имени, телефону"
+              placeholder="Номер, имя, телефон"
+              aria-label="Поиск заказов"
             />
-            <button type="button" className="director-btn secondary" onClick={() => load(search)}>
+            <button type="button" className="internal-btn secondary" onClick={() => void load(search)}>
               Найти
             </button>
           </>
         }
       />
-      {error ? <div className="director-alert error">{error}</div> : null}
+      {error ? <ErrorAlert message={error} /> : null}
 
-      <section className="director-panel">
-        <div className="director-table-wrap">
-          <table className="director-table">
+      <section className="internal-panel" style={{ padding: 0 }}>
+        <div className="internal-table-scroll">
+          <table className="internal-table">
             <thead>
               <tr>
                 <th>Номер</th>
                 <th>Клиент</th>
                 <th>Локация</th>
                 <th>Сеанс</th>
-                <th>Сумма</th>
+                <th className="num">Сумма</th>
                 <th>Источник</th>
                 <th>Статус</th>
                 <th />
@@ -76,20 +87,37 @@ export default function DirectorOrdersPage() {
                   <td>{order.customerName}</td>
                   <td>{order.location.name}</td>
                   <td>{formatDateTime(order.session.startsAt)}</td>
-                  <td>{formatMoneyFromKopecks(order.totalAmount)}</td>
+                  <td className="num tabular-nums">{formatMoneyFromKopecks(order.totalAmount)}</td>
                   <td>
-                    <span className={`director-badge ${order.source === "ONLINE" ? "green" : "orange"}`}>
-                      {order.source}
-                    </span>
+                    <StatusBadge
+                      tone={order.source === "ONLINE" ? "success" : "warning"}
+                      label={labelSource(order.source)}
+                    />
                   </td>
-                  <td>{order.status}</td>
                   <td>
-                    <Link href={`/director/orders/${order.number}`} className="director-link">
-                      Детали ({order._count.tickets})
+                    <StatusBadge status={order.status} label={labelStatus(order.status)} />
+                  </td>
+                  <td>
+                    <Link href={`/director/orders/${order.number}`} className="internal-btn secondary">
+                      Детали
                     </Link>
                   </td>
                 </tr>
               ))}
+              {!loading && orders.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>
+                    <EmptyState title="Заказов нет" description="Попробуйте изменить поиск." />
+                  </td>
+                </tr>
+              ) : null}
+              {loading && orders.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="internal-empty">
+                    Загрузка…
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

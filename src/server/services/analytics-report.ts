@@ -7,6 +7,7 @@ import {
   compareKpi,
   comparisonWindow,
   ratePercent,
+  reservationConversionRate,
   type KpiComparison,
 } from "@/server/services/analytics-formulas";
 
@@ -61,6 +62,12 @@ async function kpiBundle(params: AnalyticsReportParams) {
   const where = paidOrderWhere(params);
   const tz = params.timeZone ?? "Europe/Moscow";
 
+  const locationScope = params.locationId
+    ? {
+        OR: [{ locationId: params.locationId }, { session: { locationId: params.locationId } }],
+      }
+    : {};
+
   const [
     ordersAgg,
     refundsAgg,
@@ -72,6 +79,8 @@ async function kpiBundle(params: AnalyticsReportParams) {
     payments,
     noShowTickets,
     pastPaidTickets,
+    reservationsCreated,
+    paidFromReservations,
   ] = await Promise.all([
     prisma.order.aggregate({
       where,
@@ -107,14 +116,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
       where: {
         status: "CANCELLED",
         updatedAt: { gte: params.from, lte: params.to },
-        ...(params.locationId
-          ? {
-              OR: [
-                { locationId: params.locationId },
-                { session: { locationId: params.locationId } },
-              ],
-            }
-          : {}),
+        ...locationScope,
         ...(params.source && params.source !== "ALL" ? { source: params.source } : {}),
       },
     }),
@@ -165,6 +167,18 @@ async function kpiBundle(params: AnalyticsReportParams) {
           endsAt: { lt: params.now ?? new Date() },
           ...(params.locationId ? { locationId: params.locationId } : {}),
         },
+      },
+    }),
+    prisma.reservation.count({
+      where: {
+        createdAt: { gte: params.from, lte: params.to },
+        ...(params.locationId ? { session: { locationId: params.locationId } } : {}),
+      },
+    }),
+    prisma.order.count({
+      where: {
+        ...where,
+        reservationId: { not: null },
       },
     }),
   ]);
@@ -233,6 +247,12 @@ async function kpiBundle(params: AnalyticsReportParams) {
       noShow: noShowTickets,
       availableCapacity: capacity,
       paidSeats,
+      reservationConversionRate: reservationConversionRate(
+        paidFromReservations,
+        reservationsCreated,
+      ),
+      reservationsCreated,
+      paidFromReservations,
     },
     sessionsMeta: sessions,
   };

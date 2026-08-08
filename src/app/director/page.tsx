@@ -2,7 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/director/PageHeader";
+import {
+  ErrorAlert,
+  EmptyState,
+  KpiCard,
+  LoadingSkeleton,
+  PageHeader,
+} from "@/components/internal";
 import { directorFetch, formatDateTime, formatPercent } from "@/lib/director/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
@@ -19,6 +25,16 @@ type AnalyticsSummary = {
     checkIns: number;
     noShow: number;
   };
+  comparison?: Record<
+    string,
+    {
+      current: number;
+      previous: number;
+      absolute: number;
+      percent: number | null;
+      label: "ok" | "no_baseline" | "new";
+    }
+  >;
 };
 
 type SessionRow = {
@@ -33,6 +49,7 @@ export default function DirectorDashboardPage() {
   const [data, setData] = useState<AnalyticsSummary | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -53,6 +70,8 @@ export default function DirectorDashboardPage() {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Ошибка загрузки");
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -61,65 +80,87 @@ export default function DirectorDashboardPage() {
     <>
       <PageHeader
         title="Обзор"
-        description="Ключевые показатели за сегодня (только PAID). Подробности — в Аналитике."
+        description="Ключевые показатели за сегодня. Только оплаченные заказы из БД."
         actions={
-          <Link href="/director/analytics" className="director-btn primary">
+          <Link href="/director/analytics" className="internal-btn primary">
             Открыть аналитику
           </Link>
         }
       />
-      {error ? <div className="director-alert error">{error}</div> : null}
-      {!data && !error ? <div className="director-empty">Загрузка KPI…</div> : null}
+      {error ? <ErrorAlert message={error} /> : null}
+      {loading ? <LoadingSkeleton variant="kpi" count={5} /> : null}
       {data ? (
         <>
-          <div className="director-card-grid">
-            <div className="director-kpi">
-              <div className="director-kpi-label">Чистая выручка</div>
-              <div className="director-kpi-value accent-green">
-                {formatMoneyFromKopecks(data.kpis.netRevenueKopecks)}
-              </div>
-              <div className="director-kpi-sub">
-                Возвраты: {formatMoneyFromKopecks(data.kpis.refundedAmountKopecks)}
-              </div>
-            </div>
-            <div className="director-kpi">
-              <div className="director-kpi-label">Онлайн / Касса</div>
-              <div className="director-kpi-value accent-orange">
-                {formatMoneyFromKopecks(data.kpis.onlineRevenueKopecks)}
-              </div>
-              <div className="director-kpi-sub">
-                Касса: {formatMoneyFromKopecks(data.kpis.cashierRevenueKopecks)}
-              </div>
-            </div>
-            <div className="director-kpi">
-              <div className="director-kpi-label">Заказы</div>
-              <div className="director-kpi-value">{data.kpis.paidOrders}</div>
-              <div className="director-kpi-sub">Билетов: {data.kpis.ticketsSold}</div>
-            </div>
-            <div className="director-kpi">
-              <div className="director-kpi-label">Средний чек</div>
-              <div className="director-kpi-value">
-                {formatMoneyFromKopecks(data.kpis.averageOrderValueKopecks)}
-              </div>
-            </div>
-            <div className="director-kpi">
-              <div className="director-kpi-label">Загрузка</div>
-              <div className="director-kpi-value">{formatPercent(data.kpis.occupancyRate)}</div>
-              <div className="director-kpi-sub">
-                Check-in: {data.kpis.checkIns} · No-show: {data.kpis.noShow}
-              </div>
-            </div>
+          <div className="internal-kpi-grid">
+            <KpiCard
+              label="Чистая выручка"
+              value={formatMoneyFromKopecks(data.kpis.netRevenueKopecks)}
+              comparison={data.comparison?.netRevenueKopecks}
+              formula="Gross − Refunded (PAID)"
+              tone="accent"
+              deltaKind="money"
+            />
+            <KpiCard
+              label="Онлайн"
+              value={formatMoneyFromKopecks(data.kpis.onlineRevenueKopecks)}
+              comparison={data.comparison?.onlineRevenueKopecks}
+              deltaKind="money"
+            />
+            <KpiCard
+              label="Касса"
+              value={formatMoneyFromKopecks(data.kpis.cashierRevenueKopecks)}
+              comparison={data.comparison?.cashierRevenueKopecks}
+              tone="accent"
+              deltaKind="money"
+            />
+            <KpiCard
+              label="Заказы / билеты"
+              value={`${data.kpis.paidOrders} / ${data.kpis.ticketsSold}`}
+              comparison={data.comparison?.paidOrders}
+            />
+            <KpiCard
+              label="Средний чек"
+              value={formatMoneyFromKopecks(data.kpis.averageOrderValueKopecks)}
+              comparison={data.comparison?.averageOrderValueKopecks}
+              formula="Net / Paid Orders"
+              deltaKind="money"
+            />
+            <KpiCard
+              label="Загрузка"
+              value={formatPercent(data.kpis.occupancyRate)}
+              comparison={data.comparison?.occupancyRate}
+              formula="Оплаченные места / capacity"
+              deltaKind="percent"
+            />
+            <KpiCard
+              label="Check-in"
+              value={String(data.kpis.checkIns)}
+              comparison={data.comparison?.checkIns}
+            />
+            <KpiCard
+              label="No-show"
+              value={String(data.kpis.noShow)}
+              comparison={data.comparison?.noShow}
+              tone="warning"
+            />
+            <KpiCard
+              label="Возвраты"
+              value={formatMoneyFromKopecks(data.kpis.refundedAmountKopecks)}
+              comparison={data.comparison?.refundedAmountKopecks}
+              tone="danger"
+              deltaKind="money"
+            />
           </div>
 
-          <section className="director-panel">
-            <div className="director-panel-head">
-              <h2>Ближайшие сеансы</h2>
-              <Link href="/director/sessions" className="director-link">
+          <section className="internal-panel">
+            <div className="internal-table-head">
+              <h3>Ближайшие сеансы</h3>
+              <Link href="/director/sessions" className="internal-btn secondary">
                 Все сеансы
               </Link>
             </div>
-            <div className="director-table-wrap">
-              <table className="director-table">
+            <div className="internal-table-scroll">
+              <table className="internal-table">
                 <thead>
                   <tr>
                     <th>Локация</th>
@@ -131,8 +172,11 @@ export default function DirectorDashboardPage() {
                 <tbody>
                   {sessions.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="director-empty">
-                        Нет предстоящих сеансов
+                      <td colSpan={4}>
+                        <EmptyState
+                          title="Нет сеансов"
+                          description="В ближайшем окне сеансов нет."
+                        />
                       </td>
                     </tr>
                   ) : (
@@ -140,8 +184,8 @@ export default function DirectorDashboardPage() {
                       <tr key={session.id}>
                         <td>{session.location?.name ?? "—"}</td>
                         <td>{formatDateTime(session.startsAt)}</td>
-                        <td>{session._count?.tickets ?? 0}</td>
-                        <td>{session.capacity}</td>
+                        <td className="num tabular-nums">{session._count?.tickets ?? 0}</td>
+                        <td className="num tabular-nums">{session.capacity}</td>
                       </tr>
                     ))
                   )}

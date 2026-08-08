@@ -29,10 +29,11 @@ Calendar boundaries use the selected location timezone (default `Europe/Moscow`)
 | Average Ticket Price | `Net / Tickets Sold` (0 if no tickets) |
 | Available Capacity | Σ session.capacity in period |
 | Paid Occupancy | paid seats / Available Capacity |
-| Attendance Rate | successful unique check-ins / active paid tickets |
+| Attendance Rate | successful check-ins / active paid tickets |
 | No-show | VALID paid tickets for past sessions with no SUCCESS check-in |
-| Online Share | online revenue / Net |
-| Cashier Share | cashier revenue / Net |
+| Online / Cashier revenue | PAID totals by `Order.source` |
+| Cash / Card / YooKassa | SUCCEEDED payments by method (`CASH` / `CARD_TERMINAL` / `CARD_ONLINE`) |
+| Reservation Conversion | PAID orders with `reservationId` / reservations created in period |
 
 Payment split is **disjoint**:
 

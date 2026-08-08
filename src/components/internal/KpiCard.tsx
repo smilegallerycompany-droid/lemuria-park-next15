@@ -9,16 +9,33 @@ type Props = {
   formula?: string;
   tone?: "default" | "danger" | "warning" | "accent";
   loading?: boolean;
+  /** How to render absolute delta. Default: plain number. */
+  deltaKind?: "number" | "money" | "percent";
 };
 
-function deltaText(comparison?: KpiComparison): string {
+function formatAbsolute(value: number, kind: Props["deltaKind"]): string {
+  if (kind === "money") {
+    return new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency: "RUB",
+      maximumFractionDigits: 0,
+    }).format(value / 100);
+  }
+  if (kind === "percent") {
+    return `${(value * 100).toFixed(1)} п.п.`;
+  }
+  return value.toLocaleString("ru-RU");
+}
+
+function deltaText(comparison: KpiComparison | undefined, kind: Props["deltaKind"]): string {
   if (!comparison) return "";
   if (comparison.label === "no_baseline") return "Нет данных для сравнения";
   if (comparison.label === "new") return "Новый показатель";
   const sign = comparison.absolute > 0 ? "+" : "";
+  const abs = formatAbsolute(comparison.absolute, kind);
   const pct =
     comparison.percent === null ? "" : ` (${sign}${comparison.percent.toFixed(1)}%)`;
-  return `${sign}${comparison.absolute.toLocaleString("ru-RU")}${pct}`;
+  return `${sign}${abs}${pct}`;
 }
 
 export function KpiCard({
@@ -28,12 +45,13 @@ export function KpiCard({
   formula,
   tone = "default",
   loading,
+  deltaKind = "number",
 }: Props) {
   if (loading) {
     return <div className="internal-kpi skeleton" aria-busy="true" />;
   }
 
-  const delta = deltaText(comparison);
+  const delta = deltaText(comparison, deltaKind);
   const up = comparison && comparison.label === "ok" && comparison.absolute > 0;
   const down = comparison && comparison.label === "ok" && comparison.absolute < 0;
 

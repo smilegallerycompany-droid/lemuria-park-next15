@@ -1,31 +1,65 @@
 /* Internal design system — cashier + director only (not public site). */
 :root {
-  --internal-bg: #f4f6f3;
+  --internal-bg: #f3f5f2;
   --internal-surface: #ffffff;
   --internal-elevated: #ffffff;
-  --internal-border: #d7ddd4;
-  --internal-text: #1c2a22;
-  --internal-text-secondary: #5b675f;
+  --internal-border: #d9dfd6;
+  --internal-border-strong: #c4cdc0;
+  --internal-text: #1a2920;
+  --internal-text-secondary: #5a655d;
+  --internal-text-muted: #7a847c;
   --internal-green: #1f6b45;
-  --internal-green-soft: #3d8f62;
-  --internal-orange: #d97706;
+  --internal-green-soft: #e8f3ec;
+  --internal-green-mid: #3d8f62;
+  --internal-orange: #c96a0a;
+  --internal-orange-soft: #fff4e8;
   --internal-success: #1f6b45;
-  --internal-warning: #ca8a04;
+  --internal-warning: #a16207;
+  --internal-warning-soft: #fef7e0;
   --internal-danger: #b42318;
+  --internal-danger-soft: #feecec;
   --internal-radius: 16px;
   --internal-radius-sm: 10px;
+  --internal-radius-lg: 20px;
   --internal-space-1: 4px;
   --internal-space-2: 8px;
   --internal-space-3: 12px;
   --internal-space-4: 16px;
   --internal-space-5: 24px;
   --internal-space-6: 32px;
-  --internal-shadow: 0 1px 2px rgba(28, 42, 34, 0.06), 0 4px 12px rgba(28, 42, 34, 0.04);
+  --internal-shadow: 0 1px 2px rgba(26, 41, 32, 0.05);
+  --internal-shadow-elevated: 0 1px 2px rgba(26, 41, 32, 0.04), 0 6px 16px rgba(26, 41, 32, 0.05);
   --internal-chart-1: #1f6b45;
   --internal-chart-2: #3d8f62;
-  --internal-chart-3: #d97706;
+  --internal-chart-3: #c96a0a;
   --internal-chart-4: #8a9289;
   --internal-chart-5: #b42318;
-  --internal-font: "Manrope", "Segoe UI", sans-serif;
+  --internal-font: var(--font-manrope, "Manrope"), "Segoe UI", sans-serif;
   --internal-tap: 44px;
+  --internal-row: 52px;
+  --internal-focus: 0 0 0 3px rgba(31, 107, 69, 0.22);
+}
+
+/* Compatibility aliases for existing director/cashier class names */
+.director-root,
+.cashier-root {
+  --dir-bg: var(--internal-bg);
+  --dir-panel: var(--internal-surface);
+  --dir-ink: var(--internal-text);
+  --dir-muted: var(--internal-text-secondary);
+  --dir-line: var(--internal-border);
+  --dir-green: var(--internal-green-mid);
+  --dir-green-deep: var(--internal-green);
+  --dir-orange: var(--internal-orange);
+  --dir-orange-soft: var(--internal-orange-soft);
+  --dir-green-soft: var(--internal-green-soft);
+  --dir-shadow: var(--internal-shadow);
+  --ink: var(--internal-text);
+  --green-deep: var(--internal-green);
+  --green: var(--internal-green-mid);
+  --green-soft: var(--internal-green-soft);
+  --paper: var(--internal-bg);
+  font-family: var(--internal-font);
+  color: var(--internal-text);
+  background: var(--internal-bg);
 }
