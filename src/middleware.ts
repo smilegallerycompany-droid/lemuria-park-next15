@@ -20,9 +20,13 @@ export function middleware(request: NextRequest) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  // Cashier QR scanner needs getUserMedia on same origin; keep camera denied elsewhere.
+  const cameraPolicy = pathname === "/cashier/scan" || pathname.startsWith("/cashier/scan/")
+    ? "camera=(self)"
+    : "camera=()";
   response.headers.set(
     "Permissions-Policy",
-    "camera=(), microphone=(), geolocation=(), payment=()",
+    `${cameraPolicy}, microphone=(), geolocation=(), payment=()`,
   );
   // Basic CSP — allows self assets, inline styles from Next, and YooKassa checkout redirects.
   response.headers.set(
@@ -32,6 +36,7 @@ export function middleware(request: NextRequest) {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
+      "media-src 'self' blob:",
       "font-src 'self' data:",
       "connect-src 'self' https://api.yookassa.ru",
       "frame-ancestors 'none'",
@@ -40,7 +45,11 @@ export function middleware(request: NextRequest) {
     ].join("; "),
   );
 
-  if (isStaffPath(pathname)) {
+  const stagingNoIndex =
+    process.env.APP_ENV === "staging" ||
+    process.env.NEXT_PUBLIC_APP_ENV === "staging" ||
+    process.env.STAGING === "1";
+  if (stagingNoIndex || isStaffPath(pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
 
