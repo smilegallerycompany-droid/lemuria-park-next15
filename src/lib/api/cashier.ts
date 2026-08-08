@@ -85,7 +85,14 @@ export function createCashierSale(
 }
 
 export type CashierCheckInResult = {
-  result: "SUCCESS" | "ALREADY_USED" | "INVALID" | "CANCELLED" | "EXPIRED";
+  result:
+    | "SUCCESS"
+    | "ALREADY_USED"
+    | "INVALID"
+    | "CANCELLED"
+    | "EXPIRED"
+    | "WRONG_DATE"
+    | "WRONG_LOCATION";
   message: string;
   ticket?: {
     publicId: string;
@@ -93,6 +100,7 @@ export type CashierCheckInResult = {
     sessionLocalDate: string;
     sessionLocalTime: string;
     usedAt: string | null;
+    locationName?: string;
   };
 };
 

@@ -32,6 +32,7 @@ export async function POST(req: Request) {
       const result = await checkInTicket({
         qrToken: input.qrToken,
         cashierId: user.id,
+        allowedLocationIds: user.locationIds,
       });
       return apiSuccess(result);
     } catch (error) {

@@ -47,7 +47,7 @@ function feedback(prefs: Prefs, ok: boolean) {
 
 function resultTone(result: CashierCheckInResult["result"]) {
   if (result === "SUCCESS") return "valid";
-  if (result === "ALREADY_USED" || result === "EXPIRED") return "used";
+  if (result === "ALREADY_USED" || result === "EXPIRED" || result === "WRONG_DATE") return "used";
   return "bad";
 }
 
@@ -60,7 +60,10 @@ function resultTitle(result: CashierCheckInResult["result"]) {
     case "CANCELLED":
       return "Билет отменён или возвращён";
     case "EXPIRED":
+    case "WRONG_DATE":
       return "Билет на другую дату";
+    case "WRONG_LOCATION":
+      return "Другая локация";
     case "INVALID":
       return "Билет не найден";
     default:
@@ -326,6 +329,9 @@ export function QrScanner() {
               Сеанс: {result.ticket.sessionLocalDate} {result.ticket.sessionLocalTime}
             </p>
             <p>Билет: {result.ticket.publicId}</p>
+            {result.result === "WRONG_LOCATION" && result.ticket.locationName ? (
+              <p>Нужная локация: {result.ticket.locationName}</p>
+            ) : null}
             {result.ticket.usedAt ? (
               <p>Первый проход: {new Date(result.ticket.usedAt).toLocaleString("ru-RU")}</p>
             ) : null}

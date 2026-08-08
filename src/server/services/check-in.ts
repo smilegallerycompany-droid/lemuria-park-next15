@@ -3,8 +3,17 @@ import { recordAuditLog } from "@/lib/audit";
 import { formatDateInTimezone } from "@/lib/datetime";
 import { getErrorReporter } from "@/server/monitoring/error-reporter";
 
+export type CheckInResultCode =
+  | "SUCCESS"
+  | "ALREADY_USED"
+  | "INVALID"
+  | "CANCELLED"
+  | "EXPIRED"
+  | "WRONG_DATE"
+  | "WRONG_LOCATION";
+
 export type CheckInResponse = {
-  result: "SUCCESS" | "ALREADY_USED" | "INVALID" | "CANCELLED" | "EXPIRED";
+  result: CheckInResultCode;
   message: string;
   ticket?: {
     publicId: string;
@@ -12,6 +21,7 @@ export type CheckInResponse = {
     sessionLocalDate: string;
     sessionLocalTime: string;
     usedAt: string | null;
+    locationName?: string;
   };
 };
 
@@ -22,6 +32,8 @@ export type CheckInResponse = {
 export async function checkInTicket(params: {
   qrToken: string;
   cashierId: string;
+  /** Empty / omitted = all locations (OWNER/ADMIN). */
+  allowedLocationIds?: string[];
 }): Promise<CheckInResponse> {
   const token = params.qrToken.trim();
   if (!token) {
@@ -56,7 +68,18 @@ export async function checkInTicket(params: {
       sessionLocalDate: sessionDate,
       sessionLocalTime,
       usedAt: ticket.usedAt?.toISOString() ?? null,
+      locationName: ticket.session.location.name,
     };
+
+    const allowed = params.allowedLocationIds ?? [];
+    if (allowed.length > 0 && !allowed.includes(ticket.session.locationId)) {
+      await log(ticket.id, "INVALID", params.cashierId, "Wrong location");
+      return {
+        result: "WRONG_LOCATION",
+        message: `Билет для другой локации: ${ticket.session.location.name}`,
+        ticket: baseTicket,
+      };
+    }
 
     if (ticket.status === "CANCELLED" || ticket.status === "REFUNDED") {
       await log(ticket.id, "CANCELLED", params.cashierId, "Билет отменён/возвращён");
@@ -65,7 +88,11 @@ export async function checkInTicket(params: {
 
     if (sessionDate !== today) {
       await log(ticket.id, "EXPIRED", params.cashierId, "Другая дата сеанса");
-      return { result: "EXPIRED", message: "Билет на другую дату", ticket: baseTicket };
+      return {
+        result: "WRONG_DATE",
+        message: `Билет на ${sessionDate}, сегодня ${today}`,
+        ticket: baseTicket,
+      };
     }
 
     if (ticket.status === "USED" || ticket.usedAt) {
@@ -79,7 +106,6 @@ export async function checkInTicket(params: {
 
     const usedAt = new Date();
     const outcome = await prisma.$transaction(async (tx) => {
-      // Conditional update — only one concurrent winner can flip VALID → USED.
       const updated = await tx.ticket.updateMany({
         where: { id: ticket.id, status: "VALID", usedAt: null },
         data: { status: "USED", usedAt },
