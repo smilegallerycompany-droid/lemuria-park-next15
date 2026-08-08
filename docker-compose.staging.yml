@@ -1,0 +1,22 @@
+# Isolated staging Postgres — never point this at production.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lemuria-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: lemuria_staging
+      POSTGRES_PASSWORD: lemuria_staging_pw_rc2
+      POSTGRES_DB: lemuria_staging
+    ports:
+      - "5433:5432"
+    volumes:
+      - lemuria_staging_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lemuria_staging -d lemuria_staging"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  lemuria_staging_pg:
