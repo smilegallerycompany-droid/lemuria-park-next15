@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { WhereWeAreSection, type PublicLocationCard } from "@/components/public/WhereWeAreSection";
 
 type LocationDetail = {
   id: string;
@@ -11,6 +12,7 @@ type LocationDetail = {
   name: string;
   city: string;
   address: string;
+  addressLine2: string | null;
   status: string;
   timezone: string;
   defaultCapacity: number;
@@ -18,9 +20,12 @@ type LocationDetail = {
   visitDurationMinutes: number;
   phone: string | null;
   email: string | null;
-  workingHoursText: string | null;
-  siteHeadline: string | null;
-  siteDescription: string | null;
+  mapUrl: string | null;
+  routeUrl: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  mapZoom: number;
+  mapLabel: string | null;
 };
 
 export default function DirectorLocationDetailPage() {
@@ -42,23 +47,30 @@ export default function DirectorLocationDetailPage() {
     setSaved(false);
     setError(null);
     try {
-      const data = await directorFetch<{ location: LocationDetail }>(`/api/director/locations/${location.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({
-          name: location.name,
-          city: location.city,
-          address: location.address,
-          status: location.status,
-          defaultCapacity: location.defaultCapacity,
-          sessionIntervalMinutes: location.sessionIntervalMinutes,
-          visitDurationMinutes: location.visitDurationMinutes,
-          phone: location.phone,
-          email: location.email,
-          workingHoursText: location.workingHoursText,
-          siteHeadline: location.siteHeadline,
-          siteDescription: location.siteDescription,
-        }),
-      });
+      const data = await directorFetch<{ location: LocationDetail }>(
+        `/api/director/locations/${location.id}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: location.name,
+            city: location.city,
+            address: location.address,
+            addressLine2: location.addressLine2,
+            status: location.status,
+            defaultCapacity: location.defaultCapacity,
+            sessionIntervalMinutes: location.sessionIntervalMinutes,
+            visitDurationMinutes: location.visitDurationMinutes,
+            phone: location.phone,
+            email: location.email,
+            mapUrl: location.mapUrl,
+            routeUrl: location.routeUrl,
+            latitude: location.latitude,
+            longitude: location.longitude,
+            mapZoom: location.mapZoom,
+            mapLabel: location.mapLabel,
+          }),
+        },
+      );
       setLocation(data.location);
       setSaved(true);
     } catch (err) {
@@ -76,91 +88,122 @@ export default function DirectorLocationDetailPage() {
     return <div className="director-alert error">{error}</div>;
   }
 
+  const preview: PublicLocationCard = {
+    slug: location.slug,
+    name: location.name,
+    city: location.city,
+    address: location.address,
+    addressLine2: location.addressLine2,
+    phone: location.phone,
+    email: location.email,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    mapZoom: location.mapZoom ?? 16,
+    mapLabel: location.mapLabel,
+    routeUrl: location.routeUrl,
+    mapUrl: location.mapUrl,
+    scheduleSummary: "Пн–Вс · по расписанию сеансов",
+    nextSessions: [],
+  };
+
   return (
     <>
       <PageHeader
         title={location.name}
-        description={`${location.city} · ${location.slug}`}
+        description="Публичная локация, карта и маршрут"
         actions={
-          <button type="button" className="director-btn primary" disabled={saving} onClick={save}>
+          <button type="button" className="director-btn" onClick={save} disabled={saving}>
             {saving ? "Сохранение…" : "Сохранить"}
           </button>
         }
       />
       {error ? <div className="director-alert error">{error}</div> : null}
-      {saved ? <div className="director-alert success">Изменения сохранены</div> : null}
+      {saved ? <div className="director-alert success">Сохранено</div> : null}
 
-      <section className="director-panel">
-        <div className="director-form-grid">
-          <div className="director-field">
-            <label>Статус</label>
+      <div className="director-grid-2">
+        <section className="director-card" style={{ padding: 16 }}>
+          <h2 style={{ marginTop: 0, fontSize: 16 }}>Основные данные</h2>
+          {(
+            [
+              ["name", "Название"],
+              ["city", "Город"],
+              ["address", "Адрес"],
+              ["addressLine2", "Ориентир / этаж"],
+              ["phone", "Телефон"],
+              ["email", "Email"],
+              ["mapLabel", "Подпись на карте"],
+              ["routeUrl", "URL маршрута"],
+              ["mapUrl", "mapUrl (legacy)"],
+            ] as const
+          ).map(([key, label]) => (
+            <label key={key} className="director-field">
+              {label}
+              <input
+                value={(location[key] as string | null) ?? ""}
+                onChange={(e) => setLocation({ ...location, [key]: e.target.value || null })}
+              />
+            </label>
+          ))}
+          <label className="director-field">
+            Статус
             <select
               value={location.status}
               onChange={(e) => setLocation({ ...location, status: e.target.value })}
             >
-              {["UPCOMING", "ACTIVE", "PAUSED", "CLOSED"].map((status) => (
-                <option key={status} value={status}>
-                  {status}
+              {["UPCOMING", "ACTIVE", "PAUSED", "CLOSED"].map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
               ))}
             </select>
+          </label>
+          <div className="director-grid-2">
+            <label className="director-field">
+              Latitude
+              <input
+                type="number"
+                step="any"
+                value={location.latitude ?? ""}
+                onChange={(e) =>
+                  setLocation({
+                    ...location,
+                    latitude: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+            <label className="director-field">
+              Longitude
+              <input
+                type="number"
+                step="any"
+                value={location.longitude ?? ""}
+                onChange={(e) =>
+                  setLocation({
+                    ...location,
+                    longitude: e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              />
+            </label>
           </div>
-          <div className="director-field">
-            <label>Timezone</label>
-            <input value={location.timezone} readOnly />
-          </div>
-          <div className="director-field">
-            <label>Ёмкость по умолчанию</label>
+          <label className="director-field">
+            Map zoom
             <input
               type="number"
-              value={location.defaultCapacity}
-              onChange={(e) => setLocation({ ...location, defaultCapacity: Number(e.target.value) })}
+              min={1}
+              max={21}
+              value={location.mapZoom ?? 16}
+              onChange={(e) => setLocation({ ...location, mapZoom: Number(e.target.value) })}
             />
-          </div>
-          <div className="director-field">
-            <label>Интервал сеансов (мин)</label>
-            <input
-              type="number"
-              value={location.sessionIntervalMinutes}
-              onChange={(e) => setLocation({ ...location, sessionIntervalMinutes: Number(e.target.value) })}
-            />
-          </div>
-          <div className="director-field">
-            <label>Длительность визита (мин)</label>
-            <input
-              type="number"
-              value={location.visitDurationMinutes}
-              onChange={(e) => setLocation({ ...location, visitDurationMinutes: Number(e.target.value) })}
-            />
-          </div>
-          <div className="director-field">
-            <label>Телефон</label>
-            <input value={location.phone ?? ""} onChange={(e) => setLocation({ ...location, phone: e.target.value })} />
-          </div>
-          <div className="director-field">
-            <label>Email</label>
-            <input value={location.email ?? ""} onChange={(e) => setLocation({ ...location, email: e.target.value })} />
-          </div>
-          <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-            <label>Адрес</label>
-            <input value={location.address} onChange={(e) => setLocation({ ...location, address: e.target.value })} />
-          </div>
-          <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-            <label>Заголовок на сайте</label>
-            <input
-              value={location.siteHeadline ?? ""}
-              onChange={(e) => setLocation({ ...location, siteHeadline: e.target.value })}
-            />
-          </div>
-          <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-            <label>Описание на сайте</label>
-            <textarea
-              value={location.siteDescription ?? ""}
-              onChange={(e) => setLocation({ ...location, siteDescription: e.target.value })}
-            />
-          </div>
-        </div>
-      </section>
+          </label>
+        </section>
+
+        <section className="director-card public-awwwards" style={{ padding: 8, overflow: "hidden" }}>
+          <h2 style={{ margin: "12px 16px", fontSize: 16 }}>Как будет выглядеть на сайте</h2>
+          <WhereWeAreSection sectionTitle="Где мы находимся?" locations={[preview]} />
+        </section>
+      </div>
     </>
   );
 }
