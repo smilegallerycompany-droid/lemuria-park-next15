@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Clock3, Leaf, MapPin, Sparkles, Ticket, Users } from "lucide-react";
 import { BookingAwwwards as Booking } from "@/components/booking/BookingAwwwards";
@@ -9,33 +9,114 @@ import {
   WhereWeAreSection,
   type PublicLocationCard,
 } from "@/components/public/WhereWeAreSection";
+import { DEFAULT_ABOUT, DEFAULT_FAQ, DEFAULT_HERO } from "@/lib/cms/defaults";
+
+type CmsPayload = {
+  site: { name: string; subtitle: string; ctaLabel: string };
+  hero: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    description: string;
+    ctaLabel: string;
+    ctaHref: string;
+    imageUrl: string;
+  } | null;
+  about: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    benefits: Array<{
+      title: string;
+      description: string;
+      iconKey: string;
+      sortOrder: number;
+      isActive: boolean;
+    }>;
+  };
+  faq: Array<{ question: string; answer: string }>;
+  gallery: Array<{ imageUrl: string; altText: string; caption: string | null }>;
+  contact: { phone: string; email: string | null; supportHours: string | null } | null;
+  schedulePreview: Array<{ startsAt: string; localTime: string; remainingHint: string }>;
+  locations: { sectionTitle: string; locations: PublicLocationCard[] };
+};
+
+const ICON_MAP: Record<string, typeof Leaf> = {
+  leaf: Leaf,
+  clock: Clock3,
+  sparkles: Sparkles,
+  map: MapPin,
+};
+
+function titleLines(title: string) {
+  return title.split("\n").map((line, i) => (
+    <span key={i}>
+      {i > 0 ? <br /> : null}
+      {line}
+    </span>
+  ));
+}
 
 /**
- * Approved awwwards home composition — visual source of truth.
- * Booking widget talks to production `/api/public/*` (next15 services).
- * Location map section loads from DB (with safe empty fallback).
+ * Public home — CMS-bound with safe fallbacks.
+ * Booking widget talks to production `/api/public/*` (unchanged).
  */
 export default function HomePage() {
-  const [locationPayload, setLocationPayload] = useState<{
-    sectionTitle: string;
-    locations: PublicLocationCard[];
-  } | null>(null);
+  const [cms, setCms] = useState<CmsPayload | null>(null);
 
   useEffect(() => {
-    fetch("/api/public/locations")
+    fetch("/api/public/content")
       .then((r) => r.json())
       .then((body) => {
-        if (body?.ok && body.data) setLocationPayload(body.data);
+        if (body?.ok && body.data) setCms(body.data);
       })
       .catch(() => {
-        /* keep page usable without map block data */
+        /* fallback defaults below */
       });
   }, []);
 
+  const hero = cms?.hero ?? {
+    badge: DEFAULT_HERO.heroBadge,
+    title: DEFAULT_HERO.heroTitle,
+    subtitle: DEFAULT_HERO.heroSubtitle,
+    description: DEFAULT_HERO.heroDescription,
+    ctaLabel: DEFAULT_HERO.heroCtaLabel,
+    ctaHref: DEFAULT_HERO.heroCtaHref,
+    imageUrl: DEFAULT_HERO.heroImageUrl,
+  };
+
+  const about = cms?.about ?? {
+    eyebrow: DEFAULT_ABOUT.aboutEyebrow,
+    title: DEFAULT_ABOUT.aboutTitle,
+    description: DEFAULT_ABOUT.aboutDescription,
+    benefits: DEFAULT_ABOUT.aboutBenefits,
+  };
+
+  const faq = cms?.faq?.length ? cms.faq : DEFAULT_FAQ;
+  const gallery = cms?.gallery ?? [];
+  const site = cms?.site ?? {
+    name: "Лемурия Парк",
+    subtitle: "Зоотеатр лемуров",
+    ctaLabel: "Купить билет",
+  };
+
+  const locations = cms?.locations?.locations ?? [];
+  const sectionTitle = cms?.locations?.sectionTitle ?? "Где мы находимся?";
+
   const primaryAddress =
-    locationPayload?.locations[0]?.address ??
+    locations[0]?.address ??
     "Краснодар, МегаЦентр Красная площадь, 2 этаж рядом с магазином Kari";
-  const primaryPhone = locationPayload?.locations[0]?.phone ?? "+7 920 971-40-22";
+  const primaryPhone = cms?.contact?.phone ?? locations[0]?.phone ?? "+7 920 971-40-22";
+
+  const benefits = useMemo(
+    () => [...about.benefits].filter((b) => b.isActive !== false).sort((a, b) => a.sortOrder - b.sortOrder),
+    [about.benefits],
+  );
+
+  const heroStyle =
+    hero.imageUrl && hero.imageUrl !== "/hero-lemur.png"
+      ? ({ ["--hero-image" as string]: `url(${hero.imageUrl})` } as React.CSSProperties)
+      : undefined;
 
   return (
     <main>
@@ -44,8 +125,8 @@ export default function HomePage() {
           <Link href="/" className="brand">
             <span className="brand-symbol">◉</span>
             <span className="brand-copy">
-              Лемурия Парк
-              <small>зоотеатр лемуров</small>
+              {site.name}
+              <small>{site.subtitle}</small>
             </span>
           </Link>
 
@@ -58,90 +139,65 @@ export default function HomePage() {
 
           <div className="header-action">
             <a href="#booking" className="button button-orange">
-              Купить билет
+              {site.ctaLabel}
             </a>
           </div>
         </div>
       </header>
 
-      <section className="hero">
-        <div className="container hero-content">
-          <motion.div
-            className="hero-copy"
-            initial={{ opacity: 0, y: 26 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.75 }}
-          >
-            <span className="kicker">Онлайн-касса</span>
-            <h1>
-              Лемурия
-              <br />
-              Парк
-            </h1>
-            <div className="hero-subtitle">Зоотеатр лемуров</div>
-            <p>
-              Семейный зоотеатр с яркими впечатлениями и добрыми эмоциями — билеты на удобное время
-              онлайн.
-            </p>
-            <div className="hero-actions">
-              <a className="button button-orange" href="#booking">
-                Купить билет
-              </a>
-              <span className="button button-ghost">
-                <Leaf size={18} /> Сеансы по расписанию
-              </span>
-            </div>
-            <p className="hero-address">
-              <MapPin size={16} aria-hidden />
-              {primaryAddress}
-            </p>
-          </motion.div>
-        </div>
-      </section>
+      {cms?.hero === null ? null : (
+        <section className="hero" style={heroStyle}>
+          <div className="container hero-content">
+            <motion.div
+              className="hero-copy"
+              initial={{ opacity: 0, y: 26 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.75 }}
+            >
+              <span className="kicker">{hero.badge}</span>
+              <h1>{titleLines(hero.title)}</h1>
+              <div className="hero-subtitle">{hero.subtitle}</div>
+              <p>{hero.description}</p>
+              <div className="hero-actions">
+                <a className="button button-orange" href={hero.ctaHref || "#booking"}>
+                  {hero.ctaLabel}
+                </a>
+                <span className="button button-ghost">
+                  <Leaf size={18} /> Сеансы по расписанию
+                </span>
+              </div>
+              <p className="hero-address">
+                <MapPin size={16} aria-hidden />
+                {primaryAddress}
+              </p>
+            </motion.div>
+          </div>
+        </section>
+      )}
 
       <Booking />
 
       <section id="about" className="section container">
         <div className="section-head">
           <div>
-            <span className="kicker">Впечатления</span>
-            <h2>
-              Ближе к природе.
-              <br />
-              Ближе друг к другу.
-            </h2>
+            <span className="kicker">{about.eyebrow}</span>
+            <h2>{titleLines(about.title)}</h2>
           </div>
-          <p>
-            Небольшие группы, спокойный формат посещения и атмосфера, в которой каждый гость успевает
-            рассмотреть лемуров и насладиться шоу зоотеатра.
-          </p>
+          <p>{about.description}</p>
         </div>
 
         <div className="trust-strip">
-          <div className="trust-item">
-            <span className="trust-icon">
-              <Leaf />
-            </span>
-            <strong>Зоотеатр для семьи</strong>
-          </div>
-          <div className="trust-item">
-            <span className="trust-icon">
-              <Clock3 />
-            </span>
-            <strong>Сеансы каждые 30 минут</strong>
-          </div>
-          <div className="trust-item">
-            <span className="trust-icon">
-              <Sparkles />
-            </span>
-            <strong>Эмоции для всей семьи</strong>
-          </div>
-          <div className="trust-item">
-            <span className="trust-icon">
-              <MapPin />
-            </span>
-            <strong>С 1 августа по 15 сентября</strong>
-          </div>
+          {benefits.slice(0, 6).map((b) => {
+            const Icon = ICON_MAP[b.iconKey] ?? Leaf;
+            return (
+              <div className="trust-item" key={`${b.sortOrder}-${b.title}`}>
+                <span className="trust-icon">
+                  <Icon />
+                </span>
+                <strong>{b.title}</strong>
+              </div>
+            );
+          })}
         </div>
       </section>
 
@@ -188,11 +244,47 @@ export default function HomePage() {
         </div>
       </section>
 
-      {locationPayload && locationPayload.locations.length > 0 ? (
-        <WhereWeAreSection
-          sectionTitle={locationPayload.sectionTitle}
-          locations={locationPayload.locations}
-        />
+      {cms?.schedulePreview && cms.schedulePreview.length > 0 ? (
+        <section id="schedule-preview" className="section container">
+          <div className="section-head">
+            <div>
+              <span className="kicker">Расписание</span>
+              <h2>Ближайшие сеансы</h2>
+            </div>
+          </div>
+          <ul className="schedule-preview-list">
+            {cms.schedulePreview.map((s) => (
+              <li key={s.startsAt}>
+                <strong>{s.localTime}</strong>
+                <span>{s.remainingHint}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {gallery.length > 0 ? (
+        <section id="gallery" className="section container">
+          <div className="section-head">
+            <div>
+              <span className="kicker">Галерея</span>
+              <h2>Атмосфера зоотеатра</h2>
+            </div>
+          </div>
+          <div className="gallery">
+            {gallery.map((g) => (
+              <figure key={g.imageUrl + g.altText}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.imageUrl} alt={g.altText} loading="lazy" />
+                {g.caption ? <figcaption>{g.caption}</figcaption> : null}
+              </figure>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {locations.length > 0 ? (
+        <WhereWeAreSection sectionTitle={sectionTitle} locations={locations} />
       ) : null}
 
       <section id="faq" className="section container">
@@ -203,34 +295,20 @@ export default function HomePage() {
           </div>
         </div>
         <div className="faq">
-          <details>
-            <summary>Можно фотографировать?</summary>
-            <p>Да, личная съёмка разрешена. Просим соблюдать рекомендации сотрудников.</p>
-          </details>
-          <details>
-            <summary>Сколько длится посещение?</summary>
-            <p>Сеансы проходят по расписанию каждые 30 минут. Вторник — выходной.</p>
-          </details>
-          <details>
-            <summary>До какого числа работает выставка?</summary>
-            <p>Выставка в Краснодаре проходит с 1 августа по 15 сентября.</p>
-          </details>
-          <details>
-            <summary>Сколько гостей бывает на сеансе?</summary>
-            <p>Не более 15 человек, чтобы всем было комфортно.</p>
-          </details>
-          <details>
-            <summary>Можно прийти с маленьким ребёнком?</summary>
-            <p>Да. Дети находятся рядом со взрослыми и следуют правилам посещения.</p>
-          </details>
+          {faq.map((item) => (
+            <details key={item.question}>
+              <summary>{item.question}</summary>
+              <p>{item.answer}</p>
+            </details>
+          ))}
         </div>
       </section>
 
       <footer className="footer">
         <div className="container footer-inner">
           <div>
-            <strong style={{ fontSize: 24 }}>Лемурия Парк</strong>
-            <p>Зоотеатр лемуров</p>
+            <strong style={{ fontSize: 24 }}>{site.name}</strong>
+            <p>{site.subtitle}</p>
           </div>
           <div>
             <small>Телефон</small>

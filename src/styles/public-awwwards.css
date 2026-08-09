@@ -136,7 +136,23 @@
   overflow: hidden;
   background:
     linear-gradient(90deg, rgba(248,250,244,.97) 0%, rgba(248,250,244,.88) 36%, rgba(248,250,244,.05) 68%),
-    url("/hero-lemur.png") center/cover no-repeat;
+    var(--hero-image, url("/hero-lemur.png")) center/cover no-repeat;
+}
+
+.public-awwwards .schedule-preview-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  max-width: 520px;
+}
+.public-awwwards .schedule-preview-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(20, 60, 30, 0.12);
 }
 .public-awwwards .hero::after {
   content: "";
