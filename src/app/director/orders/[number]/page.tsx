@@ -4,8 +4,16 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
+import { OrderTimeline } from "@/components/director/OrderTimeline";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
+
+type TimelineEvent = {
+  type: string;
+  at: string;
+  title: string;
+  detail?: string | null;
+};
 
 type OrderDetail = {
   number: string;
@@ -32,6 +40,7 @@ type OrderDetail = {
 export default function DirectorOrderDetailPage() {
   const params = useParams<{ number: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [confirmRefund, setConfirmRefund] = useState(false);
   const [reason, setReason] = useState("");
@@ -42,10 +51,13 @@ export default function DirectorOrderDetailPage() {
     let cancelled = false;
     (async () => {
       try {
-        const data = await directorFetch<{ order: OrderDetail }>(
+        const data = await directorFetch<{ order: OrderDetail; timeline: TimelineEvent[] }>(
           `/api/director/orders/${params.number}`,
         );
-        if (!cancelled) setOrder(data.order);
+        if (!cancelled) {
+          setOrder(data.order);
+          setTimeline(data.timeline ?? []);
+        }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Ошибка");
       }
@@ -56,8 +68,11 @@ export default function DirectorOrderDetailPage() {
   }, [params.number]);
 
   async function load() {
-    const data = await directorFetch<{ order: OrderDetail }>(`/api/director/orders/${params.number}`);
+    const data = await directorFetch<{ order: OrderDetail; timeline: TimelineEvent[] }>(
+      `/api/director/orders/${params.number}`,
+    );
     setOrder(data.order);
+    setTimeline(data.timeline ?? []);
   }
 
   async function refund() {
@@ -112,6 +127,15 @@ export default function DirectorOrderDetailPage() {
           <div className="director-kpi-sub">{order.location.name}</div>
         </div>
       </div>
+
+      <section className="director-panel" style={{ marginBottom: 18 }}>
+        <div className="director-panel-head">
+          <h2>Timeline</h2>
+        </div>
+        <div style={{ padding: 18 }}>
+          <OrderTimeline events={timeline} />
+        </div>
+      </section>
 
       <section className="director-panel" style={{ marginBottom: 18 }}>
         <div className="director-panel-head">
@@ -210,12 +234,12 @@ export default function DirectorOrderDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {order.refunds.map((refund, index) => (
-                  <tr key={`${refund.createdAt}-${index}`}>
-                    <td>{formatDateTime(refund.createdAt)}</td>
-                    <td>{formatMoneyFromKopecks(refund.amount)}</td>
-                    <td>{refund.status}</td>
-                    <td>{refund.reason ?? "—"}</td>
+                {order.refunds.map((refundRow, index) => (
+                  <tr key={`${refundRow.createdAt}-${index}`}>
+                    <td>{formatDateTime(refundRow.createdAt)}</td>
+                    <td>{formatMoneyFromKopecks(refundRow.amount)}</td>
+                    <td>{refundRow.status}</td>
+                    <td>{refundRow.reason ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

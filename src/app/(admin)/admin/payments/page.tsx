@@ -45,7 +45,9 @@ export default function AdminPaymentsPage() {
             {payments.map((p) => (
               <tr key={p.id}>
                 <td>{new Date(p.createdAt).toLocaleString("ru-RU")}</td>
-                <td>{p.order.number}</td>
+                <td>
+                  <a href={`/admin/payments/${p.id}`}>{p.order.number}</a>
+                </td>
                 <td>{p.order.location?.city ?? "—"}</td>
                 <td>{p.provider ?? "—"}</td>
                 <td>{labelPaymentMethod(p.method)}</td>
