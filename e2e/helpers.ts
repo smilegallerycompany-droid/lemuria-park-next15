@@ -144,12 +144,30 @@ export async function directorLogin(request: APIRequestContext) {
   return expectOk<{ id: string; email: string; role: string }>(res);
 }
 
+/** Ensure cashier has an OPEN shift (required for sales). */
+export async function ensureOpenCashierShift(request: APIRequestContext) {
+  const cur = await request.get("/api/cashier/shift");
+  const curBody = await cur.json();
+  if (curBody?.ok && curBody.data?.shift) return curBody.data.shift;
+
+  const locs = await expectOk<{ locations: Array<{ id: string }> }>(
+    await request.get("/api/cashier/locations"),
+  );
+  const locationId = locs.locations[0]?.id;
+  if (!locationId) throw new Error("No cashier locations for shift");
+  const opened = await request.post("/api/cashier/shift", {
+    data: { locationId, openingCashAmount: 0, notes: "e2e auto-open" },
+  });
+  return expectOk<{ id: string; status: string }>(opened);
+}
+
 export async function cashierSale(
   request: APIRequestContext,
   sessionPublicId: string,
   quantity = 1,
   idempotencyKey?: string,
 ) {
+  await ensureOpenCashierShift(request);
   const res = await request.post("/api/cashier/sales", {
     data: {
       sessionPublicId,

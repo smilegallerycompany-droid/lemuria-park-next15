@@ -70,7 +70,9 @@ async function cleanupSession(locationId: string, sessionId: string) {
   await prisma.ticket.deleteMany({ where: { sessionId } });
   await prisma.payment.deleteMany({ where: { order: { sessionId } } });
   await prisma.orderItem.deleteMany({ where: { order: { sessionId } } });
+  await prisma.cashOperation.deleteMany({ where: { shift: { locationId } } });
   await prisma.order.deleteMany({ where: { sessionId } });
+  await prisma.cashierShift.deleteMany({ where: { locationId } });
   await prisma.reservationItem.deleteMany({ where: { reservation: { sessionId } } });
   await prisma.reservation.deleteMany({ where: { sessionId } });
   await prisma.session.delete({ where: { id: sessionId } });
@@ -133,6 +135,19 @@ test("online reservation and cashier sale never oversell last seats", async (t) 
       passwordHash: "x",
       role: "CASHIER",
       status: "ACTIVE",
+    },
+  });
+
+  await prisma.cashierShift.updateMany({
+    where: { userId: cashier.id, status: "OPEN" },
+    data: { status: "CLOSED", closedAt: new Date() },
+  });
+  await prisma.cashierShift.create({
+    data: {
+      userId: cashier.id,
+      locationId: location.id,
+      openingCashAmount: 0,
+      status: "OPEN",
     },
   });
 

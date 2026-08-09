@@ -75,6 +75,19 @@ test("duplicate cashier sale idempotency key returns the same order", async (t) 
     },
   });
 
+  await prisma.cashierShift.updateMany({
+    where: { userId: cashier.id, status: "OPEN" },
+    data: { status: "CLOSED", closedAt: new Date() },
+  });
+  await prisma.cashierShift.create({
+    data: {
+      userId: cashier.id,
+      locationId: location.id,
+      openingCashAmount: 0,
+      status: "OPEN",
+    },
+  });
+
   const key = `idem-cashier-${Date.now()}`;
   const input = {
     sessionPublicId: session.publicId,
@@ -97,7 +110,9 @@ test("duplicate cashier sale idempotency key returns the same order", async (t) 
     await prisma.ticket.deleteMany({ where: { sessionId: session.id } });
     await prisma.payment.deleteMany({ where: { order: { sessionId: session.id } } });
     await prisma.orderItem.deleteMany({ where: { order: { sessionId: session.id } } });
+    await prisma.cashOperation.deleteMany({ where: { shift: { locationId: location.id } } });
     await prisma.order.deleteMany({ where: { sessionId: session.id } });
+    await prisma.cashierShift.deleteMany({ where: { locationId: location.id } });
     await prisma.session.delete({ where: { id: session.id } });
     await prisma.priceRule.deleteMany({ where: { locationId: location.id } });
     await prisma.location.delete({ where: { id: location.id } });
