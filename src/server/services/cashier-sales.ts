@@ -18,6 +18,7 @@ import { expireStalePaymentOrders } from "@/server/services/order-cleanup";
 import { getSessionAvailability } from "@/server/services/availability";
 import { findTicketTypeByCode, resolveTicketPrice } from "@/server/services/pricing";
 import { issueTicketsForOrder } from "@/server/services/tickets";
+import { recordSaleOnShift, requireOpenShift } from "@/server/services/cashier-shifts";
 import type { CashierSaleInput } from "@/lib/validation/cashier";
 
 function isRetryable(error: unknown): boolean {
@@ -79,6 +80,8 @@ async function createCashierSaleInTransaction(
   assertSessionBookable(session, now);
   await sessionRepository.lockForUpdate(tx, session.id);
 
+  const shift = await requireOpenShift(tx, cashierId, session.locationId);
+
   const requestedItems = input.items.filter((item) => item.quantity > 0);
   const totalRequested = sumRequestedQuantity(requestedItems);
   const availability = await getSessionAvailability(tx, session.id, now);
@@ -117,6 +120,7 @@ async function createCashierSaleInTransaction(
     sessionId: session.id,
     locationId: session.locationId,
     cashierId,
+    shiftId: shift.id,
     customerName: input.customerName,
     customerPhone: input.customerPhone,
     customerEmail: input.customerEmail,
@@ -125,6 +129,16 @@ async function createCashierSaleInTransaction(
     idempotencyKey,
     idempotencyPayloadHash: idempotencyKey ? hashIdempotencyPayload(input) : undefined,
     items: lineItems,
+  });
+
+  const ticketsCount = lineItems.reduce((sum, i) => sum + i.quantity, 0);
+  await recordSaleOnShift(tx, {
+    shiftId: shift.id,
+    orderId: order.id,
+    userId: cashierId,
+    paymentMethod: input.paymentMethod,
+    amount: totalAmount,
+    ticketsCount,
   });
 
   await recordAuditLog(tx, {
@@ -136,6 +150,7 @@ async function createCashierSaleInTransaction(
       paymentMethod: input.paymentMethod,
       totalAmount,
       sessionId: session.id,
+      shiftId: shift.id,
     },
   });
 

@@ -22,6 +22,7 @@ export interface CreateCashierOrderRecordInput {
   sessionId: string;
   locationId?: string | null;
   cashierId: string;
+  shiftId?: string | null;
   customerName: string;
   customerPhone: string;
   customerEmail: string;
@@ -124,6 +125,7 @@ export const orderRepository = {
         status: "PAID",
         source: "CASHIER",
         cashierId: input.cashierId,
+        shiftId: input.shiftId ?? null,
         customerName: input.customerName,
         customerPhone: input.customerPhone,
         customerEmail: input.customerEmail,

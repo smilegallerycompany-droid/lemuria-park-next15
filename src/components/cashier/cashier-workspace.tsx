@@ -35,6 +35,7 @@ import {
   type CashierSessionsResponse,
   type CashierUser,
 } from "@/lib/api/cashier";
+import { CashierShiftGate } from "@/components/cashier/CashierShiftGate";
 
 type Filter = "today" | "all" | "paid" | "cancelled";
 
@@ -242,12 +243,13 @@ export function CashierWorkspace() {
   }
 
   return (
+    <CashierShiftGate>
     <div className="min-h-screen bg-gradient-to-b from-cream to-beige/60">
       <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-4 px-4 py-3 md:px-6">
           <div className="mr-auto">
             <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-orange">
-              Касса · смена открыта
+              Касса
             </p>
             <p className="font-display text-xl font-semibold text-forest">{user.name}</p>
           </div>
@@ -546,6 +548,7 @@ export function CashierWorkspace() {
         </aside>
       </main>
     </div>
+    </CashierShiftGate>
   );
 }
 

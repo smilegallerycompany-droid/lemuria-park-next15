@@ -47,6 +47,11 @@ const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   RATE_LIMITED: 429,
   UNAUTHORIZED: 401,
   FORBIDDEN: 403,
+  SHIFT_NOT_OPEN: 409,
+  SHIFT_ALREADY_OPEN: 409,
+  SHIFT_ALREADY_CLOSED: 409,
+  REFUND_NOT_ALLOWED: 403,
+  REFUND_AMOUNT_INVALID: 422,
 };
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */

@@ -106,3 +106,16 @@ export async function apiPost<T>(
   );
   return data;
 }
+
+export async function apiPatch<T>(
+  path: string,
+  payload: unknown,
+  options?: RequestOptions,
+): Promise<T> {
+  const { data } = await requestWithMeta<T>(
+    path,
+    { method: "PATCH", body: JSON.stringify(payload) },
+    options,
+  );
+  return data;
+}

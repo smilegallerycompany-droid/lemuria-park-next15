@@ -26,7 +26,12 @@ export type DomainErrorCode =
   | "SESSION_HAS_PAID_ORDERS"
   | "RATE_LIMITED"
   | "UNAUTHORIZED"
-  | "FORBIDDEN";
+  | "FORBIDDEN"
+  | "SHIFT_NOT_OPEN"
+  | "SHIFT_ALREADY_OPEN"
+  | "SHIFT_ALREADY_CLOSED"
+  | "REFUND_NOT_ALLOWED"
+  | "REFUND_AMOUNT_INVALID";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

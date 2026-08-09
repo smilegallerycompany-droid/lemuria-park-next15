@@ -106,8 +106,28 @@ enum CheckInResult {
 
 enum RefundStatus {
   PENDING
+  /// Legacy success status — treat as SUCCEEDED in queries.
   COMPLETED
   REJECTED
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum CashierShiftStatus {
+  OPEN
+  CLOSED
+  FORCE_CLOSED
+}
+
+enum CashOperationType {
+  OPENING
+  SALE
+  REFUND
+  IN
+  OUT
+  CLOSING
+  ADJUSTMENT
 }
 
 enum TicketDeliveryStatus {
@@ -140,6 +160,8 @@ model User {
   refunds          Refund[]         @relation("RefundActor")
   printLogs        PrintLog[]       @relation("PrintActor")
   ticketDeliveries TicketDelivery[] @relation("DeliveryActor")
+  cashierShifts    CashierShift[]   @relation("ShiftCashier")
+  cashOperations   CashOperation[]  @relation("CashOpUser")
 
   @@index([role])
   @@index([status])
@@ -236,6 +258,7 @@ model Location {
   galleryItems  GalleryItem[]
   userLocations UserLocation[]
   orders        Order[]
+  cashierShifts CashierShift[]
 
   @@index([status])
   @@index([city])
@@ -376,25 +399,25 @@ model ReservationItem {
 // ---------------------------------------------------------------------------
 
 model Order {
-  id                     String       @id @default(cuid())
+  id                     String        @id @default(cuid())
   /// Safe, human-friendly identifier to show the customer (e.g. "LP-000123").
-  number                 String       @unique
+  number                 String        @unique
   sessionId              String
-  session                Session      @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  session                Session       @relation(fields: [sessionId], references: [id], onDelete: Restrict)
   /// Denormalized from session for director/cashier filtering. Optional for legacy rows.
   locationId             String?
-  location               Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  reservationId          String?      @unique
-  reservation            Reservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  status                 OrderStatus  @default(DRAFT)
-  source                 OrderSource  @default(ONLINE)
+  location               Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  reservationId          String?       @unique
+  reservation            Reservation?  @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  status                 OrderStatus   @default(DRAFT)
+  source                 OrderSource   @default(ONLINE)
   customerName           String
   customerPhone          String
   customerEmail          String
   /// Total in kopecks, always computed server-side.
   totalAmount            Int
-  currency               String       @default("RUB")
-  idempotencyKey         String?      @unique
+  currency               String        @default("RUB")
+  idempotencyKey         String?       @unique
   /// Hash of the request payload that created this order, so a repeated
   /// Idempotency-Key with a *different* payload can be rejected (IDEMPOTENCY_CONFLICT)
   /// instead of silently returning an unrelated order.
@@ -404,22 +427,26 @@ model Order {
   /// swept to EXPIRED and stops occupying seats (see OrderCleanupService).
   paymentExpiresAt       DateTime?
   cashierId              String?
-  cashier                User?        @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
-  createdAt              DateTime     @default(now())
-  updatedAt              DateTime     @updatedAt
+  cashier                User?         @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  shiftId                String?
+  shift                  CashierShift? @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
-  items      OrderItem[]
-  payments   Payment[]
-  tickets    Ticket[]
-  refunds    Refund[]
-  deliveries TicketDelivery[]
-  printLogs  PrintLog[]
+  items          OrderItem[]
+  payments       Payment[]
+  tickets        Ticket[]
+  refunds        Refund[]
+  deliveries     TicketDelivery[]
+  printLogs      PrintLog[]
+  cashOperations CashOperation[]
 
   @@index([sessionId, status])
   @@index([locationId])
   @@index([status])
   @@index([source])
   @@index([status, paymentExpiresAt])
+  @@index([shiftId])
 }
 
 model OrderItem {
@@ -466,6 +493,7 @@ model Payment {
   cashier           User?         @relation("PaymentCashier", fields: [cashierId], references: [id], onDelete: SetNull)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+  refunds           Refund[]
 
   @@index([orderId, status])
   @@index([status])
@@ -473,19 +501,25 @@ model Payment {
 
 /// Financial refund history — never delete rows; mark status instead.
 model Refund {
-  id        String       @id @default(cuid())
-  orderId   String
-  order     Order        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  id               String       @id @default(cuid())
+  publicId         String       @unique @default(cuid())
+  orderId          String
+  order            Order        @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  paymentId        String?
+  payment          Payment?     @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   /// Amount in kopecks.
-  amount    Int
-  status    RefundStatus @default(PENDING)
-  reason    String?
-  actorId   String?
-  actor     User?        @relation("RefundActor", fields: [actorId], references: [id], onDelete: SetNull)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  amount           Int
+  status           RefundStatus @default(PENDING)
+  reason           String?
+  actorId          String?
+  actor            User?        @relation("RefundActor", fields: [actorId], references: [id], onDelete: SetNull)
+  providerRefundId String?
+  completedAt      DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 
   @@index([orderId])
+  @@index([paymentId])
   @@index([status])
   @@index([createdAt])
 }
@@ -511,13 +545,75 @@ model PrintLog {
   id        String   @id @default(cuid())
   orderId   String
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  ticketId  String?
+  ticket    Ticket?  @relation(fields: [ticketId], references: [id], onDelete: SetNull)
   actorId   String?
   actor     User?    @relation("PrintActor", fields: [actorId], references: [id], onDelete: SetNull)
+  /// cashier | director | admin | system
+  source    String   @default("cashier")
   note      String?
   createdAt DateTime @default(now())
 
   @@index([orderId])
+  @@index([ticketId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Cashier shifts & cash journal
+// ---------------------------------------------------------------------------
+
+model CashierShift {
+  id                   String             @id @default(cuid())
+  publicId             String             @unique @default(cuid())
+  userId               String
+  user                 User               @relation("ShiftCashier", fields: [userId], references: [id], onDelete: Restrict)
+  locationId           String
+  location             Location           @relation(fields: [locationId], references: [id], onDelete: Restrict)
+  status               CashierShiftStatus @default(OPEN)
+  openedAt             DateTime           @default(now())
+  closedAt             DateTime?
+  openingCashAmount    Int                @default(0)
+  closingCashAmount    Int?
+  expectedCashAmount   Int?
+  cashDifferenceAmount Int?
+  cashSalesAmount      Int                @default(0)
+  cardSalesAmount      Int                @default(0)
+  onlineSalesAmount    Int                @default(0)
+  cashRefundsAmount    Int                @default(0)
+  ordersCount          Int                @default(0)
+  ticketsCount         Int                @default(0)
+  notes                String?
+  closeReason          String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  orders         Order[]
+  cashOperations CashOperation[]
+
+  @@index([userId, status])
+  @@index([locationId, status])
+  @@index([openedAt])
+  @@index([status])
+}
+
+model CashOperation {
+  id        String            @id @default(cuid())
+  shiftId   String
+  shift     CashierShift      @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation("CashOpUser", fields: [userId], references: [id], onDelete: Restrict)
+  type      CashOperationType
+  /// Signed amount in kopecks (OUT is stored negative or positive with type=OUT — use type).
+  amount    Int
+  comment   String?
+  orderId   String?
+  order     Order?            @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt DateTime          @default(now())
+
+  @@index([shiftId, createdAt])
+  @@index([type])
+  @@index([orderId])
 }
 
 // ---------------------------------------------------------------------------
@@ -542,7 +638,8 @@ model Ticket {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  checkIns TicketCheckIn[]
+  checkIns  TicketCheckIn[]
+  printLogs PrintLog[]
 
   @@index([orderId])
   @@index([sessionId, status])
