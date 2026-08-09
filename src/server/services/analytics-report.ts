@@ -89,7 +89,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
     prisma.refund.aggregate({
       _sum: { amount: true },
       where: {
-        status: "COMPLETED",
+        status: { in: ["COMPLETED", "SUCCEEDED"] },
         createdAt: { gte: params.from, lte: params.to },
         order: where,
       },

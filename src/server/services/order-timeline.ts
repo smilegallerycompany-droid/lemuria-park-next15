@@ -117,7 +117,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
       title: "Refund created",
       detail: refund.reason,
     });
-    if (refund.status === "COMPLETED") {
+    if (refund.status === "COMPLETED" || refund.status === "SUCCEEDED") {
       events.push({
         type: "REFUND_SUCCEEDED",
         at: refund.updatedAt.toISOString(),

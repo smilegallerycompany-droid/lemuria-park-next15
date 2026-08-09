@@ -97,7 +97,7 @@ export async function getDirectorAnalytics(
     prisma.refund.aggregate({
       _sum: { amount: true },
       where: {
-        status: "COMPLETED",
+        status: { in: ["COMPLETED", "SUCCEEDED"] },
         createdAt: { gte: params.from, lte: params.to },
         ...(params.locationId
           ? {
@@ -176,7 +176,7 @@ export async function getDirectorAnalytics(
     }),
     prisma.refund.findMany({
       where: {
-        status: "COMPLETED",
+        status: { in: ["COMPLETED", "SUCCEEDED"] },
         createdAt: { gte: params.from, lte: params.to },
         ...(params.locationId
           ? {

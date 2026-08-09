@@ -46,7 +46,7 @@ export async function GET(_req: Request, context: RouteContext) {
     if (!payment) throw new ApiError("NOT_FOUND", "Платёж не найден", 404);
 
     const refundedAmount = payment.order.refunds
-      .filter((r) => r.status === "COMPLETED")
+      .filter((r) => r.status === "COMPLETED" || r.status === "SUCCEEDED")
       .reduce((sum, r) => sum + r.amount, 0);
 
     const succeededAt =
