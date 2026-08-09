@@ -124,6 +124,7 @@ export async function getIntegrationsStatus() {
       status: env.EMAIL_PROVIDER === "yandex_postbox" ? "Configured" : "Not configured",
     },
     maps: {
+      provider: "Yandex Maps",
       status: process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY ? "Configured" : "Not configured",
     },
     errorMonitoring: {

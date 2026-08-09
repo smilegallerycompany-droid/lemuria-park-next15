@@ -1,7 +1,11 @@
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { loginStaff } from "@/server/auth/login";
-import { clientIpFromRequest, consumeRateLimit } from "@/server/security/rate-limit";
+import {
+  clientIpFromRequest,
+  consumeRateLimit,
+  isRateLimited,
+} from "@/server/security/rate-limit";
 import { DomainError } from "@/server/domain/errors";
 
 const schema = z.object({
@@ -9,6 +13,8 @@ const schema = z.object({
   password: z.string().min(1),
   portal: z.enum(["cashier", "director", "admin"]).default("cashier"),
 });
+
+const LOGIN_WINDOW = { limit: 10, windowMs: 15 * 60 * 1000 };
 
 export async function POST(req: Request) {
   try {
@@ -18,12 +24,11 @@ export async function POST(req: Request) {
     const input = schema.parse(json);
     const ip = clientIpFromRequest(req);
     const ua = req.headers.get("user-agent");
+    const rateKey = `login:${ip}:${input.email.toLowerCase()}`;
 
-    const limit = consumeRateLimit(`login:${ip}:${input.email.toLowerCase()}`, {
-      limit: 10,
-      windowMs: 15 * 60 * 1000,
-    });
-    if (!limit.allowed) {
+    // Count only failed attempts — successful E2E/staff logins must not lock the suite.
+    const gate = isRateLimited(rateKey, LOGIN_WINDOW);
+    if (!gate.allowed) {
       throw new DomainError("RATE_LIMITED", "Слишком много попыток входа. Попробуйте позже.");
     }
 
@@ -34,21 +39,28 @@ export async function POST(req: Request) {
           ? (["DIRECTOR", "ADMIN", "OWNER"] as const)
           : (["CASHIER", "DIRECTOR", "ADMIN", "OWNER"] as const);
 
-    const user = await loginStaff({
-      email: input.email,
-      password: input.password,
-      allowedRoles: [...allowedRoles],
-      ip,
-      ua,
-    });
+    try {
+      const user = await loginStaff({
+        email: input.email,
+        password: input.password,
+        allowedRoles: [...allowedRoles],
+        ip,
+        ua,
+      });
 
-    return apiSuccess({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      locationIds: user.locationIds,
-    });
+      return apiSuccess({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        locationIds: user.locationIds,
+      });
+    } catch (error) {
+      if (error instanceof DomainError && error.code === "UNAUTHORIZED") {
+        consumeRateLimit(rateKey, LOGIN_WINDOW);
+      }
+      throw error;
+    }
   } catch (error) {
     return handleApiError(error);
   }

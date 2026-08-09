@@ -50,6 +50,24 @@ export function consumeRateLimit(key: string, options: RateLimitOptions): RateLi
   };
 }
 
+/** Read-only check — does not record an attempt. */
+export function isRateLimited(key: string, options: RateLimitOptions): RateLimitResult {
+  const now = options.now?.() ?? Date.now();
+  const windowStart = now - options.windowMs;
+  const bucket = buckets.get(key);
+  const timestamps = (bucket?.timestamps ?? []).filter((ts) => ts > windowStart);
+  if (timestamps.length >= options.limit) {
+    const oldest = timestamps[0] ?? now;
+    const retryAfterSec = Math.max(1, Math.ceil((oldest + options.windowMs - now) / 1000));
+    return { allowed: false, remaining: 0, retryAfterSec };
+  }
+  return {
+    allowed: true,
+    remaining: Math.max(0, options.limit - timestamps.length),
+    retryAfterSec: 0,
+  };
+}
+
 export function resetRateLimitStore(): void {
   buckets.clear();
 }
