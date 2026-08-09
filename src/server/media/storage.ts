@@ -1,8 +1,7 @@
 /**
  * Media storage abstraction — never store base64 blobs in DB.
- * Development: LocalMediaStorage under /public/uploads
- * Production: YandexObjectStorage when credentials present; otherwise NOT_CONFIGURED.
  */
+import { signS3Request } from "@/server/media/s3-sign";
 
 export type StoredMedia = {
   key: string;
@@ -26,6 +25,18 @@ export interface MediaStorage {
   status(): MediaStorageStatus;
 }
 
+export const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/png", "image/webp"]);
+export const DEFAULT_MAX_UPLOAD_BYTES = Number(process.env.MEDIA_MAX_UPLOAD_BYTES ?? 8 * 1024 * 1024);
+
+export function assertAllowedImageUpload(params: { mimeType: string; byteSize: number }) {
+  if (!ALLOWED_IMAGE_MIME.has(params.mimeType)) {
+    throw new Error("Разрешены только JPEG, PNG, WEBP");
+  }
+  if (params.byteSize > DEFAULT_MAX_UPLOAD_BYTES) {
+    throw new Error(`Файл больше лимита ${DEFAULT_MAX_UPLOAD_BYTES} байт`);
+  }
+}
+
 /** Development-only: writes under /public/uploads */
 export class LocalMediaStorage implements MediaStorage {
   constructor(private readonly publicDir = "public/uploads") {}
@@ -44,6 +55,9 @@ export class LocalMediaStorage implements MediaStorage {
     bytes: Buffer;
     mimeType?: string;
   }): Promise<StoredMedia> {
+    if (params.mimeType) {
+      assertAllowedImageUpload({ mimeType: params.mimeType, byteSize: params.bytes.byteLength });
+    }
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const safe = params.key.replace(/[^a-zA-Z0-9._/-]/g, "_");
@@ -67,11 +81,17 @@ export class LocalMediaStorage implements MediaStorage {
   }
 }
 
-/** Yandex Object Storage adapter — credentials required in production. */
+/** Production Yandex Object Storage (S3-compatible). */
 export class YandexObjectStorage implements MediaStorage {
   constructor(
-    private readonly bucket: string,
-    private readonly publicBaseUrl: string,
+    private readonly opts: {
+      endpoint: string;
+      bucket: string;
+      accessKey: string;
+      secretKey: string;
+      publicBaseUrl: string;
+      region?: string;
+    },
   ) {}
 
   status(): MediaStorageStatus {
@@ -79,15 +99,66 @@ export class YandexObjectStorage implements MediaStorage {
   }
 
   getPublicUrl(key: string): string {
-    return `${this.publicBaseUrl.replace(/\/$/, "")}/${key}`;
+    return `${this.opts.publicBaseUrl.replace(/\/$/, "")}/${key}`;
   }
 
-  async upload(): Promise<StoredMedia> {
-    throw new Error("Yandex Object Storage adapter is not wired — credentials present but SDK not configured");
+  private endpointHost(): string {
+    return this.opts.endpoint.replace(/^https?:\/\//, "").replace(/\/$/, "");
   }
 
-  async delete(): Promise<void> {
-    throw new Error("Yandex Object Storage adapter is not wired");
+  async upload(params: {
+    key: string;
+    bytes: Buffer;
+    mimeType?: string;
+  }): Promise<StoredMedia> {
+    if (params.mimeType) {
+      assertAllowedImageUpload({ mimeType: params.mimeType, byteSize: params.bytes.byteLength });
+    }
+    const host = this.endpointHost();
+    const path = `/${this.opts.bucket}/${params.key}`;
+    const { headers } = signS3Request({
+      method: "PUT",
+      endpointHost: host,
+      path,
+      region: this.opts.region ?? "ru-central1",
+      accessKey: this.opts.accessKey,
+      secretKey: this.opts.secretKey,
+      payload: params.bytes,
+      contentType: params.mimeType,
+    });
+
+    const res = await fetch(`https://${host}${path}`, {
+      method: "PUT",
+      headers,
+      body: new Uint8Array(params.bytes),
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      throw new Error(`Yandex storage upload failed (${res.status}): ${text.slice(0, 200)}`);
+    }
+
+    return {
+      key: params.key,
+      url: this.getPublicUrl(params.key),
+      mimeType: params.mimeType,
+      byteSize: params.bytes.byteLength,
+    };
+  }
+
+  async delete(key: string): Promise<void> {
+    const host = this.endpointHost();
+    const path = `/${this.opts.bucket}/${key}`;
+    const empty = Buffer.alloc(0);
+    const { headers } = signS3Request({
+      method: "DELETE",
+      endpointHost: host,
+      path,
+      region: this.opts.region ?? "ru-central1",
+      accessKey: this.opts.accessKey,
+      secretKey: this.opts.secretKey,
+      payload: empty,
+    });
+    await fetch(`https://${host}${path}`, { method: "DELETE", headers });
   }
 }
 
@@ -110,16 +181,25 @@ export class NotConfiguredMediaStorage implements MediaStorage {
 }
 
 export function getMediaStorage(): MediaStorage {
+  const endpoint = process.env.YANDEX_STORAGE_ENDPOINT;
   const bucket = process.env.YANDEX_STORAGE_BUCKET;
-  const publicBase = process.env.YANDEX_STORAGE_PUBLIC_URL;
-  const hasCreds = Boolean(
-    bucket && publicBase && process.env.YANDEX_STORAGE_ACCESS_KEY && process.env.YANDEX_STORAGE_SECRET_KEY,
-  );
+  const publicBase =
+    process.env.YANDEX_STORAGE_PUBLIC_BASE_URL || process.env.YANDEX_STORAGE_PUBLIC_URL;
+  const accessKey = process.env.YANDEX_STORAGE_ACCESS_KEY;
+  const secretKey = process.env.YANDEX_STORAGE_SECRET_KEY;
+  const hasCreds = Boolean(endpoint && bucket && publicBase && accessKey && secretKey);
+
+  if (hasCreds) {
+    return new YandexObjectStorage({
+      endpoint: endpoint!,
+      bucket: bucket!,
+      accessKey: accessKey!,
+      secretKey: secretKey!,
+      publicBaseUrl: publicBase!,
+    });
+  }
 
   if (process.env.NODE_ENV === "production") {
-    if (hasCreds) {
-      return new YandexObjectStorage(bucket!, publicBase!);
-    }
     return new NotConfiguredMediaStorage();
   }
 
@@ -128,4 +208,13 @@ export function getMediaStorage(): MediaStorage {
 
 export function getMediaStorageStatus(): MediaStorageStatus {
   return getMediaStorage().status();
+}
+
+/** Soft-archive preferred: only hard-delete storage object when no remaining refs. */
+export async function canPhysicallyDeleteMedia(
+  mediaObjectId: string,
+  countRefs: (mediaObjectId: string) => Promise<number>,
+): Promise<boolean> {
+  const refs = await countRefs(mediaObjectId);
+  return refs === 0;
 }

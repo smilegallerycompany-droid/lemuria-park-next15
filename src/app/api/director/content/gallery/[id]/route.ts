@@ -90,9 +90,15 @@ export async function DELETE(req: Request, context: RouteContext) {
     if (hard) {
       await prisma.galleryItem.delete({ where: { id } });
       if (before.mediaObject) {
-        const storage = getMediaStorage();
-        await storage.delete(before.mediaObject.key).catch(() => undefined);
-        await prisma.mediaObject.delete({ where: { id: before.mediaObject.id } }).catch(() => undefined);
+        const { canPhysicallyDeleteMedia } = await import("@/server/media/storage");
+        const canDelete = await canPhysicallyDeleteMedia(before.mediaObject.id, (id) =>
+          prisma.galleryItem.count({ where: { mediaObjectId: id } }),
+        );
+        if (canDelete) {
+          const storage = getMediaStorage();
+          await storage.delete(before.mediaObject.key).catch(() => undefined);
+          await prisma.mediaObject.delete({ where: { id: before.mediaObject.id } }).catch(() => undefined);
+        }
       }
       await recordAuditLog(prisma, {
         actorId: actor.id,

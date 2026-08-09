@@ -6,7 +6,7 @@ import { assertLocationAccess } from "@/server/auth/location-access";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
 import { revalidatePublicCms } from "@/server/cms/revalidate";
-import { getMediaStorage } from "@/server/media/storage";
+import { assertAllowedImageUpload, getMediaStorage } from "@/server/media/storage";
 import { randomBytes } from "node:crypto";
 
 const metaSchema = z.object({
@@ -66,12 +66,15 @@ export async function POST(req: Request) {
       if (!(file instanceof File)) {
         throw new ApiError("VALIDATION_ERROR", "file обязателен", 400);
       }
-      if (file.size > 8 * 1024 * 1024) {
-        throw new ApiError("VALIDATION_ERROR", "Файл больше 8MB", 400);
-      }
       const mimeType = file.type || "application/octet-stream";
-      if (!mimeType.startsWith("image/")) {
-        throw new ApiError("VALIDATION_ERROR", "Только изображения", 400);
+      try {
+        assertAllowedImageUpload({ mimeType, byteSize: file.size });
+      } catch (err) {
+        throw new ApiError(
+          "VALIDATION_ERROR",
+          err instanceof Error ? err.message : "Некорректный файл",
+          400,
+        );
       }
 
       const locationIdRaw = form.get("locationId");
