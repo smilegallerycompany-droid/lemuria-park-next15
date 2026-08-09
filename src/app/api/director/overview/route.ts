@@ -24,7 +24,8 @@ export async function GET() {
 
     const locationId = locationIds?.[0];
 
-    const [report, alerts, sessions, hourlyOrders] = await Promise.all([
+    const [report, alerts, sessions, hourlyOrders, openShifts, closedShiftsToday, diffShifts] =
+      await Promise.all([
       getDirectorAnalyticsReport({
         from,
         to,
@@ -41,6 +42,33 @@ export async function GET() {
           ...(locationId ? { locationId } : {}),
         },
         select: { createdAt: true, totalAmount: true, source: true },
+      }),
+      prisma.cashierShift.findMany({
+        where: {
+          status: "OPEN",
+          ...(locationIds?.length ? { locationId: { in: locationIds } } : {}),
+        },
+        include: {
+          user: { select: { name: true } },
+          location: { select: { city: true, name: true } },
+        },
+        take: 20,
+      }),
+      prisma.cashierShift.count({
+        where: {
+          status: { in: ["CLOSED", "FORCE_CLOSED"] },
+          closedAt: { gte: from, lte: to },
+          ...(locationIds?.length ? { locationId: { in: locationIds } } : {}),
+        },
+      }),
+      prisma.cashierShift.findMany({
+        where: {
+          cashDifferenceAmount: { not: 0 },
+          closedAt: { gte: from },
+          ...(locationIds?.length ? { locationId: { in: locationIds } } : {}),
+        },
+        take: 10,
+        include: { user: { select: { name: true } }, location: { select: { city: true } } },
       }),
     ]);
 
@@ -86,6 +114,23 @@ export async function GET() {
       },
       sessions,
       alerts,
+      shifts: {
+        open: openShifts.map((s) => ({
+          id: s.id,
+          cashierName: s.user.name,
+          location: `${s.location.city}`,
+          openedAt: s.openedAt,
+          cashSalesAmount: s.cashSalesAmount,
+          ordersCount: s.ordersCount,
+        })),
+        closedToday: closedShiftsToday,
+        withDifference: diffShifts.map((s) => ({
+          id: s.id,
+          cashierName: s.user.name,
+          location: s.location.city,
+          cashDifferenceAmount: s.cashDifferenceAmount,
+        })),
+      },
     });
   } catch (error) {
     return handleApiError(error);

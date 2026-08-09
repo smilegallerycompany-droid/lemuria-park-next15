@@ -10,6 +10,7 @@ const NAV = [
   { href: "/director", label: "Обзор" },
   { href: "/director/analytics", label: "Аналитика" },
   { href: "/director/orders", label: "Заказы" },
+  { href: "/director/shifts", label: "Смены" },
   { href: "/director/tickets", label: "Билеты" },
   { href: "/director/schedule", label: "Расписание" },
   { href: "/director/sessions", label: "Сеансы" },

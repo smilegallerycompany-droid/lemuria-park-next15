@@ -65,6 +65,23 @@ type Overview = {
     description: string;
     href: string;
   }>;
+  shifts?: {
+    open: Array<{
+      id: string;
+      cashierName: string;
+      location: string;
+      openedAt: string;
+      cashSalesAmount: number;
+      ordersCount: number;
+    }>;
+    closedToday: number;
+    withDifference: Array<{
+      id: string;
+      cashierName: string;
+      location: string;
+      cashDifferenceAmount: number | null;
+    }>;
+  };
 };
 
 const PIE_COLORS = ["#2f6b45", "#c45c26", "#6b8f71"];
@@ -160,6 +177,59 @@ export default function DirectorDashboardPage() {
               deltaKind="money"
             />
           </div>
+
+          {data.shifts ? (
+            <section className="internal-panel" style={{ marginBottom: 18 }}>
+              <div className="internal-table-head">
+                <h3>Смены сегодня</h3>
+                <Link href="/director/shifts" className="internal-btn secondary">
+                  Все смены
+                </Link>
+              </div>
+              <ul className="director-plain-list" style={{ padding: 12 }}>
+                <li>
+                  <span>Открытые смены</span>
+                  <strong>{data.shifts.open.length}</strong>
+                </li>
+                <li>
+                  <span>Закрыто сегодня</span>
+                  <strong>{data.shifts.closedToday}</strong>
+                </li>
+                <li>
+                  <span>С расхождением</span>
+                  <strong>{data.shifts.withDifference.length}</strong>
+                </li>
+              </ul>
+              {data.shifts.open.length > 0 ? (
+                <div className="internal-table-scroll">
+                  <table className="internal-table">
+                    <thead>
+                      <tr>
+                        <th>Кассир</th>
+                        <th>Локация</th>
+                        <th>С</th>
+                        <th>Заказы</th>
+                        <th>Наличные</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.shifts.open.map((s) => (
+                        <tr key={s.id}>
+                          <td>{s.cashierName}</td>
+                          <td>{s.location}</td>
+                          <td>{formatDateTime(s.openedAt)}</td>
+                          <td className="num tabular-nums">{s.ordersCount}</td>
+                          <td className="num tabular-nums">
+                            {formatMoneyFromKopecks(s.cashSalesAmount)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           {data.alerts.length > 0 ? (
             <section className="internal-panel" style={{ marginBottom: 18 }}>
