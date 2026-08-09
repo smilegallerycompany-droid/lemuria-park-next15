@@ -4,23 +4,8 @@ import { prisma } from "@/lib/db/prisma";
 import { requireDirector } from "@/server/auth/staff-session";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
-
-const faqSchema = z.object({
-  id: z.string().optional(),
-  question: z.string().min(1),
-  answer: z.string().min(1),
-  sortOrder: z.number().int().default(0),
-  isPublished: z.boolean().default(true),
-});
-
-const gallerySchema = z.object({
-  id: z.string().optional(),
-  locationId: z.string().nullable().optional(),
-  imageUrl: z.string().url(),
-  altText: z.string().min(1),
-  sortOrder: z.number().int().default(0),
-  isPublished: z.boolean().default(true),
-});
+import { aboutBenefitSchema } from "@/lib/cms/defaults";
+import { revalidatePublicCms } from "@/server/cms/revalidate";
 
 const patchSchema = z.object({
   site: z
@@ -34,6 +19,21 @@ const patchSchema = z.object({
       maintenanceMode: z.boolean().optional(),
       metaTitle: z.string().nullable().optional(),
       metaDescription: z.string().nullable().optional(),
+      heroBadge: z.string().nullable().optional(),
+      heroTitle: z.string().nullable().optional(),
+      heroSubtitle: z.string().nullable().optional(),
+      heroDescription: z.string().nullable().optional(),
+      heroImageUrl: z.string().nullable().optional(),
+      heroCtaLabel: z.string().nullable().optional(),
+      heroCtaHref: z.string().nullable().optional(),
+      heroActive: z.boolean().optional(),
+      aboutEyebrow: z.string().nullable().optional(),
+      aboutTitle: z.string().nullable().optional(),
+      aboutDescription: z.string().nullable().optional(),
+      aboutBenefits: z.array(aboutBenefitSchema).optional(),
+      locationSectionTitle: z.string().nullable().optional(),
+      supportPhone: z.string().nullable().optional(),
+      supportEmail: z.string().nullable().optional(),
     })
     .optional(),
   contact: z
@@ -44,8 +44,6 @@ const patchSchema = z.object({
       supportHours: z.string().nullable().optional(),
     })
     .optional(),
-  faq: z.array(faqSchema).optional(),
-  gallery: z.array(gallerySchema).optional(),
 });
 
 async function loadContentBundle() {
@@ -55,7 +53,10 @@ async function loadContentBundle() {
     prisma.faqItem.findMany({ orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
     prisma.galleryItem.findMany({
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      include: { location: { select: { id: true, name: true } } },
+      include: {
+        location: { select: { id: true, name: true } },
+        mediaObject: true,
+      },
     }),
   ]);
   return { siteSettings, contactSettings, faq, gallery };
@@ -83,15 +84,20 @@ export async function PATCH(req: Request) {
 
     await prisma.$transaction(async (tx) => {
       if (input.site) {
+        const { aboutBenefits, ...rest } = input.site;
+        const data = {
+          ...rest,
+          ...(aboutBenefits !== undefined ? { aboutBenefits } : {}),
+        };
         const existing = await tx.siteSettings.findFirst({ orderBy: { createdAt: "asc" } });
         if (existing) {
-          await tx.siteSettings.update({ where: { id: existing.id }, data: input.site });
+          await tx.siteSettings.update({ where: { id: existing.id }, data });
         } else {
           await tx.siteSettings.create({
             data: {
               id: "singleton-site-settings",
-              siteName: input.site.siteName ?? "Лемурия Парк",
-              ...input.site,
+              siteName: rest.siteName ?? "Лемурия Парк",
+              ...data,
             },
           });
         }
@@ -110,47 +116,38 @@ export async function PATCH(req: Request) {
           });
         }
       }
-
-      if (input.faq) {
-        for (const item of input.faq) {
-          if (item.id) {
-            await tx.faqItem.upsert({
-              where: { id: item.id },
-              update: item,
-              create: item,
-            });
-          } else {
-            await tx.faqItem.create({ data: item });
-          }
-        }
-      }
-
-      if (input.gallery) {
-        for (const item of input.gallery) {
-          if (item.id) {
-            await tx.galleryItem.upsert({
-              where: { id: item.id },
-              update: item,
-              create: item,
-            });
-          } else {
-            await tx.galleryItem.create({ data: item });
-          }
-        }
-      }
     });
 
     const after = await loadContentBundle();
 
+    const action =
+      input.site &&
+      (input.site.heroTitle !== undefined ||
+        input.site.heroBadge !== undefined ||
+        input.site.heroActive !== undefined)
+        ? "HERO_UPDATE"
+        : "CONTENT_UPDATE";
+
     await recordAuditLog(prisma, {
       actorId: actor.id,
-      action: "CONTENT_UPDATE",
+      action,
       entityType: "SiteSettings",
-      metadata: { sections: Object.keys(input) },
-      before,
-      after,
+      metadata: {
+        sections: Object.keys(input),
+        // never log image binary — only keys/urls already in settings
+      },
+      before: {
+        siteSettings: before.siteSettings,
+        contactSettings: before.contactSettings,
+      },
+      after: {
+        siteSettings: after.siteSettings,
+        contactSettings: after.contactSettings,
+      },
       ...meta,
     });
+
+    revalidatePublicCms();
 
     return apiSuccess(after);
   } catch (error) {

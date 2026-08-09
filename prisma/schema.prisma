@@ -585,8 +585,14 @@ model SiteSettings {
   heroSubtitle           String?
   heroDescription        String?
   heroImageUrl           String?
+  heroCtaLabel           String?
+  heroCtaHref            String?  @default("#booking")
+  heroActive             Boolean  @default(true)
+  aboutEyebrow           String?
   aboutTitle             String?
   aboutDescription       String?
+  /// Zod-validated array of { title, description, iconKey, sortOrder, isActive }
+  aboutBenefits          Json?
   locationSectionTitle   String?  @default("Где мы находимся?")
   defaultTimezone        String   @default("Europe/Moscow")
   supportPhone           String?
@@ -618,18 +624,22 @@ model FaqItem {
 }
 
 model GalleryItem {
-  id          String    @id @default(cuid())
-  locationId  String?
-  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
-  imageUrl    String
-  altText     String
-  sortOrder   Int       @default(0)
-  isPublished Boolean   @default(true)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id            String       @id @default(cuid())
+  locationId    String?
+  location      Location?    @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  mediaObjectId String?
+  mediaObject   MediaObject? @relation(fields: [mediaObjectId], references: [id], onDelete: SetNull)
+  imageUrl      String
+  altText       String
+  caption       String?
+  sortOrder     Int          @default(0)
+  isPublished   Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   @@index([isPublished, sortOrder])
   @@index([locationId])
+  @@index([mediaObjectId])
 }
 
 /// Operational signals for admin system health (no secrets).
@@ -647,16 +657,17 @@ model OperationalEvent {
 
 /// Media metadata — store URL/key only, never base64 blobs in DB.
 model MediaObject {
-  id        String   @id @default(cuid())
-  key       String   @unique
-  url       String
-  mimeType  String?
-  byteSize  Int?
-  width     Int?
-  height    Int?
-  altText   String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String        @id @default(cuid())
+  key          String        @unique
+  url          String
+  mimeType     String?
+  byteSize     Int?
+  width        Int?
+  height       Int?
+  altText      String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  galleryItems GalleryItem[]
 
   @@index([createdAt])
 }

@@ -59,6 +59,9 @@ export async function PATCH(req: Request, context: RouteContext) {
       throw new ApiError("NOT_FOUND", "Локация не найдена", 404);
     }
 
+    const { assertLocationAccess } = await import("@/server/auth/location-access");
+    assertLocationAccess(actor, id);
+
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
@@ -86,13 +89,16 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     await recordAuditLog(prisma, {
       actorId: actor.id,
-      action: "LOCATION_UPDATE",
+      action: "LOCATION_MAP_UPDATE",
       entityType: "Location",
       entityId: id,
       before,
       after: location,
       ...meta,
     });
+
+    const { revalidatePublicCms } = await import("@/server/cms/revalidate");
+    revalidatePublicCms();
 
     return apiSuccess({ location });
   } catch (error) {

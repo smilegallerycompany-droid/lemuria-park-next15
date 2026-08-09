@@ -20,7 +20,8 @@ export type ApiErrorCode =
   | "DATABASE_ERROR"
   | "INTERNAL_ERROR"
   | "UNAUTHORIZED"
-  | "FORBIDDEN";
+  | "FORBIDDEN"
+  | "NOT_CONFIGURED";
 
 /** Maps each domain-layer error code to its public HTTP status. */
 const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
