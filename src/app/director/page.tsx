@@ -3,6 +3,17 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import {
+  Bar,
+  BarChart,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
   ErrorAlert,
   EmptyState,
   KpiCard,
@@ -12,10 +23,9 @@ import {
 import { directorFetch, formatDateTime, formatPercent } from "@/lib/director/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
-type AnalyticsSummary = {
+type Overview = {
   kpis: {
     netRevenueKopecks: number;
-    refundedAmountKopecks: number;
     onlineRevenueKopecks: number;
     cashierRevenueKopecks: number;
     paidOrders: number;
@@ -23,7 +33,6 @@ type AnalyticsSummary = {
     averageOrderValueKopecks: number;
     occupancyRate: number;
     checkIns: number;
-    noShow: number;
   };
   comparison?: Record<
     string,
@@ -35,70 +44,107 @@ type AnalyticsSummary = {
       label: "ok" | "no_baseline" | "new";
     }
   >;
+  charts: {
+    revenueByHour: Array<{ hour: string; amount: number }>;
+    onlineVsCashier: { online: number; cashier: number };
+    paymentMethods: { cash: number; card: number; yookassa: number };
+  };
+  sessions: Array<{
+    id: string;
+    startsAt: string;
+    sold: number;
+    reserved: number;
+    free: number;
+    occupancy: number;
+    status: string;
+    location?: { name: string };
+  }>;
+  alerts: Array<{
+    severity: "info" | "warning" | "danger";
+    title: string;
+    description: string;
+    href: string;
+  }>;
 };
 
-type SessionRow = {
-  id: string;
-  startsAt: string;
-  capacity: number;
-  _count?: { tickets: number };
-  location?: { name: string };
-};
+const PIE_COLORS = ["#2f6b45", "#c45c26", "#6b8f71"];
 
 export default function DirectorDashboardPage() {
-  const [data, setData] = useState<AnalyticsSummary | null>(null);
-  const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const analytics = await directorFetch<AnalyticsSummary>(
-          "/api/director/analytics?preset=today",
-        );
-        setData(analytics);
-        const locs = await directorFetch<{ locations: Array<{ id: string }> }>(
-          "/api/director/locations",
-        );
-        const locationId = locs.locations[0]?.id;
-        if (locationId) {
-          const sessionsData = await directorFetch<{ sessions: SessionRow[] }>(
-            `/api/director/sessions?locationId=${locationId}`,
-          );
-          setSessions(sessionsData.sessions.slice(0, 8));
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Ошибка загрузки");
-      } finally {
-        setLoading(false);
-      }
-    })();
+    directorFetch<Overview>("/api/director/overview")
+      .then(setData)
+      .catch((err) => setError(err instanceof Error ? err.message : "Ошибка загрузки"))
+      .finally(() => setLoading(false));
   }, []);
+
+  const channelData = data
+    ? [
+        { name: "Online", value: data.charts.onlineVsCashier.online },
+        { name: "Касса", value: data.charts.onlineVsCashier.cashier },
+      ]
+    : [];
+  const methodData = data
+    ? [
+        { name: "YooKassa", value: data.charts.paymentMethods.yookassa },
+        { name: "Карта", value: data.charts.paymentMethods.card },
+        { name: "Наличные", value: data.charts.paymentMethods.cash },
+      ]
+    : [];
 
   return (
     <>
       <PageHeader
-        title="Обзор"
-        description="Ключевые показатели за сегодня. Только оплаченные заказы из БД."
+        title="Сегодня"
+        description="Оперативный обзор за 10 секунд. Только реальные данные из БД."
         actions={
           <Link href="/director/analytics" className="internal-btn primary">
-            Открыть аналитику
+            Аналитика
           </Link>
         }
       />
       {error ? <ErrorAlert message={error} /> : null}
-      {loading ? <LoadingSkeleton variant="kpi" count={5} /> : null}
+      {loading ? <LoadingSkeleton variant="kpi" count={8} /> : null}
+
       {data ? (
         <>
           <div className="internal-kpi-grid">
             <KpiCard
-              label="Чистая выручка"
+              label="Выручка сегодня"
               value={formatMoneyFromKopecks(data.kpis.netRevenueKopecks)}
               comparison={data.comparison?.netRevenueKopecks}
-              formula="Gross − Refunded (PAID)"
               tone="accent"
               deltaKind="money"
+            />
+            <KpiCard
+              label="Заказы"
+              value={String(data.kpis.paidOrders)}
+              comparison={data.comparison?.paidOrders}
+            />
+            <KpiCard
+              label="Билеты"
+              value={String(data.kpis.ticketsSold)}
+              comparison={data.comparison?.ticketsSold}
+            />
+            <KpiCard
+              label="Средний чек"
+              value={formatMoneyFromKopecks(data.kpis.averageOrderValueKopecks)}
+              comparison={data.comparison?.averageOrderValueKopecks}
+              deltaKind="money"
+            />
+            <KpiCard
+              label="Посетили"
+              value={String(data.kpis.checkIns)}
+              comparison={data.comparison?.checkIns}
+            />
+            <KpiCard
+              label="Загрузка"
+              value={formatPercent(data.kpis.occupancyRate)}
+              comparison={data.comparison?.occupancyRate}
+              deltaKind="percent"
             />
             <KpiCard
               label="Онлайн"
@@ -113,43 +159,72 @@ export default function DirectorDashboardPage() {
               tone="accent"
               deltaKind="money"
             />
-            <KpiCard
-              label="Заказы / билеты"
-              value={`${data.kpis.paidOrders} / ${data.kpis.ticketsSold}`}
-              comparison={data.comparison?.paidOrders}
-            />
-            <KpiCard
-              label="Средний чек"
-              value={formatMoneyFromKopecks(data.kpis.averageOrderValueKopecks)}
-              comparison={data.comparison?.averageOrderValueKopecks}
-              formula="Net / Paid Orders"
-              deltaKind="money"
-            />
-            <KpiCard
-              label="Загрузка"
-              value={formatPercent(data.kpis.occupancyRate)}
-              comparison={data.comparison?.occupancyRate}
-              formula="Оплаченные места / capacity"
-              deltaKind="percent"
-            />
-            <KpiCard
-              label="Check-in"
-              value={String(data.kpis.checkIns)}
-              comparison={data.comparison?.checkIns}
-            />
-            <KpiCard
-              label="No-show"
-              value={String(data.kpis.noShow)}
-              comparison={data.comparison?.noShow}
-              tone="warning"
-            />
-            <KpiCard
-              label="Возвраты"
-              value={formatMoneyFromKopecks(data.kpis.refundedAmountKopecks)}
-              comparison={data.comparison?.refundedAmountKopecks}
-              tone="danger"
-              deltaKind="money"
-            />
+          </div>
+
+          {data.alerts.length > 0 ? (
+            <section className="internal-panel" style={{ marginBottom: 18 }}>
+              <div className="internal-table-head">
+                <h3>Требует внимания</h3>
+              </div>
+              <ul className="internal-alert-list" style={{ padding: 12 }}>
+                {data.alerts.map((a) => (
+                  <li key={a.title + a.href} className="internal-alert-item" data-severity={a.severity}>
+                    <strong>{a.title}</strong>
+                    <span>{a.description}</span>
+                    <Link href={a.href}>Открыть →</Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+
+          <div className="director-grid-2" style={{ marginBottom: 18 }}>
+            <section className="internal-panel">
+              <div className="internal-table-head">
+                <h3>Выручка по часам</h3>
+              </div>
+              <div style={{ width: "100%", height: 180, padding: "8px 12px" }}>
+                <ResponsiveContainer>
+                  <BarChart data={data.charts.revenueByHour.filter((h) => Number(h.hour) >= 8 && Number(h.hour) <= 22)}>
+                    <XAxis dataKey="hour" tick={{ fontSize: 11 }} />
+                    <YAxis hide />
+                    <Tooltip
+                      formatter={(v) => formatMoneyFromKopecks(Number(v ?? 0))}
+                      isAnimationActive={false}
+                    />
+                    <Bar dataKey="amount" fill="#2f6b45" radius={3} isAnimationActive={false} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            <section className="internal-panel">
+              <div className="internal-table-head">
+                <h3>Online vs касса · оплаты</h3>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: 180 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={channelData} dataKey="value" nameKey="name" outerRadius={60} isAnimationActive={false}>
+                      {channelData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatMoneyFromKopecks(Number(v ?? 0))} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie data={methodData} dataKey="value" nameKey="name" outerRadius={60} isAnimationActive={false}>
+                      {methodData.map((_, i) => (
+                        <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(v) => formatMoneyFromKopecks(Number(v ?? 0))} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
           </div>
 
           <section className="internal-panel">
@@ -164,28 +239,31 @@ export default function DirectorDashboardPage() {
                 <thead>
                   <tr>
                     <th>Локация</th>
-                    <th>Начало</th>
-                    <th>Билеты</th>
-                    <th>Capacity</th>
+                    <th>Время</th>
+                    <th>Sold</th>
+                    <th>Reserved</th>
+                    <th>Free</th>
+                    <th>Occupancy</th>
+                    <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sessions.length === 0 ? (
+                  {data.sessions.length === 0 ? (
                     <tr>
-                      <td colSpan={4}>
-                        <EmptyState
-                          title="Нет сеансов"
-                          description="В ближайшем окне сеансов нет."
-                        />
+                      <td colSpan={7}>
+                        <EmptyState title="Нет сеансов" description="В ближайшем окне сеансов нет." />
                       </td>
                     </tr>
                   ) : (
-                    sessions.map((session) => (
+                    data.sessions.map((session) => (
                       <tr key={session.id}>
                         <td>{session.location?.name ?? "—"}</td>
                         <td>{formatDateTime(session.startsAt)}</td>
-                        <td className="num tabular-nums">{session._count?.tickets ?? 0}</td>
-                        <td className="num tabular-nums">{session.capacity}</td>
+                        <td className="num tabular-nums">{session.sold}</td>
+                        <td className="num tabular-nums">{session.reserved}</td>
+                        <td className="num tabular-nums">{session.free}</td>
+                        <td className="num tabular-nums">{formatPercent(session.occupancy)}</td>
+                        <td>{session.status}</td>
                       </tr>
                     ))
                   )}
