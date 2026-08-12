@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiClientError, apiGet, apiPost } from "@/lib/api/client";
 import { cashierLogout } from "@/lib/api/cashier";
@@ -333,6 +334,12 @@ export default function CashierProfilePage() {
               </button>
             </form>
             <div className="cashier-actions-row">
+              <Link href="/cashier/shift" className="internal-btn primary">
+                Смена / касса
+              </Link>
+              <Link href="/cashier/shift/close" className="internal-btn secondary">
+                Закрыть смену
+              </Link>
               <button
                 type="button"
                 className="internal-btn secondary"

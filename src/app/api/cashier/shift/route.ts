@@ -2,11 +2,12 @@ import { z } from "zod";
 import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
 import { getCashierSessionUser } from "@/server/auth/cashier-session";
 import {
-  addCashOperation,
   closeCashierShift,
   computeShiftCashSummary,
+  getLastClosedShiftForCashier,
   getOpenShiftForCashier,
   openCashierShift,
+  serializeOpenShiftDto,
 } from "@/server/services/cashier-shifts";
 import { clientIpFromRequest } from "@/server/security/rate-limit";
 import { prisma } from "@/lib/db/prisma";
@@ -17,28 +18,13 @@ export async function GET() {
     if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
 
     const shift = await getOpenShiftForCashier(prisma, user.id);
-    if (!shift) return apiSuccess({ shift: null });
+    const lastClosed = await getLastClosedShiftForCashier(user.id);
+    if (!shift) return apiSuccess({ shift: null, lastClosed });
 
     const summary = await computeShiftCashSummary(shift.id);
     return apiSuccess({
-      shift: {
-        id: shift.id,
-        publicId: shift.publicId,
-        status: shift.status,
-        openedAt: shift.openedAt,
-        openingCashAmount: shift.openingCashAmount,
-        cashSalesAmount: shift.cashSalesAmount,
-        cardSalesAmount: shift.cardSalesAmount,
-        onlineSalesAmount: shift.onlineSalesAmount,
-        ordersCount: shift.ordersCount,
-        ticketsCount: shift.ticketsCount,
-        location: shift.location,
-        user: shift.user,
-        expectedCashAmount: summary.expectedCashAmount,
-        cashIn: summary.cashIn,
-        cashOut: summary.cashOut,
-        cashRefunds: summary.cashRefunds,
-      },
+      shift: serializeOpenShiftDto(summary),
+      lastClosed,
     });
   } catch (error) {
     return handleApiError(error);
@@ -110,6 +96,3 @@ export async function PATCH(req: Request) {
     return handleApiError(error);
   }
 }
-
-// Allow cash IN/OUT via POST /api/cashier/shift/cash
-void addCashOperation;

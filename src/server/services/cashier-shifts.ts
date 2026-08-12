@@ -3,6 +3,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { DomainError } from "@/server/domain/errors";
 import {
   cashDifferenceKopecks,
+  currentCashBalanceKopecks,
   expectedCashKopecks,
 } from "@/server/domain/shift.domain";
 import type { CashOperationType, PaymentMethod } from "@prisma/client";
@@ -115,6 +116,17 @@ export async function addCashOperation(params: {
   const shift = await getOpenShiftForCashier(prisma, params.userId);
   if (!shift) throw new DomainError("SHIFT_NOT_OPEN", "Нет открытой смены");
 
+  if (params.type === "OUT") {
+    const summary = await computeShiftCashSummary(shift.id);
+    if (params.amount > summary.currentCashBalance) {
+      throw new DomainError(
+        "INSUFFICIENT_CASH_BALANCE",
+        "Нельзя изъять больше, чем сейчас в кассе",
+        { currentCashBalance: summary.currentCashBalance, amount: params.amount },
+      );
+    }
+  }
+
   const op = await prisma.$transaction(async (tx) => {
     const row = await tx.cashOperation.create({
       data: {
@@ -139,7 +151,8 @@ export async function addCashOperation(params: {
     return row;
   });
 
-  return { operation: op, shiftId: shift.id };
+  const after = await computeShiftCashSummary(shift.id);
+  return { operation: op, shiftId: shift.id, currentCashBalance: after.currentCashBalance };
 }
 
 export async function recordSaleOnShift(
@@ -187,7 +200,15 @@ export async function computeShiftCashSummary(shiftId: string) {
   const shift = await prisma.cashierShift.findUniqueOrThrow({
     where: { id: shiftId },
     include: {
-      cashOperations: true,
+      location: { select: { id: true, name: true, city: true } },
+      user: { select: { id: true, name: true, email: true } },
+      cashOperations: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: { select: { name: true } },
+          order: { select: { number: true } },
+        },
+      },
       orders: {
         include: {
           refunds: { where: { status: { in: ["COMPLETED", "SUCCEEDED"] } } },
@@ -203,6 +224,9 @@ export async function computeShiftCashSummary(shiftId: string) {
   const cashOut = shift.cashOperations
     .filter((o) => o.type === "OUT")
     .reduce((s, o) => s + o.amount, 0);
+  const adjustmentsAmount = shift.cashOperations
+    .filter((o) => o.type === "ADJUSTMENT")
+    .reduce((s, o) => s + o.amount, 0);
 
   const cashRefunds = shift.orders.reduce((sum, order) => {
     const cashPaid = order.payments.some((p) => p.method === "CASH" && p.status === "SUCCEEDED");
@@ -210,22 +234,99 @@ export async function computeShiftCashSummary(shiftId: string) {
     return sum + order.refunds.reduce((r, ref) => r + ref.amount, 0);
   }, 0);
 
-  const expected = expectedCashKopecks({
+  const ledger = {
     openingCashAmount: shift.openingCashAmount,
     cashSalesAmount: shift.cashSalesAmount,
     cashRefundsAmount: cashRefunds,
     cashInAmount: cashIn,
     cashOutAmount: cashOut,
-  });
+    adjustmentsAmount,
+  };
+  const expected = expectedCashKopecks(ledger);
+  const currentCashBalance = currentCashBalanceKopecks(ledger);
+  const salesTotal =
+    shift.cashSalesAmount + shift.cardSalesAmount + shift.onlineSalesAmount;
 
   return {
     shift,
     cashIn,
     cashOut,
     cashRefunds,
+    adjustmentsAmount,
     expectedCashAmount: expected,
+    currentCashBalance,
+    salesTotal,
     refundsCount: shift.orders.reduce((n, o) => n + o.refunds.length, 0),
   };
+}
+
+export function serializeShiftOperations(
+  ops: Array<{
+    id: string;
+    type: string;
+    amount: number;
+    comment: string | null;
+    createdAt: Date;
+    orderId: string | null;
+    user: { name: string };
+    order: { number: string } | null;
+  }>,
+) {
+  return ops.map((op) => ({
+    id: op.id,
+    type: op.type,
+    amount: op.amount,
+    comment: op.comment,
+    createdAt: op.createdAt,
+    orderId: op.orderId,
+    orderNumber: op.order?.number ?? null,
+    userName: op.user.name,
+  }));
+}
+
+export function serializeOpenShiftDto(
+  summary: Awaited<ReturnType<typeof computeShiftCashSummary>>,
+) {
+  const { shift } = summary;
+  return {
+    id: shift.id,
+    publicId: shift.publicId,
+    status: shift.status,
+    openedAt: shift.openedAt,
+    closedAt: shift.closedAt,
+    openingCashAmount: shift.openingCashAmount,
+    closingCashAmount: shift.closingCashAmount,
+    cashSalesAmount: shift.cashSalesAmount,
+    cardSalesAmount: shift.cardSalesAmount,
+    onlineSalesAmount: shift.onlineSalesAmount,
+    ordersCount: shift.ordersCount,
+    ticketsCount: shift.ticketsCount,
+    notes: shift.notes,
+    closeReason: shift.closeReason,
+    location: shift.location,
+    user: shift.user,
+    expectedCashAmount: summary.expectedCashAmount,
+    currentCashBalance: summary.currentCashBalance,
+    salesTotal: summary.salesTotal,
+    cashIn: summary.cashIn,
+    cashOut: summary.cashOut,
+    cashRefunds: summary.cashRefunds,
+    adjustmentsAmount: summary.adjustmentsAmount,
+    cashDifferenceAmount: shift.cashDifferenceAmount,
+    refundsCount: summary.refundsCount,
+    operations: serializeShiftOperations(shift.cashOperations),
+  };
+}
+
+export async function getLastClosedShiftForCashier(userId: string) {
+  const closed = await prisma.cashierShift.findFirst({
+    where: { userId, status: { in: ["CLOSED", "FORCE_CLOSED"] } },
+    orderBy: { closedAt: "desc" },
+    select: { id: true },
+  });
+  if (!closed) return null;
+  const summary = await computeShiftCashSummary(closed.id);
+  return serializeOpenShiftDto(summary);
 }
 
 export async function closeCashierShift(params: {
@@ -301,12 +402,19 @@ export async function closeCashierShift(params: {
     return updated;
   });
 
+  const after = await computeShiftCashSummary(shift.id);
   return {
     shift: closed,
+    report: serializeOpenShiftDto(after),
     summary: {
-      ...summary,
+      cashIn: after.cashIn,
+      cashOut: after.cashOut,
+      cashRefunds: after.cashRefunds,
+      expectedCashAmount: after.expectedCashAmount,
+      currentCashBalance: after.currentCashBalance,
       cashDifferenceAmount: diff,
       closingCashAmount: params.closingCashAmount,
+      refundsCount: after.refundsCount,
     },
   };
 }

@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Banknote,
   CreditCard,
   Globe,
-  LogOut,
   QrCode,
   RefreshCw,
-  RotateCcw,
   Search,
   Printer,
 } from "lucide-react";
@@ -24,7 +23,6 @@ import { ApiClientError } from "@/lib/api/client";
 import {
   cashierCheckIn,
   cashierLogin,
-  cashierLogout,
   createCashierSale,
   getCashierMe,
   getCashierOrders,
@@ -35,7 +33,8 @@ import {
   type CashierSessionsResponse,
   type CashierUser,
 } from "@/lib/api/cashier";
-import { CashierShiftGate } from "@/components/cashier/CashierShiftGate";
+import { OpenShiftForm } from "@/components/cashier/OpenShiftForm";
+import { useCashierShift } from "@/components/cashier/CashierShiftProvider";
 
 type Filter = "today" | "all" | "paid" | "cancelled";
 
@@ -125,6 +124,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (user: CashierUser) => void }) 
 }
 
 export function CashierWorkspace() {
+  const { shift, loading: shiftLoading, setSheet, reload: reloadShift } = useCashierShift();
   const [user, setUser] = useState<CashierUser | null>(null);
   const [bootstrapping, setBootstrapping] = useState(true);
   const [sessionsData, setSessionsData] = useState<CashierSessionsResponse | null>(null);
@@ -221,7 +221,7 @@ export function CashierWorkspace() {
       );
       setStatusMessage(`Продажа ${order.number} · ${formatMoneyFromKopecks(order.totalAmount)}`);
       setQuantities({});
-      await Promise.all([refreshSessions(), refreshOrders()]);
+      await Promise.all([refreshSessions(), refreshOrders(), reloadShift()]);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Продажа не выполнена");
       void refreshSessions();
@@ -239,43 +239,59 @@ export function CashierWorkspace() {
   }
 
   if (!user) {
-    return <LoginScreen onSuccess={setUser} />;
+    return (
+      <LoginScreen
+        onSuccess={(next) => {
+          setUser(next);
+          void reloadShift();
+        }}
+      />
+    );
+  }
+
+  if (shiftLoading && !shift) {
+    return (
+      <div className="grid min-h-[40vh] place-items-center">
+        <Skeleton className="h-40 w-80" />
+      </div>
+    );
+  }
+
+  if (!shift) {
+    return <OpenShiftForm />;
   }
 
   return (
-    <CashierShiftGate>
-    <div className="min-h-screen bg-gradient-to-b from-cream to-beige/60">
-      <header className="sticky top-0 z-40 border-b border-white/60 bg-white/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center gap-4 px-4 py-3 md:px-6">
-          <div className="mr-auto">
-            <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-orange">
-              Касса
-            </p>
-            <p className="font-display text-xl font-semibold text-forest">{user.name}</p>
-          </div>
-          <div className="text-right text-sm">
-            <p className="font-extrabold capitalize text-forest">{clock.date}</p>
-            <p className="font-display text-2xl font-semibold tabular-nums text-forest">
-              {clock.time}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-secondary px-3 py-2 text-sm font-bold text-secondary-foreground">
-            {sessionsData?.location.city ?? "…"} · {sessionsData?.location.venue ?? "локация"}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              void cashierLogout().finally(() => setUser(null));
-            }}
-          >
-            <LogOut size={16} aria-hidden />
-            Выйти
-          </Button>
+    <div className="cashier-home">
+      <div className="cashier-home-clock no-print">
+        <div>
+          <p className="cashier-page-sub" style={{ marginBottom: 0 }}>
+            {clock.date}
+          </p>
+          <p className="font-display text-2xl font-semibold tabular-nums text-forest">{clock.time}</p>
         </div>
-      </header>
+        <div className="rounded-2xl bg-secondary px-3 py-2 text-sm font-bold text-secondary-foreground">
+          {sessionsData?.location.city ?? shift.location.city} ·{" "}
+          {sessionsData?.location.venue ?? shift.location.name}
+        </div>
+      </div>
 
-      <main className="mx-auto grid max-w-[1440px] gap-5 px-4 py-5 md:px-6 lg:grid-cols-[1fr_360px]">
+      <div className="cashier-quick-actions no-print">
+        <Link href="/cashier/scan" className="cashier-btn cashier-btn-orange">
+          QR
+        </Link>
+        <button type="button" className="cashier-btn cashier-btn-primary" onClick={() => setSheet("in")}>
+          Внести
+        </button>
+        <button type="button" className="cashier-btn cashier-btn-ghost" onClick={() => setSheet("out")}>
+          Изъять
+        </button>
+        <Link href="/cashier/shift" className="cashier-btn cashier-btn-ghost">
+          Смена
+        </Link>
+      </div>
+
+      <main className="mx-auto grid max-w-[1440px] gap-5 pt-4 lg:grid-cols-[1fr_360px]">
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-display text-2xl font-semibold text-forest">Сеансы сегодня</h2>
@@ -414,6 +430,13 @@ export function CashierWorkspace() {
                     <Badge variant={order.status === "PAID" ? "success" : "muted"}>
                       {order.status}
                     </Badge>
+                    <Link
+                      href={`/cashier/orders/${order.number}/print`}
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-bold text-forest underline"
+                    >
+                      <Printer size={12} aria-hidden />
+                      Печать
+                    </Link>
                   </div>
                 </div>
               ))}
@@ -421,19 +444,6 @@ export function CashierWorkspace() {
           </Card>
 
           <CashierCheckInPanel />
-
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <Card variant="soft" className="p-4 opacity-80">
-              <RotateCcw className="text-forest" aria-hidden />
-              <p className="mt-2 font-extrabold text-forest">Возврат</p>
-              <p className="text-xs text-muted-foreground">Ещё не подключено</p>
-            </Card>
-            <Card variant="soft" className="p-4 opacity-80">
-              <Printer className="text-forest" aria-hidden />
-              <p className="mt-2 font-extrabold text-forest">Печать</p>
-              <p className="text-xs text-muted-foreground">Ещё не подключено</p>
-            </Card>
-          </div>
         </section>
 
         <aside className="lg:sticky lg:top-24 lg:self-start">
@@ -548,7 +558,6 @@ export function CashierWorkspace() {
         </aside>
       </main>
     </div>
-    </CashierShiftGate>
   );
 }
 
