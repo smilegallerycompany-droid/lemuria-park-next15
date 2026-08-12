@@ -16,7 +16,7 @@ export async function getDirectorAlerts(locationIds?: string[]): Promise<Directo
 
   const locationFilter = locationIds?.length ? { id: { in: locationIds } } : {};
 
-  const [paused, sessionsSoon, failedPayments, failedEmail, lastCleanup, priceGaps] =
+  const [paused, sessionsSoon, failedPayments, failedEmail, lastCleanup, priceGaps, cashDiffs] =
     await Promise.all([
       prisma.location.count({ where: { ...locationFilter, status: "PAUSED" } }),
       prisma.session.findMany({
@@ -46,6 +46,20 @@ export async function getDirectorAlerts(locationIds?: string[]): Promise<Directo
           id: true,
           name: true,
           priceRules: { select: { id: true }, take: 1 },
+        },
+      }),
+      prisma.cashierShift.findMany({
+        where: {
+          status: { in: ["CLOSED", "FORCE_CLOSED"] },
+          cashDifferenceAmount: { not: 0 },
+          closedAt: { gte: dayAgo },
+          ...(locationIds?.length ? { locationId: { in: locationIds } } : {}),
+        },
+        orderBy: { closedAt: "desc" },
+        take: 8,
+        include: {
+          user: { select: { name: true } },
+          location: { select: { city: true, name: true } },
         },
       }),
     ]);
@@ -121,6 +135,28 @@ export async function getDirectorAlerts(locationIds?: string[]): Promise<Directo
         ? "Последний успешный cleanup давно"
         : "Cleanup ещё не фиксировался",
       href: "/admin/system",
+    });
+  }
+
+  for (const shift of cashDiffs) {
+    const diff = shift.cashDifferenceAmount ?? 0;
+    if (diff === 0) continue;
+    const shortage = diff < 0;
+    const amount = Math.abs(diff);
+    const rub = new Intl.NumberFormat("ru-RU").format(amount / 100);
+    alerts.push({
+      severity: shortage ? "danger" : "warning",
+      title: shortage ? `Недостача по смене — ${rub} ₽` : `Излишек по смене — ${rub} ₽`,
+      description: `${shift.user.name} · ${shift.location.city} · закрыта ${
+        shift.closedAt
+          ? new Intl.DateTimeFormat("ru-RU", {
+              timeZone: "Europe/Moscow",
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(shift.closedAt)
+          : "—"
+      }`,
+      href: `/director/shifts/${shift.id}`,
     });
   }
 

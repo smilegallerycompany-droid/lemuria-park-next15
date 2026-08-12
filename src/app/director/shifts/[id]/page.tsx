@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { PageHeader } from "@/components/internal";
+import { ConfirmDialog, PageHeader } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
@@ -23,6 +23,8 @@ export default function DirectorShiftDetailPage() {
       onlineSalesAmount: number;
       ordersCount: number;
       ticketsCount: number;
+      notes: string | null;
+      closeReason: string | null;
       user: { name: string };
       location: { city: string; name: string };
       cashOperations: Array<{
@@ -31,6 +33,8 @@ export default function DirectorShiftDetailPage() {
         amount: number;
         comment: string | null;
         createdAt: string;
+        user?: { name: string };
+        order?: { number: string } | null;
       }>;
       orders: Array<{ number: string; totalAmount: number; status: string; createdAt: string }>;
     };
@@ -44,28 +48,92 @@ export default function DirectorShiftDetailPage() {
       durationMinutes: number;
     };
   } | null>(null);
+  const [forceReason, setForceReason] = useState("");
+  const [forceCash, setForceCash] = useState("");
+  const [forceForm, setForceForm] = useState(false);
+  const [forceConfirm, setForceConfirm] = useState(false);
+  const [forceBusy, setForceBusy] = useState(false);
+  const [forceError, setForceError] = useState<string | null>(null);
+
+  function reload() {
+    directorFetch<NonNullable<typeof data>>(`/api/director/shifts/${params.id}`)
+      .then((payload) => {
+        setData(payload);
+        setForceCash(String((payload.summary.expectedCashAmount / 100).toFixed(2)));
+      })
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
-    directorFetch<NonNullable<typeof data>>(`/api/director/shifts/${params.id}`)
-      .then(setData)
-      .catch(() => undefined);
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
   if (!data) return <div className="director-empty">Загрузка…</div>;
   const { shift, summary } = data;
   const diff = shift.cashDifferenceAmount;
+  const kind = diff == null || diff === 0 ? "ok" : diff < 0 ? "shortage" : "overage";
+
+  async function forceClose() {
+    if (!forceReason.trim()) {
+      setForceError("Укажите причину");
+      return;
+    }
+    const rub = Number(forceCash.replace(",", "."));
+    const kopecks = Math.round((Number.isFinite(rub) ? rub : 0) * 100);
+    setForceBusy(true);
+    setForceError(null);
+    try {
+      await directorFetch("/api/director/shifts", {
+        method: "POST",
+        body: JSON.stringify({
+          shiftId: shift.id,
+          closingCashAmount: kopecks,
+          reason: forceReason.trim(),
+        }),
+      });
+      setForceConfirm(false);
+      setForceForm(false);
+      reload();
+    } catch (err) {
+      setForceError(err instanceof Error ? err.message : "Не удалось закрыть");
+    } finally {
+      setForceBusy(false);
+    }
+  }
 
   return (
-    <>
+    <div className="shift-print-root">
+      <div className="shift-print-letterhead">
+        <p>Лемурия Парк</p>
+        <h1>Отчёт по смене</h1>
+        <p>
+          {shift.user.name} · {shift.location.city} — {shift.location.name}
+        </p>
+        <p>Дата: {formatDateTime(shift.openedAt)}</p>
+      </div>
       <PageHeader
         title={`Смена · ${shift.user.name}`}
         description={`${shift.location.city} · ${shift.status} · ${summary.durationMinutes} мин`}
         actions={
-          <button type="button" className="director-btn secondary" onClick={() => window.print()}>
-            Печать отчёта
-          </button>
+          <div className="no-print" style={{ display: "flex", gap: 8 }}>
+            {shift.status === "OPEN" ? (
+              <button type="button" className="director-btn danger" onClick={() => setForceForm(true)}>
+                Force close
+              </button>
+            ) : null}
+            <button type="button" className="director-btn secondary" onClick={() => window.print()}>
+              Печать отчёта
+            </button>
+          </div>
         }
       />
+
+      {diff != null && diff !== 0 ? (
+        <div className={`director-alert ${kind === "shortage" ? "error" : ""}`} data-testid="shift-diff-banner">
+          {kind === "shortage" ? "Недостача" : "Излишек"}: {formatMoneyFromKopecks(Math.abs(diff))}
+        </div>
+      ) : null}
 
       <div className="director-card-grid">
         <div className="director-kpi">
@@ -90,7 +158,7 @@ export default function DirectorShiftDetailPage() {
         </div>
         <div className={`director-kpi ${diff && diff < 0 ? "tone-danger" : diff && diff > 0 ? "tone-warning" : ""}`}>
           <div className="director-kpi-label">Difference</div>
-          <div className="director-kpi-value tabular-nums">
+          <div className={`director-kpi-value tabular-nums diff ${kind}`}>
             {diff == null ? "—" : formatMoneyFromKopecks(diff)}
           </div>
         </div>
@@ -130,6 +198,18 @@ export default function DirectorShiftDetailPage() {
               {summary.refundsCount}
             </strong>
           </li>
+          {shift.notes ? (
+            <li>
+              <span>Комментарий</span>
+              <strong>{shift.notes}</strong>
+            </li>
+          ) : null}
+          {shift.closeReason ? (
+            <li>
+              <span>Force-close причина</span>
+              <strong>{shift.closeReason}</strong>
+            </li>
+          ) : null}
         </ul>
       </section>
 
@@ -145,15 +225,17 @@ export default function DirectorShiftDetailPage() {
                 <th>Тип</th>
                 <th>Сумма</th>
                 <th>Комментарий</th>
+                <th>Сотрудник</th>
               </tr>
             </thead>
             <tbody>
               {shift.cashOperations.map((op) => (
-                <tr key={op.id}>
+                <tr key={op.id} className={`cash-op-${op.type.toLowerCase()}`}>
                   <td>{formatDateTime(op.createdAt)}</td>
                   <td>{op.type}</td>
                   <td className="tabular-nums">{formatMoneyFromKopecks(op.amount)}</td>
                   <td>{op.comment ?? "—"}</td>
+                  <td>{op.user?.name ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -190,6 +272,62 @@ export default function DirectorShiftDetailPage() {
           </table>
         </div>
       </section>
-    </>
+
+      <p className="shift-print-footer">
+        Сформировано {new Date().toLocaleString("ru-RU")} · расхождение{" "}
+        {diff == null ? "—" : formatMoneyFromKopecks(diff)}
+        {shift.notes ? ` · ${shift.notes}` : ""}
+      </p>
+
+      {forceForm ? (
+        <div className="director-panel no-print" style={{ marginTop: 12 }} data-testid="force-close-form">
+          <p>
+            Принудительное закрытие. Смена получит статус FORCE_CLOSED. Причина обязательна.
+          </p>
+          <label>
+            Фактически в кассе, ₽
+            <input
+              value={forceCash}
+              onChange={(e) => setForceCash(e.target.value)}
+              inputMode="decimal"
+            />
+          </label>
+          <label>
+            Причина (обязательно)
+            <input value={forceReason} onChange={(e) => setForceReason(e.target.value)} />
+          </label>
+          {forceError ? <p className="cashier-error">{forceError}</p> : null}
+          <div className="cashier-actions-row">
+            <button type="button" className="director-btn secondary" onClick={() => setForceForm(false)}>
+              Отмена
+            </button>
+            <button
+              type="button"
+              className="director-btn danger"
+              onClick={() => {
+                if (!forceReason.trim()) {
+                  setForceError("Укажите причину");
+                  return;
+                }
+                setForceConfirm(true);
+              }}
+            >
+              Закрыть принудительно
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <ConfirmDialog
+        open={forceConfirm}
+        title="Принудительно закрыть смену?"
+        description="Смена будет FORCE_CLOSED. Это действие пишется в AuditLog."
+        confirmLabel="Force close"
+        danger
+        busy={forceBusy}
+        onCancel={() => setForceConfirm(false)}
+        onConfirm={() => void forceClose()}
+      />
+    </div>
   );
 }

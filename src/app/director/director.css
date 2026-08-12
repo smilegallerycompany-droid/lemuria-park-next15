@@ -485,3 +485,27 @@
 @media (prefers-reduced-motion: reduce) {
   .director-sidebar { transition: none; }
 }
+
+@media print {
+  .no-print,
+  .director-sidebar,
+  .director-mobile-bar,
+  .director-nav,
+  .director-nav-backdrop,
+  .internal-filter-bar,
+  .director-btn {
+    display: none !important;
+  }
+  .director-shell {
+    display: block !important;
+  }
+  .shift-print-letterhead {
+    display: block !important;
+    margin-bottom: 16px;
+  }
+  .shift-print-letterhead p { margin: 0; font-weight: 800; }
+  .shift-print-footer {
+    margin-top: 24px;
+    font-size: 12px;
+  }
+}

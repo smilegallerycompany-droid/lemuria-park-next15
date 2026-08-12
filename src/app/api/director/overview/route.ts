@@ -5,6 +5,7 @@ import { getUpcomingSessionsForDirector } from "@/server/services/director-sessi
 import { getDirectorAnalyticsReport } from "@/server/services/analytics-report";
 import { todayInTimezone, addDaysUtc } from "@/lib/datetime";
 import { prisma } from "@/lib/db/prisma";
+import { computeShiftCashSummary } from "@/server/services/cashier-shifts";
 
 export async function GET() {
   try {
@@ -115,14 +116,20 @@ export async function GET() {
       sessions,
       alerts,
       shifts: {
-        open: openShifts.map((s) => ({
-          id: s.id,
-          cashierName: s.user.name,
-          location: `${s.location.city}`,
-          openedAt: s.openedAt,
-          cashSalesAmount: s.cashSalesAmount,
-          ordersCount: s.ordersCount,
-        })),
+        open: await Promise.all(
+          openShifts.map(async (s) => {
+            const summary = await computeShiftCashSummary(s.id);
+            return {
+              id: s.id,
+              cashierName: s.user.name,
+              location: `${s.location.city}`,
+              openedAt: s.openedAt,
+              cashSalesAmount: s.cashSalesAmount,
+              currentCashBalance: summary.currentCashBalance,
+              ordersCount: s.ordersCount,
+            };
+          }),
+        ),
         closedToday: closedShiftsToday,
         withDifference: diffShifts.map((s) => ({
           id: s.id,

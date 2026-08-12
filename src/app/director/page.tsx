@@ -72,6 +72,7 @@ type Overview = {
       location: string;
       openedAt: string;
       cashSalesAmount: number;
+      currentCashBalance?: number;
       ordersCount: number;
     }>;
     closedToday: number;
@@ -209,7 +210,7 @@ export default function DirectorDashboardPage() {
                         <th>Локация</th>
                         <th>С</th>
                         <th>Заказы</th>
-                        <th>Наличные</th>
+                        <th>Наличные в кассе</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -220,7 +221,7 @@ export default function DirectorDashboardPage() {
                           <td>{formatDateTime(s.openedAt)}</td>
                           <td className="num tabular-nums">{s.ordersCount}</td>
                           <td className="num tabular-nums">
-                            {formatMoneyFromKopecks(s.cashSalesAmount)}
+                            {formatMoneyFromKopecks(s.currentCashBalance ?? s.cashSalesAmount)}
                           </td>
                         </tr>
                       ))}
@@ -241,7 +242,9 @@ export default function DirectorDashboardPage() {
                   <li key={a.title + a.href} className="internal-alert-item" data-severity={a.severity}>
                     <strong>{a.title}</strong>
                     <span>{a.description}</span>
-                    <Link href={a.href}>Открыть →</Link>
+                    <Link href={a.href}>
+                      {a.href.includes("/director/shifts/") ? "Открыть смену" : "Открыть →"}
+                    </Link>
                   </li>
                 ))}
               </ul>
