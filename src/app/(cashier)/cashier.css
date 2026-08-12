@@ -722,5 +722,211 @@
     background: var(--internal-orange);
     transform: translateY(-6px);
     box-shadow: var(--internal-shadow);
+    min-height: 52px;
   }
 }
+
+.cashier-shift-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 8px 16px;
+  background: #eef6f0;
+  border-bottom: 1px solid rgba(32, 53, 16, 0.1);
+}
+.cashier-shift-strip-idle {
+  background: #fff8e8;
+}
+.cashier-shift-strip-main strong,
+.cashier-shift-strip strong {
+  display: block;
+  font-size: 13px;
+}
+.cashier-shift-strip span {
+  font-size: 12px;
+  color: rgba(32, 53, 16, 0.65);
+}
+.cashier-shift-strip-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-left: auto;
+}
+.cashier-shift-strip-metrics span {
+  display: block;
+  font-size: 11px;
+}
+.cashier-shift-strip-metrics b {
+  font-size: 14px;
+}
+.cashier-shift-strip-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+}
+.cashier-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 50;
+  background: #14532d;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 14px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px rgba(20, 83, 45, 0.25);
+}
+.cashier-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+.cashier-quick-actions .cashier-btn {
+  min-height: 44px;
+  flex: 1 1 120px;
+}
+.cashier-home-clock {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-end;
+}
+.cashier-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  align-items: end;
+}
+.cashier-sheet-scrim {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(12, 20, 14, 0.45);
+}
+.cashier-sheet {
+  position: relative;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: 12px;
+  max-height: 90vh;
+  overflow: auto;
+}
+.cashier-sheet h2 { margin: 0; }
+.cashier-sheet label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.cashier-sheet input {
+  min-height: 48px;
+  border: 2px solid rgba(32, 53, 16, 0.15);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font: inherit;
+}
+.cashier-hint-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.cashier-journal {
+  display: grid;
+  gap: 8px;
+}
+.cashier-journal-row {
+  border: 1px solid rgba(32, 53, 16, 0.1);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: #fff;
+}
+.cashier-journal-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.cashier-journal-amount { font-weight: 800; }
+.cashier-journal-meta,
+.cashier-journal-row p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: rgba(32, 53, 16, 0.65);
+}
+.cash-op-opening, .cash-op-closing { border-left: 4px solid #94a3b8; }
+.cash-op-sale, .cash-op-in { border-left: 4px solid #2f6b45; }
+.cash-op-refund { border-left: 4px solid #b02828; }
+.cash-op-out { border-left: 4px solid #c45c26; }
+.cash-op-adjustment { border-left: 4px solid #b87912; }
+.cashier-close-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.cashier-close-ledger li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.cashier-close-expected {
+  padding-top: 8px;
+  border-top: 1px solid rgba(32, 53, 16, 0.12);
+  font-size: 1.05rem;
+}
+.cashier-close-hero {
+  margin: 8px 0 16px;
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--green-deep);
+}
+.cashier-close-wide { max-width: 560px; }
+.cashier-report-dl {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.cashier-report-dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(32, 53, 16, 0.08);
+  padding-bottom: 8px;
+}
+.cashier-report-dl dt { color: rgba(32, 53, 16, 0.6); }
+.cashier-report-dl dd { margin: 0; font-weight: 700; text-align: right; }
+.shift-print-letterhead { display: none; }
+.shift-print-footer { font-size: 12px; color: rgba(32, 53, 16, 0.55); }
+
+@media (min-width: 720px) {
+  .cashier-sheet-backdrop { place-items: center; }
+  .cashier-sheet {
+    border-radius: 16px;
+    width: min(440px, 92vw);
+    padding: 24px;
+  }
+}
+
+@media print {
+  .no-print,
+  .cashier-topbar,
+  .cashier-nav,
+  .cashier-bottom-nav,
+  .cashier-shift-strip,
+  .cashier-quick-actions {
+    display: none !important;
+  }
+  .cashier-main { padding: 0; max-width: none; }
+  .shift-print-letterhead { display: block; }
+  .shift-print-letterhead p { margin: 0; font-weight: 800; }
+  .cashier-root { background: #fff; }
+}
+

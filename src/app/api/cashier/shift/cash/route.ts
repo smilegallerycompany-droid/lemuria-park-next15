@@ -28,7 +28,14 @@ export async function POST(req: Request) {
       ua: req.headers.get("user-agent"),
     });
 
-    return apiSuccess(result, 201);
+    return apiSuccess(
+      {
+        operation: result.operation,
+        shiftId: result.shiftId,
+        currentCashBalance: result.currentCashBalance,
+      },
+      201,
+    );
   } catch (error) {
     return handleApiError(error);
   }
