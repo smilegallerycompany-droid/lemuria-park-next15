@@ -144,7 +144,20 @@ export async function directorLogin(request: APIRequestContext) {
   return expectOk<{ id: string; email: string; role: string }>(res);
 }
 
-/** Ensure cashier has an OPEN shift (required for sales). */
+/** Today's cashier sessions (includes already-started). Needed for check-in date rules. */
+export async function findCashierTodaySession(
+  request: APIRequestContext,
+  minSeats = 1,
+): Promise<{ publicId: string; remaining: number }> {
+  const data = await expectOk<{
+    sessions: Array<{ publicId: string; remaining: number; soldOut?: boolean }>;
+  }>(await request.get("/api/cashier/sessions"));
+  const session = data.sessions.find((s) => !s.soldOut && (s.remaining ?? 0) >= minSeats);
+  if (!session) {
+    throw new Error(`No cashier today session with >= ${minSeats} seats`);
+  }
+  return { publicId: session.publicId, remaining: session.remaining };
+}
 export async function ensureOpenCashierShift(request: APIRequestContext) {
   const cur = await request.get("/api/cashier/shift");
   const curBody = await cur.json();

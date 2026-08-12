@@ -4,6 +4,7 @@ import {
   cashierSale,
   expectOk,
   findBookableSession,
+  moscowToday,
   readJson,
 } from "./helpers";
 
@@ -21,6 +22,7 @@ test.describe("Mobile QR scanner UI", () => {
     await cashierLogin(request);
 
     const session = await findBookableSession(request, 1);
+    test.skip(session.localDate !== moscowToday(), "no remaining bookable session today for check-in date");
     const { body } = await cashierSale(request, session.publicId, 1);
     expect(body.ok).toBe(true);
     if (!body.ok) throw new Error("sale failed");

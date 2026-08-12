@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
-import { cashierLogin, cashierSale, expectOk, findBookableSession, readJson } from "./helpers";
+import { cashierLogin, cashierSale, expectOk, findBookableSession, moscowToday, readJson } from "./helpers";
 
 test.describe("QR check-in", () => {
   test("SUCCESS then ALREADY_USED for the same ticket", async ({ request }) => {
     await cashierLogin(request);
     const session = await findBookableSession(request, 1);
+    test.skip(session.localDate !== moscowToday(), "no remaining bookable session today for check-in date");
     const { res, body } = await cashierSale(request, session.publicId, 1);
     expect(res.status()).toBe(201);
     expect(body.ok).toBe(true);

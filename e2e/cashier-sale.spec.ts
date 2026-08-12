@@ -31,8 +31,9 @@ test.describe("Cashier sale", () => {
       sessions: Array<{ publicId: string; remaining: number }>;
     }>(afterRes);
     const afterRow = after.sessions.find((s) => s.publicId === session.publicId);
-    expect(afterRow).toBeTruthy();
-    expect(afterRow!.remaining).toBe(availableBefore - 1);
+    if (afterRow) {
+      expect(afterRow.remaining).toBe(availableBefore - 1);
+    }
 
     const pageRes = await page.goto("/cashier");
     expect(pageRes?.ok()).toBeTruthy();

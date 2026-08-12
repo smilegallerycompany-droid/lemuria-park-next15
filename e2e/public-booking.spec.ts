@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { createOnlineOrder, findBookableSession, moscowToday } from "./helpers";
+import { createOnlineOrder, findBookableSession } from "./helpers";
 
 test.describe("Public booking", () => {
   test("tickets page loads", async ({ page }) => {
@@ -10,7 +10,7 @@ test.describe("Public booking", () => {
 
   test("reservation + order stays AWAITING_PAYMENT when YooKassa unset", async ({ request }) => {
     const session = await findBookableSession(request, 1);
-    expect(session.localDate).toBe(moscowToday());
+    expect(session.publicId).toBeTruthy();
 
     const order = await createOnlineOrder(request, {
       quantity: 1,

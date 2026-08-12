@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   cashDifferenceKopecks,
+  currentCashBalanceKopecks,
   differenceLabel,
   expectedCashKopecks,
 } from "@/server/domain/shift.domain";
@@ -18,10 +19,45 @@ describe("shift cash math", () => {
       cashOutAmount: 20_00,
     });
     assert.equal(expected, 730_00);
+    assert.equal(
+      currentCashBalanceKopecks({
+        openingCashAmount: 500_00,
+        cashSalesAmount: 200_00,
+        cashRefundsAmount: 50_00,
+        cashInAmount: 100_00,
+        cashOutAmount: 20_00,
+      }),
+      expected,
+    );
     assert.equal(cashDifferenceKopecks(730_00, expected), 0);
     assert.equal(differenceLabel(0), "ok");
     assert.equal(differenceLabel(-100), "shortage");
     assert.equal(differenceLabel(50), "overage");
+  });
+
+  it("includes audited adjustments in live balance", () => {
+    const balance = currentCashBalanceKopecks({
+      openingCashAmount: 100_00,
+      cashSalesAmount: 0,
+      cashRefundsAmount: 0,
+      cashInAmount: 0,
+      cashOutAmount: 0,
+      adjustmentsAmount: -15_00,
+    });
+    assert.equal(balance, 85_00);
+  });
+
+  it("shortage when actual is below expected", () => {
+    const expected = expectedCashKopecks({
+      openingCashAmount: 100_00,
+      cashSalesAmount: 0,
+      cashRefundsAmount: 0,
+      cashInAmount: 0,
+      cashOutAmount: 0,
+    });
+    const diff = cashDifferenceKopecks(88_00, expected);
+    assert.equal(diff, -12_00);
+    assert.equal(differenceLabel(diff), "shortage");
   });
 });
 
