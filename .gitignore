@@ -19,3 +19,4 @@ docs/screenshots/*.png
 !docs/screenshots/.gitkeep
 docs/qa-screenshots/
 docs/qa-screenshots-rc2/
+docs/qa-screenshots-rc3/
