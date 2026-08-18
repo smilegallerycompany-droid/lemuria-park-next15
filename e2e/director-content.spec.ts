@@ -13,27 +13,44 @@ test.describe("Director content CMS", () => {
     await directorLogin(request);
     const marker = `E2E Hero ${Date.now()}`;
 
-    const patch = await request.patch("/api/director/content", {
-      data: {
-        site: {
-          heroBadge: "E2E",
-          heroTitle: marker,
-          heroSubtitle: "Зоотеатр",
-          heroDescription: "CMS e2e description",
-          heroCtaLabel: "Купить билет",
-          heroCtaHref: "#booking",
-          heroActive: true,
+    try {
+      const patch = await request.patch("/api/director/content", {
+        data: {
+          site: {
+            heroBadge: "E2E",
+            heroTitle: marker,
+            heroSubtitle: "Зоотеатр",
+            heroDescription: "CMS e2e description",
+            heroCtaLabel: "Купить билет",
+            heroCtaHref: "#booking",
+            heroActive: true,
+          },
         },
-      },
-    });
-    await expectOk(patch);
+      });
+      await expectOk(patch);
 
-    const publicRes = await request.get("/api/public/content");
-    const cms = await expectOk<{ hero: { title: string } }>(publicRes);
-    expect(cms.hero.title).toBe(marker);
+      const publicRes = await request.get("/api/public/content");
+      const cms = await expectOk<{ hero: { title: string } }>(publicRes);
+      expect(cms.hero.title).toBe(marker);
 
-    await page.goto("/");
-    await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Hero");
+      await page.goto("/");
+      await expect(page.getByRole("heading", { level: 1 })).toContainText("E2E Hero");
+    } finally {
+      await request.patch("/api/director/content", {
+        data: {
+          site: {
+            heroBadge: "Онлайн-касса",
+            heroTitle: "Лемурия\nПарк",
+            heroSubtitle: "Зоотеатр лемуров",
+            heroDescription:
+              "Семейный зоотеатр с яркими впечатлениями и добрыми эмоциями — билеты на удобное время онлайн.",
+            heroCtaLabel: "Купить билет",
+            heroCtaHref: "#booking",
+            heroActive: true,
+          },
+        },
+      });
+    }
   });
 
   test("FAQ create → public sees; archive → public hides", async ({ request }) => {
@@ -74,11 +91,17 @@ test.describe("Director content CMS", () => {
         isPublished: true,
       },
     });
-    await expectOk(created);
+    const { item } = await expectOk<{ item: { id: string } }>(created);
 
     const pub = await expectOk<{ gallery: Array<{ altText: string }> }>(
       await request.get("/api/public/content"),
     );
     expect(pub.gallery.some((g) => g.altText === alt)).toBe(true);
+
+    await expectOk(
+      await request.patch(`/api/director/content/gallery/${item.id}`, {
+        data: { archive: true },
+      }),
+    );
   });
 });

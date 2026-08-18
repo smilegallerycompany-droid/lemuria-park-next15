@@ -17,7 +17,10 @@ Server-calculated only:
 
 `opening + cash sales + IN − cash refunds − OUT + audited adjustments`
 
-OUT above current balance → `INSUFFICIENT_CASH_BALANCE` (409). No client-trusted balance.
+OUT above current balance → `INSUFFICIENT_CASH_BALANCE` (409) for CASHIER/DIRECTOR.
+ADMIN/OWNER may override (AuditLog `adminOverride: true`). No client-trusted balance.
+
+Cash journal is a table (time / type / amount / comment / order / staff) with typed row colors.
 
 ## Director
 

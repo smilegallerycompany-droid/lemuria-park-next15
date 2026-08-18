@@ -276,21 +276,6 @@ export function CashierWorkspace() {
         </div>
       </div>
 
-      <div className="cashier-quick-actions no-print">
-        <Link href="/cashier/scan" className="cashier-btn cashier-btn-orange">
-          QR
-        </Link>
-        <button type="button" className="cashier-btn cashier-btn-primary" onClick={() => setSheet("in")}>
-          Внести
-        </button>
-        <button type="button" className="cashier-btn cashier-btn-ghost" onClick={() => setSheet("out")}>
-          Изъять
-        </button>
-        <Link href="/cashier/shift" className="cashier-btn cashier-btn-ghost">
-          Смена
-        </Link>
-      </div>
-
       <main className="mx-auto grid max-w-[1440px] gap-5 pt-4 lg:grid-cols-[1fr_360px]">
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -442,6 +427,21 @@ export function CashierWorkspace() {
               ))}
             </div>
           </Card>
+
+          <div className="cashier-quick-actions no-print">
+            <Link href="/cashier/scan" className="cashier-btn cashier-btn-orange">
+              QR
+            </Link>
+            <button type="button" className="cashier-btn cashier-btn-primary" onClick={() => setSheet("in")}>
+              Внести
+            </button>
+            <button type="button" className="cashier-btn cashier-btn-ghost" onClick={() => setSheet("out")}>
+              Изъять
+            </button>
+            <Link href="/cashier/shift" className="cashier-btn cashier-btn-ghost">
+              Смена
+            </Link>
+          </div>
 
           <CashierCheckInPanel />
         </section>

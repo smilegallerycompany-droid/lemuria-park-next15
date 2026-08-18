@@ -23,8 +23,22 @@ test.describe("Cashier shift mobile", () => {
     await expect(page.getByTestId("cashier-shift-bar").getByRole("link", { name: "Смена" })).toBeVisible();
 
     await page.goto("/cashier/shift");
-    await expect(page.getByRole("button", { name: "Внести наличные" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Изъять наличные" })).toBeVisible();
+    const cashIn = page.getByRole("button", { name: "Внести наличные" });
+    const cashOut = page.getByRole("button", { name: "Изъять наличные" });
+    await expect(cashIn).toBeVisible();
+    await expect(cashOut).toBeVisible();
+    for (const btn of [cashIn, cashOut]) {
+      const box = await btn.boundingBox();
+      expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    }
+
+    await cashIn.click();
+    const sheet = page.locator(".cashier-sheet");
+    await expect(sheet).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Внести наличные" })).toBeVisible();
+    const submit = sheet.getByRole("button", { name: "Внести" });
+    const submitBox = await submit.boundingBox();
+    expect(submitBox?.height ?? 0).toBeGreaterThanOrEqual(44);
   });
 
   test("open-shift form when no shift", async ({ page }) => {

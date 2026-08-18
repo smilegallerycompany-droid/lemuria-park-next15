@@ -33,7 +33,7 @@ test("cash IN/OUT, insufficient OUT, close difference, force close, closed immut
       name: "Shift Ops",
       city: "Test",
       address: "Addr",
-      status: "ACTIVE",
+      status: "PAUSED",
     },
   });
   const user = await prisma.user.create({
@@ -92,6 +92,55 @@ test("cash IN/OUT, insufficient OUT, close difference, force close, closed immut
       }),
     (err: unknown) => err instanceof DomainError && err.code === "INSUFFICIENT_CASH_BALANCE",
   );
+
+  const other = await prisma.user.create({
+    data: {
+      email: `shift-ops-other-${stamp}@lemuria.test`,
+      name: "Other Cashier",
+      passwordHash: "x",
+      role: "CASHIER",
+      status: "ACTIVE",
+    },
+  });
+  await assert.rejects(
+    () =>
+      closeCashierShift({
+        userId: other.id,
+        shiftId: opened.id,
+        closingCashAmount: 13_000,
+        notes: "чужая смена",
+      }),
+    (err: unknown) => err instanceof DomainError && err.code === "FORBIDDEN",
+  );
+
+  const admin = await prisma.user.create({
+    data: {
+      email: `shift-ops-admin-${stamp}@lemuria.test`,
+      name: "Admin Override",
+      passwordHash: "x",
+      role: "ADMIN",
+      status: "ACTIVE",
+    },
+  });
+  const adminShift = await openCashierShift({
+    userId: admin.id,
+    locationId: location.id,
+    openingCashAmount: 1_000,
+    notes: "admin open",
+  });
+  const overdraft = await addCashOperation({
+    userId: admin.id,
+    type: "OUT",
+    amount: 5_000,
+    comment: "ADMIN override",
+  });
+  assert.ok(overdraft.currentCashBalance < 0);
+  await closeCashierShift({
+    userId: admin.id,
+    shiftId: adminShift.id,
+    closingCashAmount: 0,
+    notes: "admin close after override",
+  });
 
   const closed = await closeCashierShift({
     userId: user.id,

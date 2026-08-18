@@ -17,7 +17,10 @@ export async function GET(_req: Request, context: RouteContext) {
         location: { select: { id: true, name: true, city: true } },
         cashOperations: {
           orderBy: { createdAt: "asc" },
-          include: { user: { select: { name: true } } },
+          include: {
+            user: { select: { name: true } },
+            order: { select: { number: true } },
+          },
         },
         orders: {
           orderBy: { createdAt: "desc" },

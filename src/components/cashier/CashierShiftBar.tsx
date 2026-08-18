@@ -35,7 +35,7 @@ export function CashierShiftBar() {
         <div className="cashier-shift-strip-main">
           <strong>Смена открыта</strong>
           <span>
-            Открыта {opened} · {shift.user.name} · {shift.location.city}
+            Открыта {opened} · {shift.user.name} · {shift.location.city} — {shift.location.name}
           </span>
         </div>
         <div className="cashier-shift-strip-metrics">

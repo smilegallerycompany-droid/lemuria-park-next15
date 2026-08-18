@@ -838,28 +838,31 @@
   flex-wrap: wrap;
   gap: 6px;
 }
-.cashier-journal {
-  display: grid;
-  gap: 8px;
-}
-.cashier-journal-row {
+.cashier-journal-wrap {
+  overflow-x: auto;
   border: 1px solid rgba(32, 53, 16, 0.1);
-  border-radius: 12px;
-  padding: 10px 12px;
+  border-radius: 14px;
   background: #fff;
 }
-.cashier-journal-row > div:first-child {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-}
-.cashier-journal-amount { font-weight: 800; }
-.cashier-journal-meta,
-.cashier-journal-row p {
-  margin: 4px 0 0;
+.cashier-journal-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: 13px;
-  color: rgba(32, 53, 16, 0.65);
 }
+.cashier-journal-table th,
+.cashier-journal-table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid rgba(32, 53, 16, 0.08);
+  vertical-align: top;
+}
+.cashier-journal-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(32, 53, 16, 0.55);
+}
+.cashier-journal-amount { font-weight: 800; font-variant-numeric: tabular-nums; }
 .cash-op-opening, .cash-op-closing { border-left: 4px solid #94a3b8; }
 .cash-op-sale, .cash-op-in { border-left: 4px solid #2f6b45; }
 .cash-op-refund { border-left: 4px solid #b02828; }

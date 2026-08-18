@@ -21,7 +21,8 @@ export const locationRepository = {
           { OR: [{ activeTo: null }, { activeTo: { gte: now } }] },
         ],
       },
-      orderBy: { activeFrom: "asc" },
+      // Seed/canonical venue first so leftover E2E locations never become the public default.
+      orderBy: { createdAt: "asc" },
     });
   },
 

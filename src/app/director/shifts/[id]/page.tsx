@@ -225,6 +225,7 @@ export default function DirectorShiftDetailPage() {
                 <th>Тип</th>
                 <th>Сумма</th>
                 <th>Комментарий</th>
+                <th>Заказ</th>
                 <th>Сотрудник</th>
               </tr>
             </thead>
@@ -235,6 +236,7 @@ export default function DirectorShiftDetailPage() {
                   <td>{op.type}</td>
                   <td className="tabular-nums">{formatMoneyFromKopecks(op.amount)}</td>
                   <td>{op.comment ?? "—"}</td>
+                  <td>{op.order?.number ?? "—"}</td>
                   <td>{op.user?.name ?? "—"}</td>
                 </tr>
               ))}

@@ -116,14 +116,22 @@ export async function addCashOperation(params: {
   const shift = await getOpenShiftForCashier(prisma, params.userId);
   if (!shift) throw new DomainError("SHIFT_NOT_OPEN", "Нет открытой смены");
 
+  let adminCashOverride = false;
   if (params.type === "OUT") {
     const summary = await computeShiftCashSummary(shift.id);
     if (params.amount > summary.currentCashBalance) {
-      throw new DomainError(
-        "INSUFFICIENT_CASH_BALANCE",
-        "Нельзя изъять больше, чем сейчас в кассе",
-        { currentCashBalance: summary.currentCashBalance, amount: params.amount },
-      );
+      const actor = await prisma.user.findUnique({
+        where: { id: params.userId },
+        select: { role: true },
+      });
+      adminCashOverride = actor?.role === "ADMIN" || actor?.role === "OWNER";
+      if (!adminCashOverride) {
+        throw new DomainError(
+          "INSUFFICIENT_CASH_BALANCE",
+          "Нельзя изъять больше, чем сейчас в кассе",
+          { currentCashBalance: summary.currentCashBalance, amount: params.amount },
+        );
+      }
     }
   }
 
@@ -143,7 +151,12 @@ export async function addCashOperation(params: {
       action: `CASH_${params.type}`,
       entityType: "CashOperation",
       entityId: row.id,
-      metadata: { shiftId: shift.id, amount: params.amount, comment: params.comment },
+      metadata: {
+        shiftId: shift.id,
+        amount: params.amount,
+        comment: params.comment,
+        ...(adminCashOverride ? { adminOverride: true } : {}),
+      },
       ipAddress: params.ip,
       userAgent: params.ua,
     });

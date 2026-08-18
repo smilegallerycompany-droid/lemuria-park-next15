@@ -36,7 +36,7 @@ export async function getPublicLocationsPayload(): Promise<PublicLocationPayload
   const settings = await prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } });
   const locations = await prisma.location.findMany({
     where: { status: { in: ["ACTIVE", "UPCOMING"] } },
-    orderBy: [{ status: "asc" }, { city: "asc" }],
+    orderBy: [{ status: "asc" }, { createdAt: "asc" }],
     include: {
       schedules: { orderBy: { dayOfWeek: "asc" } },
     },
