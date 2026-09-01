@@ -49,7 +49,7 @@ const envSchema = z.object({
   /** `staging` enables site-wide noindex. */
   APP_ENV: z.string().optional().default(""),
 
-  /** Prisma pool cap per container instance. Default 5 in production runtime. */
+  /** Prisma pool cap per container instance. Default 1 in production runtime. */
   PRISMA_CONNECTION_LIMIT: z.string().optional().default(""),
 
   /**

@@ -1,5 +1,6 @@
 import { PrismaClient, Prisma } from "@prisma/client";
 import { env } from "@/lib/config/env";
+import { withPrismaPoolParams } from "@/lib/db/prisma-pool";
 
 /** A regular PrismaClient or an interactive `$transaction` callback client. */
 export type DbClient = PrismaClient | Prisma.TransactionClient;
@@ -14,12 +15,10 @@ export type DbClient = PrismaClient | Prisma.TransactionClient;
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function datasourceUrl(): string {
-  const raw = env.DATABASE_URL;
-  if (/[?&]connection_limit=/.test(raw)) return raw;
-  const fromEnv = env.PRISMA_CONNECTION_LIMIT.trim();
-  const limit = fromEnv || (env.NODE_ENV === "production" ? "5" : "");
-  if (!limit) return raw;
-  return raw.includes("?") ? `${raw}&connection_limit=${limit}` : `${raw}?connection_limit=${limit}`;
+  return withPrismaPoolParams(env.DATABASE_URL, {
+    connectionLimit: env.PRISMA_CONNECTION_LIMIT,
+    nodeEnv: env.NODE_ENV,
+  });
 }
 
 export const prisma: PrismaClient =
