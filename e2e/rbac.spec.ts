@@ -22,6 +22,21 @@ test.describe("RBAC", () => {
     }
   });
 
+  test("cashier cannot call /api/admin/*", async ({ request }) => {
+    const login = await request.post("/api/cashier/login", { data: CASHIER });
+    expect(login.status()).toBe(200);
+
+    const res = await request.get("/api/admin/users");
+    expect([401, 403]).toContain(res.status());
+  });
+
+  test("unauthenticated internal APIs return 401", async ({ request }) => {
+    const cashier = await request.get("/api/cashier/me");
+    expect([401, 403]).toContain(cashier.status());
+    const admin = await request.get("/api/admin/dashboard");
+    expect([401, 403]).toContain(admin.status());
+  });
+
   test("disabled user cannot login", async ({ request }) => {
     const res = await request.post("/api/auth/login", {
       data: { ...DISABLED_USER, portal: "cashier" },
