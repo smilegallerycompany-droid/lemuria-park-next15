@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireDirector } from "@/server/auth/staff-session";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
+import { locationIdsForActor } from "@/server/auth/location-access";
 
 const createSchema = z.object({
   slug: z.string().min(2).max(64),
@@ -21,8 +22,10 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    await requireDirector();
+    const actor = await requireDirector();
+    const scoped = locationIdsForActor(actor);
     const locations = await prisma.location.findMany({
+      where: scoped ? { id: { in: scoped } } : {},
       orderBy: [{ status: "asc" }, { name: "asc" }],
       include: { _count: { select: { sessions: true, orders: true } } },
     });
