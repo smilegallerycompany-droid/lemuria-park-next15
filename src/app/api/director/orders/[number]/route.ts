@@ -19,7 +19,12 @@ export async function GET(_req: Request, context: RouteContext) {
         payments: { orderBy: { createdAt: "desc" } },
         refunds: { orderBy: { createdAt: "desc" } },
         tickets: {
-          include: { ticketType: { select: { name: true, code: true } } },
+          select: {
+            publicId: true,
+            status: true,
+            ticketType: { select: { name: true, code: true } },
+            orderItem: { select: { unitPriceAmount: true } },
+          },
           orderBy: { createdAt: "asc" },
         },
         cashier: { select: { id: true, name: true, email: true } },

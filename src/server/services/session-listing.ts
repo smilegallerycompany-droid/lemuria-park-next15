@@ -2,6 +2,7 @@ import type { Session } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { formatDateInTimezone, formatTimeInTimezone, todayInTimezone } from "@/lib/datetime";
 import { DomainError } from "@/server/domain/errors";
+import { resolveBookableLocation } from "@/server/domain/public-location";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import {
   computeAvailability,
@@ -37,15 +38,20 @@ const ONE_DAY_MS = 24 * 60 * 60 * 1000;
  * ids or `visitDurationMinutes`.
  */
 export async function listPublicSessions(query: SessionsQuery): Promise<PublicSessionsResponseDto> {
-  const location = query.locationSlug
-    ? await locationRepository.findBySlug(prisma, query.locationSlug)
-    : await locationRepository.findDefaultActive(prisma);
-
-  if (!location) {
-    throw new DomainError("LOCATION_NOT_FOUND", "Активная локация не найдена");
-  }
-
   const now = new Date();
+  const active = await locationRepository.listActive(prisma, now);
+  const resolved = resolveBookableLocation({
+    slug: query.locationSlug,
+    active,
+  });
+  if (resolved.kind === "need-slug") {
+    throw new DomainError("LOCATION_NOT_FOUND", "Укажите локацию");
+  }
+  if (resolved.kind === "not-found") {
+    throw new DomainError("LOCATION_NOT_FOUND", "Локация не найдена");
+  }
+  const location = resolved.location;
+
   await Promise.all([expireStaleReservations(prisma, now), expireStalePaymentOrders(prisma, now)]);
 
   const targetDate = query.date ?? todayInTimezone(location.timezone, now);

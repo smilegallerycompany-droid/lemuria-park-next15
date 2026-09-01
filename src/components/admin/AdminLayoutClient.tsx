@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { directorFetch } from "@/lib/director/client";
 import { labelRole } from "@/lib/director/labels";
+import { StaffPortalProvider } from "@/lib/staff-portal";
 
 const NAV = [
   { href: "/admin", label: "Обзор" },
@@ -61,15 +62,21 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
     return <div className="director-root">{children}</div>;
   }
 
+  const crumb =
+    NAV.find((item) =>
+      item.href === "/admin" ? pathname === "/admin" : pathname === item.href || pathname.startsWith(`${item.href}/`),
+    )?.label ?? "Раздел";
+
   return (
+    <StaffPortalProvider portal="admin">
     <div className="director-root">
       <div className={`director-shell ${navOpen ? "nav-open" : ""}`}>
         <aside className="director-sidebar" aria-label="Админ-меню">
           <div className="director-brand">
             <div className="director-brand-mark">A</div>
             <div className="director-brand-copy">
-              <strong>Admin</strong>
-              <small>Лемурия Парк</small>
+              <strong>Админ</strong>
+              <small>Все локации</small>
             </div>
           </div>
           <nav className="director-nav" aria-label="Навигация admin">
@@ -119,8 +126,15 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
             >
               Меню
             </button>
-            <strong>Лемурия · Admin</strong>
+            <strong>Лемурия · Администрирование</strong>
           </div>
+          {pathname !== "/admin" ? (
+            <nav className="admin-breadcrumb" aria-label="Навигация раздела">
+              <Link href="/admin">Администрирование</Link>
+              <span aria-hidden>/</span>
+              <span>{crumb}</span>
+            </nav>
+          ) : null}
           {children}
         </main>
         {navOpen ? (
@@ -128,5 +142,6 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
         ) : null}
       </div>
     </div>
+    </StaffPortalProvider>
   );
 }

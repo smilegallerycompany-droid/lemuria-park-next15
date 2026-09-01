@@ -103,6 +103,7 @@ enum CheckInResult {
   INVALID
   CANCELLED
   EXPIRED
+  REFUNDED
 }
 
 enum RefundStatus {
@@ -515,14 +516,31 @@ model Refund {
   actorId          String?
   actor            User?        @relation("RefundActor", fields: [actorId], references: [id], onDelete: SetNull)
   providerRefundId String?
+  idempotencyKey   String?      @unique
   completedAt      DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+  tickets          RefundTicket[]
 
   @@index([orderId])
   @@index([paymentId])
   @@index([status])
   @@index([createdAt])
+}
+
+/// Tickets included in a refund. Additive; historical full refunds may have zero rows.
+model RefundTicket {
+  id        String   @id @default(cuid())
+  refundId  String
+  refund    Refund   @relation(fields: [refundId], references: [id], onDelete: Cascade)
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Restrict)
+  /// Snapshot of that ticket's unit price in kopecks.
+  amount    Int
+  createdAt DateTime @default(now())
+
+  @@unique([refundId, ticketId])
+  @@index([ticketId])
 }
 
 model TicketDelivery {
@@ -639,8 +657,9 @@ model Ticket {
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
-  checkIns  TicketCheckIn[]
-  printLogs PrintLog[]
+  checkIns      TicketCheckIn[]
+  printLogs     PrintLog[]
+  refundTickets RefundTicket[]
 
   @@index([orderId])
   @@index([sessionId, status])

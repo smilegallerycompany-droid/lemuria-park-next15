@@ -6,6 +6,23 @@ export const locationRepository = {
     return db.location.findFirst({ where: { slug, status: { in: ["ACTIVE", "UPCOMING"] } } });
   },
 
+  findBookableBySlug(db: DbClient, slug: string) {
+    return db.location.findFirst({ where: { slug, status: "ACTIVE" } });
+  },
+
+  listActive(db: DbClient, now: Date = new Date()) {
+    return db.location.findMany({
+      where: {
+        status: "ACTIVE",
+        AND: [
+          { OR: [{ activeFrom: null }, { activeFrom: { lte: now } }] },
+          { OR: [{ activeTo: null }, { activeTo: { gte: now } }] },
+        ],
+      },
+      orderBy: { createdAt: "asc" },
+    });
+  },
+
   findById(db: DbClient, id: string) {
     return db.location.findUnique({ where: { id } });
   },

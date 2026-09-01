@@ -115,24 +115,33 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [locationSlug, setLocationSlug] = useState<string | undefined>(undefined);
 
-  const loadConfig = useCallback(async () => {
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setLocationSlug(new URLSearchParams(window.location.search).get("location")?.trim() || undefined);
+  }, []);
+
+  const loadConfig = useCallback(async (slug?: string) => {
     setConfigStatus("loading");
     try {
-      const response = await getPublicConfig();
+      const response = await getPublicConfig({ locationSlug: slug });
       setConfig(response);
       setSelectedDate((current) => current ?? response.availableDateRange.from);
+      if (response.location && slug !== response.location.slug) {
+        setLocationSlug(response.location.slug);
+      }
       setConfigStatus("ready");
     } catch {
       setConfigStatus("error");
     }
   }, []);
 
-  const loadSessions = useCallback(async (date: string) => {
+  const loadSessions = useCallback(async (date: string, slug?: string) => {
     setSessionsStatus("loading");
     setSubmitError(null);
     try {
-      const response = await getPublicSessions({ date });
+      const response = await getPublicSessions({ date, locationSlug: slug });
       setSessionsData(response);
       const firstAvailable = response.sessions.find((session) => !session.soldOut);
       setSelectedSessionId(firstAvailable?.publicId ?? response.sessions[0]?.publicId ?? null);
@@ -144,12 +153,12 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   }, []);
 
   useEffect(() => {
-    void loadConfig();
-  }, [loadConfig]);
+    void loadConfig(locationSlug);
+  }, [loadConfig, locationSlug]);
 
   useEffect(() => {
-    if (selectedDate) void loadSessions(selectedDate);
-  }, [selectedDate, loadSessions]);
+    if (selectedDate && config?.location) void loadSessions(selectedDate, config.location.slug);
+  }, [selectedDate, loadSessions, config]);
 
   // Keep selected date chip in view on the snap rail.
   useEffect(() => {
@@ -254,7 +263,7 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
     }
   };
 
-  const timezone = config?.location.timezone ?? "UTC";
+  const timezone = config?.location?.timezone ?? "UTC";
 
   const summary = (
     <div className="flex flex-col gap-4">
@@ -348,7 +357,29 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
                 Купить билет
               </h2>
             </div>
-            {config?.location && (
+            {config && config.locations.length > 1 ? (
+              <label className="mt-3 block text-sm font-bold text-forest">
+                Локация
+                <select
+                  className="mt-1 w-full rounded-xl border border-beige bg-white px-3 py-2"
+                  value={config.location?.slug ?? ""}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    setLocationSlug(slug);
+                    const url = new URL(window.location.href);
+                    url.searchParams.set("location", slug);
+                    window.history.replaceState({}, "", url.toString());
+                  }}
+                >
+                  <option value="">Выберите локацию</option>
+                  {config.locations.map((loc) => (
+                    <option key={loc.slug} value={loc.slug}>
+                      {loc.city} · {loc.venue}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : config?.location ? (
               <motion.div
                 layout
                 className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-beige bg-white/80 px-3 py-1.5 text-xs font-bold text-forest shadow-sm"
@@ -359,7 +390,7 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
                   <span className="text-muted-foreground"> · {config.location.venue}</span>
                 </span>
               </motion.div>
-            )}
+            ) : null}
           </div>
 
           {/* Progress */}

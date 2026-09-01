@@ -30,7 +30,8 @@ export interface PublicConfigDisplayRulesDto {
 }
 
 export interface PublicConfigDto {
-  location: PublicConfigLocationDto;
+  location: PublicConfigLocationDto | null;
+  locations: PublicConfigLocationDto[];
   /** Inclusive `YYYY-MM-DD` window the public date picker should offer. */
   availableDateRange: { from: string; to: string };
   /** Weekdays when the venue is closed (e.g. `TUESDAY`). */

@@ -515,6 +515,14 @@ export function AnalyticsDashboard() {
           label="Check-in"
           value={String(kpis?.checkIns ?? 0)}
           comparison={comparison?.checkIns}
+          formula="Только SUCCESS"
+          loading={loading}
+        />
+        <KpiCard
+          label="Сканы возвратов"
+          value={String(kpis?.checkInsRefunded ?? 0)}
+          comparison={comparison?.checkInsRefunded}
+          formula="TicketCheckIn.result = REFUNDED"
           loading={loading}
         />
         <KpiCard

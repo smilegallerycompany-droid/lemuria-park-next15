@@ -2,6 +2,8 @@
 .git
 .gitignore
 .cursor
+.yc-cli
+.yc-keys
 .env
 .env.*
 !.env.example

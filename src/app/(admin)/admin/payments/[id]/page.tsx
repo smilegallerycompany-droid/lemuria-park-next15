@@ -49,7 +49,7 @@ export default function AdminPaymentDetailPage() {
   return (
     <div className="director-page">
       <PageHeader
-        title="Payment detail"
+        title="Платёж"
         description="Без secrets / PAN / auth headers"
         actions={
           <Link href="/admin/payments" className="internal-btn secondary">
@@ -64,7 +64,7 @@ export default function AdminPaymentDetailPage() {
             <li>
               <span>Order</span>
               <strong>
-                <Link href={`/director/orders/${payment.orderNumber}`}>{payment.orderNumber}</Link>
+                <Link href={`/admin/orders/${payment.orderNumber}`}>{payment.orderNumber}</Link>
               </strong>
             </li>
             <li>

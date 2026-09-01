@@ -61,6 +61,19 @@ export async function getPublicLocationsPayload(): Promise<PublicLocationPayload
         take: 6,
       });
 
+      const soldBySession =
+        sessions.length === 0
+          ? []
+          : await prisma.ticket.groupBy({
+              by: ["sessionId"],
+              where: {
+                sessionId: { in: sessions.map((s) => s.id) },
+                status: { in: ["VALID", "USED"] },
+              },
+              _count: { _all: true },
+            });
+      const soldMap = new Map(soldBySession.map((row) => [row.sessionId, row._count._all]));
+
       const nextSessions = sessions.map((s) => ({
         localDate: formatDateInTimezone(s.startsAt, loc.timezone),
         localTime: new Intl.DateTimeFormat("ru-RU", {
@@ -69,7 +82,7 @@ export async function getPublicLocationsPayload(): Promise<PublicLocationPayload
           minute: "2-digit",
           hourCycle: "h23",
         }).format(s.startsAt),
-        remainingSeats: s.capacity,
+        remainingSeats: Math.max(0, s.capacity - (soldMap.get(s.id) ?? 0)),
       }));
 
       return {

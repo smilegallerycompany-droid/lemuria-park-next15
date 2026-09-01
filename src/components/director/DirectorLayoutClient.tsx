@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { directorFetch } from "@/lib/director/client";
 import { labelRole } from "@/lib/director/labels";
+import { StaffPortalProvider } from "@/lib/staff-portal";
 
 const NAV = [
   { href: "/director", label: "Обзор" },
@@ -58,6 +59,7 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
   }
 
   return (
+    <StaffPortalProvider portal="director">
     <div className="director-root">
       <div className={`director-shell ${navOpen ? "nav-open" : ""}`}>
         <aside className="director-sidebar" aria-label="Боковое меню">
@@ -127,5 +129,6 @@ export function DirectorLayoutClient({ children }: { children: React.ReactNode }
         ) : null}
       </div>
     </div>
+    </StaffPortalProvider>
   );
 }

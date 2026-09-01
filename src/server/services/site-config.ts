@@ -2,71 +2,85 @@ import { prisma } from "@/lib/db/prisma";
 import { addDaysUtc, formatDateInTimezone, todayInTimezone } from "@/lib/datetime";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { DomainError } from "@/server/domain/errors";
+import { resolveBookableLocation } from "@/server/domain/public-location";
 import { locationRepository } from "@/server/repositories/location.repository";
 import { ticketTypeRepository } from "@/server/repositories/ticket-type.repository";
-import type { PublicConfigDto } from "@/types/dto/config";
+import type { PublicConfigDto, PublicConfigLocationDto } from "@/types/dto/config";
+import type { Location } from "@prisma/client";
 
-/**
- * SiteConfigService — assembles the public site configuration (the single
- * currently-active Location, brand strings, contact info, active ticket
- * types) entirely from the database. Never includes `visitDurationMinutes`,
- * internal ids, or a single "eternal" price — ticket-type prices vary by
- * date, so the client asks GET /api/public/sessions for those.
- */
-export async function getPublicSiteConfig(): Promise<PublicConfigDto> {
+function toLocationDto(location: Location): PublicConfigLocationDto {
+  return {
+    slug: location.slug,
+    city: location.city,
+    venue: location.name,
+    address: location.address,
+    timezone: location.timezone,
+  };
+}
+
+function isWithinActiveWindow(location: Location, now: Date): boolean {
+  if (location.activeFrom && location.activeFrom.getTime() > now.getTime()) return false;
+  if (location.activeTo && location.activeTo.getTime() < now.getTime()) return false;
+  return true;
+}
+
+export async function getPublicSiteConfig(locationSlug?: string): Promise<PublicConfigDto> {
   const now = new Date();
-  const location = await locationRepository.findDefaultActive(prisma, now);
+  const active = (await locationRepository.listActive(prisma, now)).filter((loc) =>
+    isWithinActiveWindow(loc, now),
+  );
 
-  if (!location) {
-    throw new DomainError("CONFIG_NOT_FOUND", "Активная локация не найдена");
+  const resolved = resolveBookableLocation({ slug: locationSlug, active });
+  if (resolved.kind === "not-found" && locationSlug) {
+    throw new DomainError("LOCATION_NOT_FOUND", "Локация не найдена");
   }
+  const selected = resolved.kind === "ok" ? resolved.location : null;
 
-  const [contact, ticketTypes, closedSchedules] = await Promise.all([
+  const [contact, ticketTypes, settings] = await Promise.all([
     prisma.contactSettings.findFirst({ orderBy: { createdAt: "asc" } }),
     ticketTypeRepository.listActive(prisma),
-    prisma.locationSchedule.findMany({
-      where: { locationId: location.id, isClosed: true },
-      select: { dayOfWeek: true },
-    }),
+    prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } }),
   ]);
 
-  const settings = await prisma.siteSettings.findFirst({ orderBy: { createdAt: "asc" } });
+  const closedSchedules = selected
+    ? await prisma.locationSchedule.findMany({
+        where: { locationId: selected.id, isClosed: true },
+        select: { dayOfWeek: true },
+      })
+    : [];
 
-  const todayLocal = todayInTimezone(location.timezone, now);
+  const timezone = selected?.timezone ?? settings?.defaultTimezone ?? "Europe/Moscow";
+  const todayLocal = todayInTimezone(timezone, now);
   const lookaheadEnd = formatDateInTimezone(
     addDaysUtc(now, DOMAIN_CONFIG.sessionsLookaheadDays),
-    location.timezone,
+    timezone,
   );
-  const activeFromLocal = location.activeFrom
-    ? formatDateInTimezone(location.activeFrom, location.timezone)
+  const activeFromLocal = selected?.activeFrom
+    ? formatDateInTimezone(selected.activeFrom, timezone)
     : null;
-  const activeToLocal = location.activeTo
-    ? formatDateInTimezone(location.activeTo, location.timezone)
+  const activeToLocal = selected?.activeTo
+    ? formatDateInTimezone(selected.activeTo, timezone)
     : null;
-
   const from =
     activeFromLocal && activeFromLocal > todayLocal ? activeFromLocal : todayLocal;
   const to = activeToLocal ?? lookaheadEnd;
 
+  const ticketTypeDtos = ticketTypes.map((ticketType) => ({
+    code: ticketType.code,
+    name: ticketType.name,
+    description: ticketType.description,
+    minAge: ticketType.minAge,
+    maxAge: ticketType.maxAge,
+  }));
+
   return {
-    location: {
-      slug: location.slug,
-      city: location.city,
-      venue: location.name,
-      address: location.address,
-      timezone: location.timezone,
-    },
+    location: selected ? toLocationDto(selected) : null,
+    locations: active.map(toLocationDto),
     availableDateRange: { from, to },
     closedWeekdays: closedSchedules.map((row) => row.dayOfWeek),
-    ticketTypes: ticketTypes.map((ticketType) => ({
-      code: ticketType.code,
-      name: ticketType.name,
-      description: ticketType.description,
-      minAge: ticketType.minAge,
-      maxAge: ticketType.maxAge,
-    })),
+    ticketTypes: ticketTypeDtos,
     displayRules: {
-      sessionIntervalMinutes: location.sessionIntervalMinutes,
+      sessionIntervalMinutes: selected?.sessionIntervalMinutes ?? 30,
       lowAvailabilityThreshold: DOMAIN_CONFIG.lowAvailabilityThreshold,
     },
     site: {

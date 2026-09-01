@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KpiCard, PageHeader } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { useStaffBasePath } from "@/lib/staff-portal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type ShiftRow = {
@@ -33,6 +34,7 @@ function moscowDayStart(offsetDays = 0) {
 }
 
 export default function DirectorShiftsPage() {
+  const base = useStaffBasePath();
   const [shifts, setShifts] = useState<ShiftRow[]>([]);
   const [period, setPeriod] = useState<"today" | "7d" | "30d" | "custom">("today");
   const [from, setFrom] = useState(moscowDayStart(0));
@@ -205,7 +207,7 @@ export default function DirectorShiftsPage() {
             {shifts.map((s) => (
               <tr key={s.id}>
                 <td>
-                  <Link href={`/director/shifts/${s.id}`}>{s.cashier.name}</Link>
+                  <Link href={`${base}/shifts/${s.id}`}>{s.cashier.name}</Link>
                 </td>
                 <td>
                   {s.location.city} — {s.location.name}

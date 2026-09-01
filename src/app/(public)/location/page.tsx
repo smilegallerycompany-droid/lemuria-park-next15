@@ -1,42 +1,40 @@
-import { MapPin, Phone, Clock } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { SITE } from "@/lib/domain";
-import { H1 } from "@/components/ui/typography";
-import { PageSection } from "@/components/layout/page-section";
-import { Container } from "@/components/layout/container";
+import { getPublicLocationsPayload } from "@/server/services/public-locations";
+import { WhereWeAreSection } from "@/components/public/WhereWeAreSection";
 
-export default function Location() {
-  return (
-    <PageSection tone="jungle" className="py-14">
-      <Container>
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">Локация</p>
-        <H1 className="mt-2 font-display text-4xl font-semibold md:text-5xl">Как нас найти</H1>
-        <div className="mt-8 grid gap-6 lg:grid-cols-[.8fr_1.2fr]">
-          <Card variant="glass" className="grid gap-5 p-6">
-            <p className="flex gap-3 text-forest">
-              <MapPin className="shrink-0 text-orange" aria-hidden />
-              {SITE.address}
-            </p>
-            <p className="flex gap-3 text-forest">
-              <Clock className="shrink-0 text-orange" aria-hidden />
-              {SITE.schedule}
-            </p>
-            <p className="flex gap-3 text-forest">
-              <Phone className="shrink-0 text-orange" aria-hidden />
-              {SITE.phone}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              МегаЦентр «Красная площадь», 2 этаж, ориентир магазин Kari.
-            </p>
-          </Card>
-          <Card
-            variant="soft"
-            className="grid min-h-[420px] place-items-center text-center text-muted-foreground"
-          >
-            Карта скоро появится
-          </Card>
+export default async function LocationPage() {
+  const data = await getPublicLocationsPayload();
+  const locations = data.locations;
+
+  if (locations.length === 0) {
+    return (
+      <main className="page-shell">
+        <div className="container" style={{ padding: "48px 0 80px" }}>
+          <p className="kicker">Локация</p>
+          <h1 className="page-title">Как нас найти</h1>
+          <section className="location-map-fallback" style={{ minHeight: 280, marginTop: 24 }}>
+            <div className="location-map-fallback-inner">
+              <div className="location-map-fallback-icon" aria-hidden>
+                ⌖
+              </div>
+              <strong>Карта пока не опубликована</strong>
+              <p>
+                Адрес и координаты появятся здесь после того, как администратор заполнит карту
+                локации в панели.
+              </p>
+            </div>
+          </section>
         </div>
-      </Container>
-    </PageSection>
+      </main>
+    );
+  }
+
+  return (
+    <main className="page-shell">
+      <WhereWeAreSection
+        sectionTitle={data.sectionTitle}
+        locations={locations}
+        initialSlug={locations.length === 1 ? locations[0]!.slug : undefined}
+      />
+    </main>
   );
 }

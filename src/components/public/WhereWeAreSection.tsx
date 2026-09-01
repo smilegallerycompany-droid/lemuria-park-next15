@@ -133,9 +133,11 @@ export function WhereWeAreSection({
             <a className="button button-orange" href="#booking">
               Купить билет
             </a>
-            <a className="button button-ghost" href={route} target="_blank" rel="noreferrer">
-              <Navigation size={16} aria-hidden /> Построить маршрут
-            </a>
+            {hasCoordinates(location) || location.routeUrl || location.mapUrl ? (
+              <a className="button button-ghost" href={route} target="_blank" rel="noreferrer">
+                <Navigation size={16} aria-hidden /> Построить маршрут
+              </a>
+            ) : null}
           </div>
         </div>
 
@@ -152,16 +154,16 @@ export function WhereWeAreSection({
               height={420}
             />
           ) : (
-            <div className="location-map-fallback" style={{ minHeight: 420 }}>
+            <div className="location-map-fallback" style={{ minHeight: 420 }} role="status">
               <div className="location-map-fallback-inner">
                 <div className="location-map-fallback-icon" aria-hidden>
                   ⌖
                 </div>
-                <strong>{title}</strong>
-                <p>{[location.address, location.addressLine2].filter(Boolean).join(", ")}</p>
-                <a className="button button-orange" href={route} target="_blank" rel="noreferrer">
-                  Открыть расположение на карте
-                </a>
+                <strong>Карта этой локации пока не заполнена</strong>
+                <p>
+                  {[location.address, location.addressLine2].filter(Boolean).join(", ") ||
+                    "Администратор ещё не указал координаты и ссылку маршрута."}
+                </p>
               </div>
             </div>
           )}

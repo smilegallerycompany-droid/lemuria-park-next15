@@ -4,10 +4,12 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ConfirmDialog, PageHeader } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { useStaffBasePath } from "@/lib/staff-portal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 export default function DirectorShiftDetailPage() {
   const params = useParams<{ id: string }>();
+  const base = useStaffBasePath();
   const [data, setData] = useState<{
     shift: {
       id: string;
@@ -263,7 +265,7 @@ export default function DirectorShiftDetailPage() {
               {shift.orders.map((o) => (
                 <tr key={o.number}>
                   <td>
-                    <a href={`/director/orders/${o.number}`}>{o.number}</a>
+                    <a href={`${base}/orders/${o.number}`}>{o.number}</a>
                   </td>
                   <td className="tabular-nums">{formatMoneyFromKopecks(o.totalAmount)}</td>
                   <td>{o.status}</td>

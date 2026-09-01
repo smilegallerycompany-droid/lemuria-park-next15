@@ -43,6 +43,22 @@ export function formatPercent(rate: number): string {
   return `${Math.round(rate * 1000) / 10}%`;
 }
 
+export function downloadCsv(filename: string, rows: Array<Record<string, string | number>>) {
+  if (rows.length === 0) return;
+  const keys = Object.keys(rows[0]!);
+  const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
+  const csv = [keys.join(","), ...rows.map((row) => keys.map((k) => escape(row[k] ?? "")).join(","))].join(
+    "\n",
+  );
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export const DAY_LABELS: Record<string, string> = {
   MONDAY: "Пн",
   TUESDAY: "Вт",

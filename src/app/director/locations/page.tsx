@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { useStaffBasePath } from "@/lib/staff-portal";
 
 type LocationRow = {
   id: string;
@@ -16,6 +17,7 @@ type LocationRow = {
 };
 
 export default function DirectorLocationsPage() {
+  const base = useStaffBasePath();
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -54,7 +56,7 @@ export default function DirectorLocationsPage() {
 
   return (
     <>
-      <PageHeader title="Locations" description="Локации парка, статус и базовые параметры сеансов." />
+      <PageHeader title="Локации" description="Локации парка, статус, карта и базовые параметры сеансов." />
       {error ? <div className="director-alert error">{error}</div> : null}
 
       <section className="director-panel" style={{ marginBottom: 18 }}>
@@ -116,7 +118,7 @@ export default function DirectorLocationsPage() {
                   <td>{location._count.sessions}</td>
                   <td>{location._count.orders}</td>
                   <td>
-                    <Link href={`/director/locations/${location.id}`} className="director-link">
+                    <Link href={`${base}/locations/${location.id}`} className="director-link">
                       Открыть
                     </Link>
                   </td>

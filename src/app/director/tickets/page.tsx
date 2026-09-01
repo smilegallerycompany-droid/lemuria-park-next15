@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
-import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { directorFetch, downloadCsv, formatDateTime } from "@/lib/director/client";
+import { useStaffBasePath } from "@/lib/staff-portal";
 
 type TicketRow = {
   publicId: string;
@@ -16,6 +18,7 @@ type TicketRow = {
 };
 
 export default function DirectorTicketsPage() {
+  const base = useStaffBasePath();
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +37,38 @@ export default function DirectorTicketsPage() {
   return (
     <>
       <PageHeader
-        title="Tickets"
+        title="Билеты"
         description="Выданные билеты и статусы check-in / refund."
         actions={
           <>
-            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="publicId, order, QR" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="publicId, заказ, QR"
+              aria-label="Поиск билетов"
+            />
             <button type="button" className="director-btn secondary" onClick={() => load(search)}>
               Найти
+            </button>
+            <button
+              type="button"
+              className="director-btn secondary"
+              onClick={() =>
+                downloadCsv(
+                  "tickets.csv",
+                  tickets.map((ticket) => ({
+                    publicId: ticket.publicId,
+                    order: ticket.order.number,
+                    status: ticket.status,
+                    type: ticket.ticketType.name,
+                    location: ticket.location.name,
+                    createdAt: ticket.createdAt,
+                  })),
+                )
+              }
+              disabled={tickets.length === 0}
+            >
+              CSV
             </button>
           </>
         }
@@ -53,7 +81,7 @@ export default function DirectorTicketsPage() {
             <thead>
               <tr>
                 <th>Public ID</th>
-                <th>Order</th>
+                <th>Номер заказа</th>
                 <th>Тип</th>
                 <th>Локация</th>
                 <th>Сеанс</th>
@@ -64,7 +92,9 @@ export default function DirectorTicketsPage() {
               {tickets.map((ticket) => (
                 <tr key={ticket.publicId}>
                   <td>{ticket.publicId}</td>
-                  <td>{ticket.order.number}</td>
+                  <td>
+                    <Link href={`${base}/orders/${ticket.order.number}`}>{ticket.order.number}</Link>
+                  </td>
                   <td>{ticket.ticketType.name}</td>
                   <td>{ticket.location.name}</td>
                   <td>{formatDateTime(ticket.session.startsAt)}</td>

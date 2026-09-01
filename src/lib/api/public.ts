@@ -16,8 +16,12 @@ import type { PublicOrderDto } from "@/types/dto/order";
  * only the DTO types below — never a Prisma model.
  */
 
-export function getPublicConfig(options?: RequestOptions): Promise<PublicConfigDto> {
-  return apiGet<PublicConfigDto>("/api/public/config", options);
+export function getPublicConfig(
+  options?: RequestOptions & { locationSlug?: string },
+): Promise<PublicConfigDto> {
+  const slug = options?.locationSlug;
+  const search = slug ? `?locationSlug=${encodeURIComponent(slug)}` : "";
+  return apiGet<PublicConfigDto>(`/api/public/config${search}`, options);
 }
 
 export interface GetPublicSessionsParams {

@@ -83,6 +83,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
     refundsAgg,
     ticketsSold,
     checkIns,
+    checkInsRefunded,
     cancelledOrders,
     refundedOrders,
     bySource,
@@ -117,6 +118,15 @@ async function kpiBundle(params: AnalyticsReportParams) {
         scannedAt: { gte: params.from, lte: params.to },
         ticket: {
           order: where,
+          ...(locations ? { session: { locationId: { in: locations } } } : {}),
+        },
+      },
+    }),
+    prisma.ticketCheckIn.count({
+      where: {
+        result: "REFUNDED",
+        scannedAt: { gte: params.from, lte: params.to },
+        ticket: {
           ...(locations ? { session: { locationId: { in: locations } } } : {}),
         },
       },
@@ -234,6 +244,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
       averageOrderValueKopecks: averageOrderValueKopecks(net, paidOrders),
       averageTicketPriceKopecks: averageTicketPriceKopecks(net, ticketsSold),
       checkIns,
+      checkInsRefunded,
       attendanceRate,
       occupancyRate,
       onlineRevenueKopecks: online,

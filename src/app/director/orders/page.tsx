@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { EmptyState, ErrorAlert, PageHeader, StatusBadge } from "@/components/internal";
-import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { directorFetch, downloadCsv, formatDateTime } from "@/lib/director/client";
 import { labelSource, labelStatus } from "@/lib/director/labels";
+import { useStaffBasePath } from "@/lib/staff-portal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type OrderRow = {
@@ -19,18 +20,37 @@ type OrderRow = {
   _count: { tickets: number };
 };
 
+type LocationOpt = { id: string; name: string; city: string };
+
+function moscowDay(offset = 0) {
+  const now = new Date();
+  const local = new Date(now.toLocaleString("en-US", { timeZone: "Europe/Moscow" }));
+  local.setDate(local.getDate() + offset);
+  local.setHours(0, 0, 0, 0);
+  const iso = new Date(local.getTime() - local.getTimezoneOffset() * 60_000);
+  return iso.toISOString().slice(0, 10);
+}
+
 export default function DirectorOrdersPage() {
+  const base = useStaffBasePath();
   const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [locations, setLocations] = useState<LocationOpt[]>([]);
   const [search, setSearch] = useState("");
+  const [locationId, setLocationId] = useState("");
+  const [from, setFrom] = useState(moscowDay(-29));
+  const [to, setTo] = useState(moscowDay(1));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  async function load(query = "") {
+  async function load() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: "100" });
-      if (query) params.set("search", query);
+      const params = new URLSearchParams({ limit: "200" });
+      if (search) params.set("search", search);
+      if (locationId) params.set("locationId", locationId);
+      if (from) params.set("from", `${from}T00:00:00+03:00`);
+      if (to) params.set("to", `${to}T00:00:00+03:00`);
       const data = await directorFetch<{ orders: OrderRow[] }>(`/api/director/orders?${params}`);
       setOrders(data.orders);
     } catch (err) {
@@ -41,7 +61,12 @@ export default function DirectorOrdersPage() {
   }
 
   useEffect(() => {
+    directorFetch<{ locations: LocationOpt[] }>("/api/director/locations")
+      .then((data) => setLocations(data.locations))
+      .catch(() => undefined);
     void load();
+    // Initial load only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -51,14 +76,59 @@ export default function DirectorOrdersPage() {
         description="Заказы всех каналов. Суммы хранятся в копейках, в интерфейсе — рубли."
         actions={
           <>
+            <label className="director-field" style={{ margin: 0 }}>
+              <span className="sr-only">Локация</span>
+              <select
+                value={locationId}
+                onChange={(e) => setLocationId(e.target.value)}
+                aria-label="Локация"
+              >
+                <option value="">Все локации</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.city} — {loc.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">С</span>
+              <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="Период с" />
+            </label>
+            <label>
+              <span className="sr-only">По</span>
+              <input type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="Период по" />
+            </label>
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Номер, имя, телефон"
               aria-label="Поиск заказов"
             />
-            <button type="button" className="internal-btn secondary" onClick={() => void load(search)}>
+            <button type="button" className="internal-btn secondary" onClick={() => void load()}>
               Найти
+            </button>
+            <button
+              type="button"
+              className="internal-btn secondary"
+              onClick={() =>
+                downloadCsv(
+                  "orders.csv",
+                  orders.map((order) => ({
+                    number: order.number,
+                    status: order.status,
+                    source: order.source,
+                    location: order.location.name,
+                    customer: order.customerName,
+                    amountKopecks: order.totalAmount,
+                    tickets: order._count.tickets,
+                    createdAt: order.createdAt,
+                  })),
+                )
+              }
+              disabled={orders.length === 0}
+            >
+              CSV
             </button>
           </>
         }
@@ -98,7 +168,7 @@ export default function DirectorOrdersPage() {
                     <StatusBadge status={order.status} label={labelStatus(order.status)} />
                   </td>
                   <td>
-                    <Link href={`/director/orders/${order.number}`} className="internal-btn secondary">
+                    <Link href={`${base}/orders/${order.number}`} className="internal-btn secondary">
                       Детали
                     </Link>
                   </td>
@@ -107,7 +177,7 @@ export default function DirectorOrdersPage() {
               {!loading && orders.length === 0 ? (
                 <tr>
                   <td colSpan={8}>
-                    <EmptyState title="Заказов нет" description="Попробуйте изменить поиск." />
+                    <EmptyState title="Заказов нет" description="Попробуйте изменить поиск или период." />
                   </td>
                 </tr>
               ) : null}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
-import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { directorFetch, downloadCsv, formatDateTime } from "@/lib/director/client";
 
 type AuditRow = {
   id: string;
@@ -25,7 +25,31 @@ export default function DirectorAuditPage() {
 
   return (
     <>
-      <PageHeader title="Audit" description="Журнал действий staff/director с фильтрами через API." />
+      <PageHeader
+        title="Журнал аудита"
+        description="Действия staff / director / admin / owner. Секреты не записываются."
+        actions={
+          <button
+            type="button"
+            className="director-btn secondary"
+            onClick={() =>
+              downloadCsv(
+                "audit-log.csv",
+                logs.map((log) => ({
+                  at: log.createdAt,
+                  actor: log.actor?.email ?? "system",
+                  role: log.actor?.role ?? "",
+                  action: log.action,
+                  entity: `${log.entityType}${log.entityId ? `:${log.entityId}` : ""}`,
+                })),
+              )
+            }
+            disabled={logs.length === 0}
+          >
+            CSV
+          </button>
+        }
+      />
       {error ? <div className="director-alert error">{error}</div> : null}
 
       <section className="director-panel">
@@ -34,9 +58,9 @@ export default function DirectorAuditPage() {
             <thead>
               <tr>
                 <th>Время</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Entity</th>
+                <th>Сотрудник</th>
+                <th>Действие</th>
+                <th>Объект</th>
               </tr>
             </thead>
             <tbody>

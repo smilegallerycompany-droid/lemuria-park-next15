@@ -84,7 +84,7 @@ export async function checkInTicket(params: {
     }
 
     if (ticket.status === "REFUNDED") {
-      await log(ticket.id, "CANCELLED", params.cashierId, "Билет возвращён");
+      await log(ticket.id, "REFUNDED", params.cashierId, "Билет возвращён");
       await auditDenied(params.cashierId, ticket.id, "REFUNDED");
       return { result: "REFUNDED", message: "Билет возвращён", ticket: baseTicket };
     }
@@ -179,7 +179,7 @@ export async function checkInTicket(params: {
 
 async function log(
   ticketId: string,
-  result: "SUCCESS" | "ALREADY_USED" | "INVALID" | "CANCELLED" | "EXPIRED",
+  result: "SUCCESS" | "ALREADY_USED" | "INVALID" | "CANCELLED" | "EXPIRED" | "REFUNDED",
   cashierId: string,
   note: string,
 ) {

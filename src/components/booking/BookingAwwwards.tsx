@@ -70,6 +70,18 @@ function weekdayEnum(dateKey: string) {
   return JS_WEEKDAY_TO_ENUM[new Date(`${dateKey}T12:00:00`).getDay()];
 }
 
+function readLocationSlug(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return new URLSearchParams(window.location.search).get("location")?.trim() || undefined;
+}
+
+function writeLocationSlug(slug: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("location", slug);
+  const hash = url.hash || "#booking";
+  window.history.replaceState({}, "", `${url.pathname}?${url.searchParams.toString()}${hash}`);
+}
+
 export function BookingAwwwards() {
   const [config, setConfig] = useState<PublicConfigDto | null>(null);
   const [sessions, setSessions] = useState<PublicSessionDto[]>([]);
@@ -80,34 +92,43 @@ export function BookingAwwwards() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [qty, setQty] = useState<QtyMap>({});
   const [submitting, setSubmitting] = useState(false);
+  const [locationSlug, setLocationSlug] = useState<string | undefined>(undefined);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoadingConfig(true);
-        const cfg = await getPublicConfig();
-        if (cancelled) return;
-        setConfig(cfg);
-        const initial: QtyMap = {};
-        for (const t of cfg.ticketTypes) {
-          if (t.code === "ADULT") initial[t.code] = 2;
-          else if (t.code === "CHILD") initial[t.code] = 1;
-          else initial[t.code] = 0;
-        }
-        setQty(initial);
-      } catch (e) {
-        if (!cancelled) {
-          setError(e instanceof ApiClientError ? e.message : "Не удалось загрузить конфигурацию");
-        }
-      } finally {
-        if (!cancelled) setLoadingConfig(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    setLocationSlug(readLocationSlug());
   }, []);
+
+  const loadConfig = useCallback(async (slug?: string) => {
+    setLoadingConfig(true);
+    setError(null);
+    try {
+      const cfg = await getPublicConfig({ locationSlug: slug });
+      setConfig(cfg);
+      const initial: QtyMap = {};
+      for (const t of cfg.ticketTypes) {
+        if (t.code === "ADULT") initial[t.code] = 2;
+        else if (t.code === "CHILD") initial[t.code] = 1;
+        else initial[t.code] = 0;
+      }
+      setQty(initial);
+      if (cfg.location && slug !== cfg.location.slug) {
+        setLocationSlug(cfg.location.slug);
+      }
+    } catch (e) {
+      setError(e instanceof ApiClientError ? e.message : "Не удалось загрузить конфигурацию");
+      setConfig(null);
+    } finally {
+      setLoadingConfig(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (locationSlug === undefined && typeof window !== "undefined") {
+      void loadConfig(readLocationSlug());
+      return;
+    }
+    void loadConfig(locationSlug);
+  }, [locationSlug, loadConfig]);
 
   const dateOptions = useMemo(() => {
     if (!config) return [];
@@ -145,7 +166,7 @@ export function BookingAwwwards() {
   }, []);
 
   useEffect(() => {
-    if (!selectedDate || !config) return;
+    if (!selectedDate || !config?.location) return;
     void loadSessions(selectedDate, config.location.slug);
   }, [selectedDate, config, loadSessions]);
 
@@ -221,6 +242,35 @@ export function BookingAwwwards() {
             Дата и время
           </div>
 
+          {config && config.locations.length > 1 ? (
+            <label className="field-select">
+              <span className="field-select-label">Локация</span>
+              <div className="select-shell">
+                <select
+                  className="booking-select"
+                  value={config.location?.slug ?? ""}
+                  onChange={(e) => {
+                    const slug = e.target.value;
+                    writeLocationSlug(slug);
+                    setLocationSlug(slug);
+                    setSessions([]);
+                    setActiveSessionId("");
+                  }}
+                  aria-label="Выберите локацию"
+                >
+                  <option value="" disabled>
+                    Выберите локацию
+                  </option>
+                  {config.locations.map((loc) => (
+                    <option key={loc.slug} value={loc.slug}>
+                      {loc.city} · {loc.venue}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </label>
+          ) : null}
+
           <label className="field-select">
             <span className="field-select-label">
               <CalendarDays size={16} /> Дата
@@ -282,11 +332,13 @@ export function BookingAwwwards() {
           {!loadingSessions && nearestSessions.length > 0 && (
             <p className="booking-hint">Показаны ближайшие свободные сеансы на выбранный день</p>
           )}
-          {config && (
+          {config?.location ? (
             <p className="booking-hint muted">
               {config.location.city} · {config.location.venue}
             </p>
-          )}
+          ) : config && config.locations.length > 1 ? (
+            <p className="booking-hint muted">Выберите локацию, чтобы увидеть сеансы</p>
+          ) : null}
         </div>
 
         <div className="booking-column">

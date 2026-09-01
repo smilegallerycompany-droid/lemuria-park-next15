@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { requireDirector } from "@/server/auth/staff-session";
-import { initiateFullRefund } from "@/server/services/refunds";
+import { initiateRefund } from "@/server/services/refunds";
 import { requestMeta } from "@/server/director/http";
 import { prisma } from "@/lib/db/prisma";
 import { canAccessLocation } from "@/server/auth/location-access";
@@ -9,11 +9,13 @@ import { canAccessLocation } from "@/server/auth/location-access";
 const schema = z.object({
   confirm: z.literal(true),
   reason: z.string().min(3).max(500),
+  ticketPublicIds: z.array(z.string().min(4)).max(50).optional(),
+  allowUsedTickets: z.boolean().optional(),
 });
 
 type RouteContext = { params: Promise<{ number: string }> };
 
-/** Full refund only. Partial deferred. Cashier cannot call this route. */
+/** Director/admin/owner refund. Cashier cannot call this route. Staging never calls ЮKassa. */
 export async function POST(req: Request, context: RouteContext) {
   try {
     const actor = await requireDirector();
@@ -31,10 +33,14 @@ export async function POST(req: Request, context: RouteContext) {
     const input = schema.parse(json);
     const meta = requestMeta(req);
 
-    const result = await initiateFullRefund({
+    const result = await initiateRefund({
       orderNumber: number,
       actorId: actor.id,
+      actorRole: actor.role,
       reason: input.reason,
+      ticketPublicIds: input.ticketPublicIds,
+      allowUsedTickets: input.allowUsedTickets,
+      idempotencyKey: req.headers.get("Idempotency-Key"),
       ip: meta.ipAddress,
       ua: meta.userAgent,
     });
