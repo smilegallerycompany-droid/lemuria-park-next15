@@ -1,8 +1,15 @@
 import { getPublicLocationsPayload } from "@/server/services/public-locations";
 import { WhereWeAreSection } from "@/components/public/WhereWeAreSection";
 
+export const dynamic = "force-dynamic";
+
 export default async function LocationPage() {
-  const data = await getPublicLocationsPayload();
+  let data: Awaited<ReturnType<typeof getPublicLocationsPayload>>;
+  try {
+    data = await getPublicLocationsPayload();
+  } catch {
+    data = { sectionTitle: "Где мы находимся?", locations: [] };
+  }
   const locations = data.locations;
 
   if (locations.length === 0) {
