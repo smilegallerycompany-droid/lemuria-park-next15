@@ -64,6 +64,9 @@ function weekdayEnum(dateIso) {
 }
 
 async function main() {
+  if (process.env.APP_ENV === "production") {
+    throw new Error("Refusing: staging seed cannot run when APP_ENV=production.");
+  }
   if (process.env.ALLOW_STAGING_SEED !== "1") {
     throw new Error("Refusing: set ALLOW_STAGING_SEED=1 to run the staging seed.");
   }
@@ -248,6 +251,25 @@ async function main() {
     }
 
     const start = todayMoscow();
+    // Check-in compares session local date to today. Public hours skip Tuesday,
+    // but cashier smoke still needs a same-calendar-day OPEN session.
+    for (const time of ["12:00", "14:00"]) {
+      const startsAt = moscowInstant(start, time);
+      const endsAt = new Date(startsAt.getTime() + 20 * 60 * 1000);
+      await prisma.session.upsert({
+        where: { locationId_startsAt: { locationId: location.id, startsAt } },
+        update: { endsAt, capacity: 8, status: "OPEN" },
+        create: {
+          locationId: location.id,
+          startsAt,
+          endsAt,
+          capacity: 8,
+          status: "OPEN",
+        },
+      });
+      summary.sessionsUpserted += 1;
+    }
+
     let made = 0;
     for (let offset = 0; offset < 10 && made < 6; offset += 1) {
       const dateIso = addDaysIso(start, offset);

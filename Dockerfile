@@ -41,9 +41,10 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY container-start.sh /app/container-start.sh
+COPY container-bootstrap.cjs /app/container-bootstrap.cjs
 # Prisma CLI for optional staging migrate/seed. Production must not set RUN_MIGRATE_ON_START.
 RUN npm install -g prisma@6.19.3 \
-  && chmod 755 /app/container-start.sh
+  && chmod 755 /app/container-start.sh /app/container-bootstrap.cjs
 USER nextjs
 EXPOSE 8080
 CMD ["/app/container-start.sh"]

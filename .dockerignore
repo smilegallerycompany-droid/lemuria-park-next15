@@ -32,6 +32,7 @@ scripts
 playwright.config.ts
 **/*.test.ts
 **/*.spec.ts
+container-bootstrap.test.cjs
 README.md
 *.log
 logs/
