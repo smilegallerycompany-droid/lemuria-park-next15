@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   TIMER_CLEANUP_PAYLOAD,
   extractCronSecret,
+  isPrivateTimerRootPost,
   isYandexTimerCleanupEvent,
   secretsEqual,
 } from "@/lib/config/cron-auth";
@@ -38,6 +39,16 @@ test("isYandexTimerCleanupEvent accepts timer messages with discriminator only",
     }),
     false,
   );
+});
+
+test("isPrivateTimerRootPost rewrites only IAM POSTs to /", () => {
+  assert.equal(isPrivateTimerRootPost("POST", "/", new Headers()), true);
+  assert.equal(
+    isPrivateTimerRootPost("POST", "/", new Headers({ "x-serverless-gateway-id": "gw" })),
+    false,
+  );
+  assert.equal(isPrivateTimerRootPost("GET", "/", new Headers()), false);
+  assert.equal(isPrivateTimerRootPost("POST", "/api/cron/cleanup", new Headers()), false);
 });
 
 test("extractCronSecret reads Bearer then X-Cron-Secret", () => {

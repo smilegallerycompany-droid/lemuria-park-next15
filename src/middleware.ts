@@ -6,6 +6,7 @@ import {
   parseAllowedHosts,
   shouldSkipHostAllowlist,
 } from "@/lib/config/allowed-hosts";
+import { isPrivateTimerRootPost } from "@/lib/config/cron-auth";
 
 const STAFF_PREFIXES = ["/cashier", "/director", "/admin", "/staff"];
 
@@ -21,6 +22,12 @@ function isStaffPath(pathname: string): boolean {
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const timerRoot = isPrivateTimerRootPost(request.method, pathname, request.headers);
+  if (timerRoot) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/cron/cleanup";
+    return NextResponse.rewrite(url);
+  }
   const allowed = parseAllowedHosts(process.env.ALLOWED_HOSTS);
   if (allowed.length > 0 && !shouldSkipHostAllowlist(pathname)) {
     const hostname = hostnameFromHostHeader(request.headers.get("host"));

@@ -52,3 +52,11 @@ export function isYandexTimerCleanupEvent(body: unknown): boolean {
 export function isGatewayProxied(headers: Headers): boolean {
   return Boolean(headers.get("x-serverless-gateway-id")?.trim());
 }
+
+/**
+ * Yandex Timer → Container POSTs to `/` (console has no path field).
+ * Only rewrite private IAM invokes, never API Gateway traffic.
+ */
+export function isPrivateTimerRootPost(method: string, pathname: string, headers: Headers): boolean {
+  return method === "POST" && pathname === "/" && !isGatewayProxied(headers);
+}
