@@ -4,6 +4,7 @@ import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
 import { issueTicketsForOrder } from "@/server/services/tickets";
 import { formatMoneyFromKopecks } from "@/lib/utils";
+import { TicketQrSvg } from "@/components/ticket/ticket-qr-svg";
 
 interface SuccessPageProps {
   searchParams: Promise<{ order?: string }>;
@@ -123,23 +124,12 @@ export default async function SuccessPage({ searchParams }: SuccessPageProps) {
                     }}
                   >
                     <p style={{ margin: 0, fontWeight: 850 }}>Билет {index + 1}</p>
-                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>
+                    <p style={{ margin: "8px 0 12px", fontSize: 12, color: "var(--muted)" }}>
                       {ticket.publicId}
                     </p>
-                    <p
-                      style={{
-                        margin: "12px 0 0",
-                        fontFamily: "ui-monospace, monospace",
-                        fontSize: 13,
-                        wordBreak: "break-all",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {ticket.qrToken}
-                    </p>
-                    <p style={{ margin: "8px 0 0", fontSize: 12, color: "var(--muted)" }}>
-                      Статус: {ticket.status}
-                    </p>
+                    {ticket.qrToken ? (
+                      <TicketQrSvg value={ticket.qrToken} caption={`Статус: ${ticket.status}`} />
+                    ) : null}
                   </div>
                 ))
               )}

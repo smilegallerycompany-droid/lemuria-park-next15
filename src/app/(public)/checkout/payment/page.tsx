@@ -4,6 +4,8 @@ import { getOrderByNumber } from "@/server/services/orders";
 import { toOrderDto } from "@/server/mappers/order";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 import { PaymentStatusClient } from "@/components/checkout/payment-status-client";
+import { env } from "@/lib/config/env";
+import { databaseNameFromUrl, STAGING_DATABASE_NAME } from "@/lib/config/staging-db-guard";
 
 interface PaymentPageProps {
   searchParams: Promise<{ order?: string }>;
@@ -23,6 +25,10 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
   if (dto.status === "PAID") redirect(`/success?order=${encodeURIComponent(dto.number)}`);
 
   const isExpired = dto.status === "EXPIRED" || dto.status === "CANCELLED";
+  const stagingTestPayEnabled =
+    env.APP_ENV === "staging" &&
+    databaseNameFromUrl(env.DATABASE_URL) === STAGING_DATABASE_NAME &&
+    !dto.paymentConfigured;
 
   return (
     <main className="page-shell">
@@ -41,9 +47,11 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
             <p style={{ color: "var(--muted)", maxWidth: 560, margin: "12px auto 0" }}>
               {isExpired
                 ? "Время ожидания оплаты истекло или заказ отменён. Оформите бронирование заново."
-                : dto.paymentConfigured
+                  : dto.paymentConfigured
                   ? "Перейдите в ЮKassa для оплаты. Билет откроется только после подтверждения платежа."
-                  : "ЮKassa не настроена на сервере. Мы не показываем фальшивую успешную оплату."}
+                  : stagingTestPayEnabled
+                    ? "STAGING / TEST: тестовая оплата доступна только на этой среде и не является ЮKassa."
+                    : "ЮKassa не настроена на сервере. Мы не показываем фальшивую успешную оплату."}
             </p>
           </div>
 
@@ -83,6 +91,7 @@ export default async function CheckoutPaymentPage({ searchParams }: PaymentPageP
                   orderNumber={dto.number}
                   confirmationUrl={dto.confirmationUrl}
                   paymentConfigured={dto.paymentConfigured}
+                  stagingTestPayEnabled={stagingTestPayEnabled}
                 />
               )}
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 28 }}>

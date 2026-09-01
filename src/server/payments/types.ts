@@ -26,4 +26,6 @@ export interface PaymentProvider {
   readonly configured: boolean;
   createPayment(input: CreatePaymentInput): Promise<CreatePaymentResult>;
   parseWebhook(payload: unknown): WebhookPaymentUpdate;
+  /** Confirm webhook claims against the provider. Optional on stubs. */
+  fetchPayment?(providerPaymentId: string): Promise<{ status: WebhookPaymentUpdate["status"] }>;
 }

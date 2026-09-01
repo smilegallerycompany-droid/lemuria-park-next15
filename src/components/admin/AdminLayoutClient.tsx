@@ -8,11 +8,13 @@ import { labelRole } from "@/lib/director/labels";
 
 const NAV = [
   { href: "/admin", label: "Обзор" },
+  { href: "/admin/analytics", label: "Аналитика" },
   { href: "/admin/locations", label: "Локации" },
   { href: "/admin/users", label: "Пользователи" },
   { href: "/admin/orders", label: "Заказы" },
   { href: "/admin/payments", label: "Платежи" },
   { href: "/admin/tickets", label: "Билеты" },
+  { href: "/admin/shifts", label: "Смены" },
   { href: "/admin/integrations", label: "Интеграции" },
   { href: "/admin/system", label: "Система" },
   { href: "/admin/audit", label: "Аудит" },

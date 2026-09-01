@@ -26,6 +26,22 @@ test("parseWebhook rejects payload without payment id", () => {
   );
 });
 
+test("fetchPayment maps remote succeeded status", async () => {
+  const provider = new YooKassaPaymentProvider("shop", "secret");
+  const original = globalThis.fetch;
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ id: "pay-1", status: "succeeded" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })) as typeof fetch;
+  try {
+    const remote = await provider.fetchPayment("pay-1");
+    assert.equal(remote.status, "SUCCEEDED");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("createPayment refuses when not configured (no fake success)", async () => {
   const provider = new YooKassaPaymentProvider("", "");
   await assert.rejects(

@@ -127,6 +127,26 @@ export class YooKassaPaymentProvider implements PaymentProvider {
       raw: payload,
     };
   }
+
+  async fetchPayment(providerPaymentId: string): Promise<{ status: WebhookPaymentUpdate["status"] }> {
+    if (!this.configured) {
+      throw new DomainError(
+        "PAYMENT_NOT_CONFIGURED",
+        "ЮKassa не настроена: задайте YUKASSA_SHOP_ID и YUKASSA_SECRET_KEY",
+      );
+    }
+    const res = await fetch(`${YOOKASSA_API}/payments/${encodeURIComponent(providerPaymentId)}`, {
+      headers: { Authorization: this.authHeader() },
+    });
+    if (!res.ok) {
+      throw new DomainError(
+        "PAYMENT_PROVIDER_ERROR",
+        `ЮKassa не подтвердила платёж (${res.status})`,
+      );
+    }
+    const data = (await res.json()) as YooKassaPaymentResponse;
+    return { status: mapYooStatus(data.status) };
+  }
 }
 
 function mapYooStatus(status: string): CreatePaymentResult["status"] | "FAILED" {

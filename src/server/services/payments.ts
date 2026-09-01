@@ -7,6 +7,7 @@ import { issueTicketsForOrder } from "@/server/services/tickets";
 import { queueTicketEmail } from "@/server/services/ticket-delivery";
 import { getErrorReporter } from "@/server/monitoring/error-reporter";
 import type { OrderWithItems } from "@/server/services/orders";
+import { assertStagingTestPaymentAllowed } from "@/lib/config/staging-runtime";
 
 export type OnlinePaymentStart = {
   configured: boolean;
@@ -167,41 +168,27 @@ export async function applyYooKassaWebhook(payload: unknown): Promise<{ handled:
     return { handled: true };
   }
 
+  if (typeof provider.fetchPayment === "function") {
+    const remote = await provider.fetchPayment(update.providerPaymentId);
+    if (remote.status !== "SUCCEEDED") {
+      throw new DomainError(
+        "PAYMENT_WEBHOOK_INVALID",
+        "Платёж не подтверждён у ЮKassa",
+      );
+    }
+  }
+
   // Idempotent: duplicate SUCCEEDED webhooks must not double-issue tickets.
   if (payment.status === "SUCCEEDED") {
     return { handled: true };
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const claimed = await tx.payment.updateMany({
-        where: { id: payment.id, status: { not: "SUCCEEDED" } },
-        data: { status: "SUCCEEDED", payload: update.raw as object },
-      });
-      if (claimed.count === 0) {
-        return;
-      }
-
-      const order = await tx.order.findUnique({ where: { id: payment.orderId } });
-      if (!order) {
-        throw new DomainError("ORDER_NOT_FOUND", "Заказ для платежа не найден");
-      }
-
-      if (order.status !== "PAID") {
-        await tx.order.update({
-          where: { id: order.id },
-          data: { status: "PAID", paymentExpiresAt: null },
-        });
-      }
-
-      await issueTicketsForOrder(order.id, tx);
-
-      await recordAuditLog(tx, {
-        action: "PAYMENT_SUCCEEDED",
-        entityType: "Order",
-        entityId: order.id,
-        metadata: { providerPaymentId: update.providerPaymentId },
-      });
+    await settleSucceededPayment({
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      providerPaymentId: update.providerPaymentId,
+      payload: update.raw,
     });
   } catch (error) {
     getErrorReporter().captureException(error, {
@@ -215,4 +202,125 @@ export async function applyYooKassaWebhook(payload: unknown): Promise<{ handled:
   await queueTicketEmail({ orderId: payment.orderId }).catch(() => undefined);
 
   return { handled: true };
+}
+
+/**
+ * Marks a payment SUCCEEDED, the order PAID, and issues tickets — once.
+ * Shared by the YooKassa webhook and the staging-only test adapter.
+ */
+export async function settleSucceededPayment(params: {
+  paymentId: string;
+  orderId: string;
+  providerPaymentId: string | null;
+  payload?: unknown;
+}): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.payment.updateMany({
+      where: { id: params.paymentId, status: { not: "SUCCEEDED" } },
+      data: {
+        status: "SUCCEEDED",
+        ...(params.payload !== undefined ? { payload: params.payload as object } : {}),
+      },
+    });
+    if (claimed.count === 0) {
+      return;
+    }
+
+    const order = await tx.order.findUnique({ where: { id: params.orderId } });
+    if (!order) {
+      throw new DomainError("ORDER_NOT_FOUND", "Заказ для платежа не найден");
+    }
+
+    if (order.status === "EXPIRED" || order.status === "CANCELLED" || order.status === "REFUNDED") {
+      throw new DomainError("ORDER_NOT_PAYABLE", "Этот заказ нельзя оплатить");
+    }
+
+    if (order.status !== "PAID") {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: "PAID", paymentExpiresAt: null },
+      });
+    }
+
+    await issueTicketsForOrder(order.id, tx);
+
+    await recordAuditLog(tx, {
+      action: "PAYMENT_SUCCEEDED",
+      entityType: "Order",
+      entityId: order.id,
+      metadata: {
+        providerPaymentId: params.providerPaymentId,
+      },
+    });
+  });
+}
+
+/**
+ * Protected staging-only settlement. Refuses production env and any DB
+ * that is not `lemuria_staging`. Never talks to ЮKassa.
+ */
+export async function applyStagingTestPayment(orderNumber: string): Promise<{
+  alreadyPaid: boolean;
+  orderNumber: string;
+}> {
+  assertStagingTestPaymentAllowed({
+    appEnv: env.APP_ENV,
+    databaseUrl: env.DATABASE_URL,
+  });
+
+  const order = await prisma.order.findUnique({ where: { number: orderNumber } });
+  if (!order) {
+    throw new DomainError("ORDER_NOT_FOUND", "Заказ не найден");
+  }
+  if (order.status === "PAID") {
+    await issueTicketsForOrder(order.id);
+    return { alreadyPaid: true, orderNumber: order.number };
+  }
+  if (order.status !== "AWAITING_PAYMENT") {
+    throw new DomainError("ORDER_NOT_PAYABLE", "Этот заказ нельзя оплатить");
+  }
+  if (order.paymentExpiresAt && order.paymentExpiresAt.getTime() <= Date.now()) {
+    throw new DomainError("RESERVATION_EXPIRED", "Время оплаты истекло");
+  }
+
+  const providerPaymentId = `staging-test-${order.id}`;
+  const existing = await prisma.payment.findFirst({
+    where: {
+      orderId: order.id,
+      provider: "staging_test",
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const payment =
+    existing ??
+    (await prisma.payment.create({
+      data: {
+        orderId: order.id,
+        method: "CARD_ONLINE",
+        status: "PENDING",
+        amount: order.totalAmount,
+        currency: "RUB",
+        provider: "staging_test",
+        providerPaymentId,
+        idempotencyKey: `staging-pay-${order.id}`,
+        payload: { staging: true, label: "STAGING / TEST" },
+      },
+    }));
+
+  if (payment.status === "SUCCEEDED") {
+    await issueTicketsForOrder(order.id);
+    return { alreadyPaid: true, orderNumber: order.number };
+  }
+
+  await settleSucceededPayment({
+    paymentId: payment.id,
+    orderId: order.id,
+    providerPaymentId: payment.providerPaymentId,
+    payload: { staging: true, label: "STAGING / TEST" },
+  });
+
+  await queueTicketEmail({ orderId: order.id }).catch(() => undefined);
+
+  return { alreadyPaid: false, orderNumber: order.number };
 }

@@ -1,3 +1,1 @@
-"use client";
-
-export { default } from "@/app/director/shifts/page";
+export { default } from "../../../director/shifts/page";
