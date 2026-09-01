@@ -86,7 +86,7 @@ function LoginScreen({ onSuccess }: { onSuccess: (user: CashierUser) => void }) 
         <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">Касса</p>
         <h1 className="mt-2 font-display text-3xl font-semibold text-forest">Вход кассира</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Рабочая панель продаж. QR / check-in / возвраты — на следующих этапах.
+          Продажа, смена, заказы и QR-погашение. Возврат билета делает администратор.
         </p>
         <form className="mt-6 grid gap-4" onSubmit={submit}>
           <div className="grid gap-1.5">
