@@ -13,10 +13,20 @@ export type DbClient = PrismaClient | Prisma.TransactionClient;
  */
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+function datasourceUrl(): string {
+  const raw = env.DATABASE_URL;
+  if (/[?&]connection_limit=/.test(raw)) return raw;
+  const fromEnv = env.PRISMA_CONNECTION_LIMIT.trim();
+  const limit = fromEnv || (env.NODE_ENV === "production" ? "5" : "");
+  if (!limit) return raw;
+  return raw.includes("?") ? `${raw}&connection_limit=${limit}` : `${raw}?connection_limit=${limit}`;
+}
+
 export const prisma: PrismaClient =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    datasources: { db: { url: datasourceUrl() } },
   });
 
 if (env.NODE_ENV !== "production") {

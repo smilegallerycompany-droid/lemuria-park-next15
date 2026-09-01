@@ -22,7 +22,7 @@ export default function About() {
           <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">О нас</p>
           <H1 className="mt-2 font-display text-4xl font-semibold md:text-5xl">О Лемурии Парке</H1>
           <Body className="mt-6 leading-8 text-muted-foreground">
-            Семейный зоотеатр с кольцехвостыми лемурами. Посещение организовано по сеансам — не более{" "}
+            Семейный зоотеатр с кольцехвостыми лемурами. Посещение организовано по сеансам, не более{" "}
             {SITE.capacity} гостей одновременно.
           </Body>
           <Body className="mt-4 leading-8 text-muted-foreground">

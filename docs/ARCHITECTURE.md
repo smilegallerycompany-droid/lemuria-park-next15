@@ -1,22 +1,38 @@
-# Production architecture
+# Production architecture (код)
 
-Next.js 15 App Router, React 19, strict TypeScript, Tailwind, shadcn-compatible primitives, Prisma/PostgreSQL, route groups `(public)`, `(staff)`, `(admin)`.
+Канон экосистемы: [`docs/ECOSYSTEM.md`](./ECOSYSTEM.md).  
+Этот файл — снимок **уже реализованного** в репозитории. Не расширять public-сайт вместо продуктов кассы / директора / owner.
 
-Cloud target: **Yandex Cloud (RU)** + **ЮKassa**. No VPN required for Russian users.
+Стек: Next.js 15 App Router, React 19, TypeScript, Prisma/PostgreSQL.  
+Облако: **Yandex Cloud (RU)** + **ЮKassa**. Без VPN для пользователей в РФ.
 
-## Implemented
+## Route groups сегодня
 
-1. PostgreSQL + migrations + seed (exhibition window, Tuesday closed, prices)
+| Группа | URL | Целевой хост |
+|---|---|---|
+| `(public)` | `/` | `lemuriapark.ru` |
+| cashier | `/cashier` | `cashier.lemuriapark.ru` |
+| director | `/director` | `admin.lemuriapark.ru` |
+| admin (служебное) | `/admin` | `owner.lemuriapark.ru` (ещё не отдельный продукт) |
+
+Host-routing пока не включён: всё на одном origin. Цель — те же приложения по subdomain, без второй кодовой базы.
+
+## Реализовано
+
+1. PostgreSQL + migrations + seed (окно выставки, вторник выходной, цены)
 2. Public booking → reservation → order (idempotent, capacity-safe)
-3. ЮKassa adapter + webhook (`/api/webhooks/yookassa`) — no fake PAID
-4. Ticket issuance (`qrToken`) on PAID / cashier sale
-5. Cashier login, sell, QR check-in
-6. Honest email skip until Yandex Postbox credentials
-7. Policy / offer pages; refund & print marked «Ещё не подключено»
+3. ЮKassa adapter + webhook (`/api/webhooks/yookassa`) — без fake PAID
+4. Выдача билета (`qrToken`) на PAID и кассовую продажу
+5. Касса: логин, продажа, смена, QR check-in
+6. Директор: аналитика, контент, смены, персонал (в рамках `/director`)
+7. Честный skip email, пока нет Yandex Postbox
+8. Медиа-порт: local / Yandex Object Storage (S3)
 
-## Remaining
+## Не делать вид, что готово
 
-1. Director analytics UI (services may exist in parallel repos)
-2. Full Postbox SMTP/SigV4 wiring with production keys
-3. Fiscalization nuances in ЮKassa receipt for complex carts
-4. Hardware receipt printer adapter
+1. Четыре отдельных хоста + Certificate Manager / Cloud DNS
+2. Owner как executive-продукт (сейчас `/admin` — операционный черновик)
+3. Postbox SMTP/API в production + SPF/DKIM/DMARC
+4. Timer-trigger cron в Serverless Containers
+5. Monium + Audit Trails облака (прикладной AuditLog уже есть)
+6. Restore drill Managed PostgreSQL

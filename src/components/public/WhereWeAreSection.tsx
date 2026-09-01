@@ -71,7 +71,7 @@ export function WhereWeAreSection({
             <select value={location.slug} onChange={(e) => setSlug(e.target.value)}>
               {locations.map((l) => (
                 <option key={l.slug} value={l.slug}>
-                  {l.city} — {l.mapLabel || l.name}
+                  {l.city}, {l.mapLabel || l.name}
                 </option>
               ))}
             </select>

@@ -14,9 +14,12 @@ test.describe("Public CMS binding", () => {
     expect(data.about.title).toBeTruthy();
     expect(Array.isArray(data.about.benefits)).toBe(true);
     expect(data.faq.length).toBeGreaterThan(0);
+    expect(data.faq.length).toBeLessThanOrEqual(5);
 
     await page.goto("/");
     await expect(page.locator("#faq")).toBeVisible();
     await expect(page.locator("#about")).toBeVisible();
+    await expect(page.locator("#reviews")).toBeVisible();
+    await expect(page.locator("#gallery")).toHaveCount(0);
   });
 });

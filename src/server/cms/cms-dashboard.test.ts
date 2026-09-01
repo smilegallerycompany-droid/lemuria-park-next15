@@ -33,7 +33,7 @@ describe("CMS defaults & benefits", () => {
 
   it("has safe hero/faq fallbacks", () => {
     assert.ok(DEFAULT_HERO.heroTitle.includes("Лемурия"));
-    assert.ok(DEFAULT_FAQ.length >= 3);
+    assert.ok(DEFAULT_FAQ.length >= 4 && DEFAULT_FAQ.length <= 5);
   });
 });
 

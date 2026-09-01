@@ -1,3 +1,4 @@
+import { FAQ_PUBLIC_LIMIT } from "@/lib/cms/defaults";
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { prisma } from "@/lib/db/prisma";
@@ -34,6 +35,17 @@ export async function PATCH(req: Request, context: RouteContext) {
     let isPublished = input.isPublished;
     if (input.archive) isPublished = false;
     if (input.restore) isPublished = true;
+
+    if (isPublished === true && !before.isPublished) {
+      const published = await prisma.faqItem.count({ where: { isPublished: true } });
+      if (published >= FAQ_PUBLIC_LIMIT) {
+        throw new ApiError(
+          "FORBIDDEN",
+          `На главной максимум ${FAQ_PUBLIC_LIMIT} вопросов FAQ`,
+          409,
+        );
+      }
+    }
 
     const item = await prisma.faqItem.update({
       where: { id },

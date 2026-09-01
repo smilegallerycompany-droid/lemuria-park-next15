@@ -69,14 +69,14 @@ async function seedSiteAndContactSettings() {
   await prisma.contactSettings.upsert({
     where: { id: "singleton-contact-settings" },
     update: {
-      supportHours: "Ежедневно кроме вторника, 10:30–21:00",
+      supportHours: "Ежедневно кроме вторника, 10:30-21:00",
     },
     create: {
       id: "singleton-contact-settings",
       phone: "+7 920 971-40-22",
       complaintsPhone: "+7 915 356-00-57",
       email: "info@lemuriapark.ru",
-      supportHours: "Ежедневно кроме вторника, 10:30–21:00",
+      supportHours: "Ежедневно кроме вторника, 10:30-21:00",
     },
   });
 }
@@ -177,30 +177,58 @@ async function seedUsers() {
 async function seedTicketTypes() {
   const adult = await prisma.ticketType.upsert({
     where: { code: "ADULT" },
-    update: {},
+    update: {
+      name: "Взрослый",
+      description: "От 13 лет",
+      minAge: 13,
+      maxAge: null,
+    },
     create: {
       code: "ADULT",
       name: "Взрослый",
-      description: "От 12 лет",
-      minAge: 12,
+      description: "От 13 лет",
+      minAge: 13,
       sortOrder: 1,
     },
   });
 
   const child = await prisma.ticketType.upsert({
     where: { code: "CHILD" },
-    update: {},
+    update: {
+      name: "Детский",
+      description: "4–12 лет",
+      minAge: 4,
+      maxAge: 12,
+    },
     create: {
       code: "CHILD",
       name: "Детский",
-      description: "От 3 до 11 лет",
-      minAge: 3,
-      maxAge: 11,
+      description: "4–12 лет",
+      minAge: 4,
+      maxAge: 12,
       sortOrder: 2,
     },
   });
 
-  return { adult, child };
+  const infant = await prisma.ticketType.upsert({
+    where: { code: "INFANT" },
+    update: {
+      name: "До 3 лет",
+      description: "До 3 лет включительно, бесплатно",
+      minAge: 0,
+      maxAge: 3,
+    },
+    create: {
+      code: "INFANT",
+      name: "До 3 лет",
+      description: "До 3 лет включительно, бесплатно",
+      minAge: 0,
+      maxAge: 3,
+      sortOrder: 3,
+    },
+  });
+
+  return { adult, child, infant };
 }
 
 async function seedLocation() {
@@ -210,7 +238,7 @@ async function seedLocation() {
   return prisma.location.upsert({
     where: { slug: "moscow-vdnh" },
     update: {
-      name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
+      name: "Лемурия Парк, Краснодар, МегаЦентр Красная площадь",
       city: "Краснодар",
       address: "Мегацентр «Красная Площадь», ул. Дзержинского, 100",
       addressLine2: "2 этаж, рядом с магазином Kari",
@@ -227,10 +255,11 @@ async function seedLocation() {
       activeFrom,
       activeTo,
       status: "ACTIVE",
+      visitDurationMinutes: 20,
     },
     create: {
       slug: "moscow-vdnh",
-      name: "Лемурия Парк — Краснодар, МегаЦентр Красная площадь",
+      name: "Лемурия Парк, Краснодар, МегаЦентр Красная площадь",
       city: "Краснодар",
       address: "Мегацентр «Красная Площадь», ул. Дзержинского, 100",
       addressLine2: "2 этаж, рядом с магазином Kari",
@@ -238,7 +267,7 @@ async function seedLocation() {
       status: "ACTIVE",
       defaultCapacity: 15,
       sessionIntervalMinutes: 30,
-      visitDurationMinutes: 45,
+      visitDurationMinutes: 20,
       activeFrom,
       activeTo,
       phone: "+7 920 971-40-22",
@@ -279,7 +308,10 @@ async function seedLocationSchedule(locationId: string) {
   return schedules;
 }
 
-async function seedPriceRules(locationId: string, ticketTypeIds: { adult: string; child: string }) {
+async function seedPriceRules(
+  locationId: string,
+  ticketTypeIds: { adult: string; child: string; infant: string },
+) {
   // Fixed validFrom keeps this idempotent across re-runs (stable unique key).
   const validFrom = new Date("2026-01-01T00:00:00Z");
 
@@ -288,6 +320,8 @@ async function seedPriceRules(locationId: string, ticketTypeIds: { adult: string
     { ticketTypeId: ticketTypeIds.adult, dayType: "WEEKEND", priceAmount: 110000 }, // 1100 RUB
     { ticketTypeId: ticketTypeIds.child, dayType: "WEEKDAY", priceAmount: 80000 }, // 800 RUB
     { ticketTypeId: ticketTypeIds.child, dayType: "WEEKEND", priceAmount: 100000 }, // 1000 RUB
+    { ticketTypeId: ticketTypeIds.infant, dayType: "WEEKDAY", priceAmount: 0 },
+    { ticketTypeId: ticketTypeIds.infant, dayType: "WEEKEND", priceAmount: 0 },
   ];
 
   for (const rule of rules) {
@@ -744,37 +778,72 @@ async function seedDemoCommerce(params: {
 }
 
 async function seedFaqAndGallery(locationId: string) {
-  await prisma.faqItem.upsert({
-    where: { id: "faq-visit-duration" },
-    update: {},
-    create: {
+  const faqs = [
+    {
       id: "faq-visit-duration",
-      question: "Сколько длится программа?",
-      answer: "Продолжительность программы уточняйте у администратора зоотеатра.",
+      question: "Сколько длится посещение?",
+      answer: "Сеанс длится 20 минут.",
       sortOrder: 1,
     },
-  });
-
-  await prisma.faqItem.upsert({
-    where: { id: "faq-tickets" },
-    update: {},
-    create: {
-      id: "faq-tickets",
-      question: "Как купить билет?",
-      answer: "Билеты можно купить онлайн на сайте или в кассе перед сеансом.",
+    {
+      id: "faq-session-size",
+      question: "Сколько человек бывает на одном сеансе?",
+      answer: "Не более 15 гостей на сеанс.",
       sortOrder: 2,
     },
-  });
+    {
+      id: "faq-photo-interact",
+      question: "Можно ли фотографировать и взаимодействовать с лемурами?",
+      answer:
+        "Личная съёмка разрешена. Соблюдайте рекомендации сотрудников. Правила взаимодействия с лемурами задаёт команда на сеансе.",
+      sortOrder: 3,
+    },
+    {
+      id: "faq-buy-ahead",
+      question: "Можно ли купить билет на месте или лучше заранее?",
+      answer:
+        "Билет можно купить онлайн или в кассе перед сеансом. Мест на сеанс немного, надёжнее взять заранее.",
+      sortOrder: 4,
+    },
+    {
+      id: "faq-late",
+      question: "Что делать, если я опоздал на сеанс?",
+      answer: "Правило для опоздавших уточняйте у кассы или администратора.",
+      sortOrder: 5,
+    },
+  ] as const;
+
+  await prisma.faqItem.updateMany({ data: { isPublished: false } });
+
+  for (const row of faqs) {
+    await prisma.faqItem.upsert({
+      where: { id: row.id },
+      update: {
+        question: row.question,
+        answer: row.answer,
+        sortOrder: row.sortOrder,
+        isPublished: true,
+      },
+      create: {
+        id: row.id,
+        question: row.question,
+        answer: row.answer,
+        sortOrder: row.sortOrder,
+        isPublished: true,
+      },
+    });
+  }
 
   await prisma.galleryItem.upsert({
     where: { id: "gallery-demo-1" },
-    update: {},
+    update: { isPublished: false },
     create: {
       id: "gallery-demo-1",
       locationId,
       imageUrl: "/gallery/placeholder-1.jpg",
       altText: "Лемур в зоотеатре Лемурия Парк",
       sortOrder: 1,
+      isPublished: false,
     },
   });
 }
@@ -791,10 +860,10 @@ async function main() {
 
   await seedSiteAndContactSettings();
   const { owner, cashier } = await seedUsers();
-  const { adult, child } = await seedTicketTypes();
+  const { adult, child, infant } = await seedTicketTypes();
   const location = await seedLocation();
   await seedLocationSchedule(location.id);
-  await seedPriceRules(location.id, { adult: adult.id, child: child.id });
+  await seedPriceRules(location.id, { adult: adult.id, child: child.id, infant: infant.id });
   await seedFaqAndGallery(location.id);
   const sessionsCreated = await seedSessions(location);
   await ensureTodayDemoSessions(location);

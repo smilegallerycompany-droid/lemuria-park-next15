@@ -3,7 +3,7 @@ export const SITE = {
   subtitle: "Зоотеатр лемуров",
   phone: "+7 920 971-40-22",
   complaintsPhone: "+7 915 356-00-57",
-  schedule: "Ежедневно кроме вторника, 10:30–21:00 · выставка 1 августа — 15 сентября",
+  schedule: "Ежедневно кроме вторника, 10:30-21:00 · выставка 1 августа - 15 сентября",
   capacity: 15,
   sessionMinutes: 30,
   visitMinutes: 20,

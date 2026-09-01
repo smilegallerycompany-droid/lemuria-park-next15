@@ -2,6 +2,8 @@
 
 ## Environments
 
+Production and staging are **separate Yandex Cloud catalogs** (`lemuria-production` / `lemuria-staging`), not one DB with a flag. Canonical: [`docs/ECOSYSTEM.md`](./ECOSYSTEM.md).
+
 | Variable | Purpose |
 |----------|---------|
 | `DATABASE_URL` | Postgres (Yandex Managed PG recommended) |

@@ -13,7 +13,7 @@ const createSchema = z.object({
   timezone: z.string().default("Europe/Moscow"),
   defaultCapacity: z.number().int().min(1).default(15),
   sessionIntervalMinutes: z.number().int().min(5).default(30),
-  visitDurationMinutes: z.number().int().min(5).default(45),
+  visitDurationMinutes: z.number().int().min(5).default(20),
   status: z.enum(["UPCOMING", "ACTIVE", "PAUSED", "CLOSED"]).default("UPCOMING"),
   phone: z.string().optional(),
   mapUrl: z.string().url().optional().or(z.literal("")),

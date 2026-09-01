@@ -26,14 +26,14 @@ export default function Location() {
               {SITE.phone}
             </p>
             <p className="text-sm text-muted-foreground">
-              МегаЦентр «Красная площадь», 2 этаж — ориентир магазин Kari.
+              МегаЦентр «Красная площадь», 2 этаж, ориентир магазин Kari.
             </p>
           </Card>
           <Card
             variant="soft"
             className="grid min-h-[420px] place-items-center text-center text-muted-foreground"
           >
-            Интерактивная карта — скоро
+            Карта скоро появится
           </Card>
         </div>
       </Container>

@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -237,7 +238,7 @@ model Location {
   defaultCapacity        Int            @default(15)
   sessionIntervalMinutes Int            @default(30)
   /// Visit duration in minutes. Internal only — must never be exposed via public API.
-  visitDurationMinutes   Int            @default(45)
+  visitDurationMinutes   Int            @default(20)
   activeFrom             DateTime?
   activeTo               DateTime?
   phone                  String?

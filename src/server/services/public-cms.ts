@@ -3,6 +3,8 @@ import {
   DEFAULT_ABOUT,
   DEFAULT_FAQ,
   DEFAULT_HERO,
+  DEFAULT_REVIEWS,
+  FAQ_PUBLIC_LIMIT,
   parseAboutBenefits,
 } from "@/lib/cms/defaults";
 import { getPublicLocationsPayload } from "@/server/services/public-locations";
@@ -15,6 +17,7 @@ export async function getPublicCmsPayload() {
     prisma.faqItem.findMany({
       where: { isPublished: true },
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      take: FAQ_PUBLIC_LIMIT,
     }),
     prisma.galleryItem.findMany({
       where: { isPublished: true },
@@ -92,12 +95,13 @@ export async function getPublicCmsPayload() {
     faq:
       faq.length > 0
         ? faq.map((f) => ({ question: f.question, answer: f.answer }))
-        : DEFAULT_FAQ,
+        : DEFAULT_FAQ.slice(0, FAQ_PUBLIC_LIMIT),
     gallery: gallery.map((g) => ({
       imageUrl: g.imageUrl,
       altText: g.altText,
       caption: g.caption,
     })),
+    reviews: DEFAULT_REVIEWS,
     contact: contact
       ? {
           phone: contact.phone,

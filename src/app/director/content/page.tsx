@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { FAQ_PUBLIC_LIMIT } from "@/lib/cms/defaults";
 
 type Benefit = {
   title: string;
@@ -128,6 +129,11 @@ export default function DirectorContentPage() {
 
   async function addFaq() {
     if (!faqDraft.question.trim() || !faqDraft.answer.trim()) return;
+    const published = (content?.faq ?? []).filter((f) => f.isPublished).length;
+    if (published >= FAQ_PUBLIC_LIMIT) {
+      setError(`На главной максимум ${FAQ_PUBLIC_LIMIT} вопросов. Скройте один, чтобы добавить новый.`);
+      return;
+    }
     setError(null);
     try {
       await directorFetch("/api/director/content/faq", {
@@ -395,6 +401,10 @@ export default function DirectorContentPage() {
             <div className="director-panel-head">
               <h2>FAQ</h2>
             </div>
+            <p style={{ margin: "0 0 12px", color: "#4f5b49", fontSize: 14 }}>
+              На главной показываются только {FAQ_PUBLIC_LIMIT} вопросов — те, что снимают сомнения перед
+              покупкой билета. Не превращайте FAQ в энциклопедию.
+            </p>
             <div className="director-form-grid">
               <div className="director-field">
                 <label>Question</label>

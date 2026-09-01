@@ -37,6 +37,21 @@ const envSchema = z.object({
   QR_SIGNING_SECRET: z.string().min(8).default(DEFAULT_QR_SECRET),
   AUTH_SECRET: z.string().min(16).default(DEFAULT_AUTH_SECRET),
 
+  /** Timer-trigger auth for `/api/cron/cleanup`. Empty locally → route returns 503. */
+  CRON_SECRET: z.string().optional().default(""),
+
+  /**
+   * Comma-separated Host allowlist (no scheme). Empty locally → skip check.
+   * Production must list the four product hosts plus any temporary gateway host.
+   */
+  ALLOWED_HOSTS: z.string().optional().default(""),
+
+  /** `staging` enables site-wide noindex. */
+  APP_ENV: z.string().optional().default(""),
+
+  /** Prisma pool cap per container instance. Default 5 in production runtime. */
+  PRISMA_CONNECTION_LIMIT: z.string().optional().default(""),
+
   /**
    * Optional DSN for a future error monitoring SDK (Sentry, etc.).
    * Presently only signals ConsoleErrorReporter that a sink is configured.
@@ -90,6 +105,16 @@ function loadEnv(): Env {
     ) {
       throw new Error(
         "Production requires a strong QR_SIGNING_SECRET (min 32 chars, not a default/dev value).",
+      );
+    }
+    if (isWeakSecret(data.CRON_SECRET, []) || data.CRON_SECRET.length < 32) {
+      throw new Error(
+        "Production requires a strong CRON_SECRET (min 32 chars, not a default/dev value).",
+      );
+    }
+    if (!data.ALLOWED_HOSTS.trim()) {
+      throw new Error(
+        "Production requires ALLOWED_HOSTS (comma-separated hostnames for the four products).",
       );
     }
   }

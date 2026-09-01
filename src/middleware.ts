@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  hostnameFromHostHeader,
+  isHostAllowed,
+  parseAllowedHosts,
+  shouldSkipHostAllowlist,
+} from "@/lib/config/allowed-hosts";
 
 const STAFF_PREFIXES = ["/cashier", "/director", "/admin", "/staff"];
 
@@ -14,8 +20,16 @@ function isStaffPath(pathname: string): boolean {
  * Does not rewrite public design or alter booking domain logic.
  */
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next();
   const { pathname } = request.nextUrl;
+  const allowed = parseAllowedHosts(process.env.ALLOWED_HOSTS);
+  if (allowed.length > 0 && !shouldSkipHostAllowlist(pathname)) {
+    const hostname = hostnameFromHostHeader(request.headers.get("host"));
+    if (!hostname || !isHostAllowed(hostname, allowed)) {
+      return new NextResponse("Unknown host", { status: 421 });
+    }
+  }
+
+  const response = NextResponse.next();
 
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");

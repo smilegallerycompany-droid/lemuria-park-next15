@@ -217,7 +217,7 @@ export function BookingAwwwards() {
       <div className="booking-card booking-card-compact">
         <div className="booking-column booking-pick">
           <div className="booking-heading">
-            <span className="step">1–2</span>
+            <span className="step">1-2</span>
             Дата и время
           </div>
 
@@ -326,7 +326,7 @@ export function BookingAwwwards() {
                 <div className="ticket-copy">
                   <strong>{freeType.name}</strong>
                   <br />
-                  <small>бесплатно</small>
+                  <small>{freeType.description ?? "бесплатно"}</small>
                 </div>
               </div>
             )}
@@ -347,12 +347,12 @@ export function BookingAwwwards() {
                       day: "numeric",
                       month: "long",
                     }).format(new Date(`${selectedDate}T12:00:00`))
-                  : "—"}
+                  : "не выбрано"}
               </strong>
             </div>
             <div className="summary-row">
               <span>Сеанс</span>
-              <strong>{activeSession?.localTime ?? "—"}</strong>
+              <strong>{activeSession?.localTime ?? "не выбрано"}</strong>
             </div>
             {(config?.ticketTypes ?? [])
               .filter((t) => (qty[t.code] ?? 0) > 0)

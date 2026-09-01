@@ -1,3 +1,4 @@
+import { FAQ_PUBLIC_LIMIT } from "@/lib/cms/defaults";
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { prisma } from "@/lib/db/prisma";
@@ -32,6 +33,16 @@ export async function POST(req: Request) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
     const input = createSchema.parse(json);
+    if (input.isPublished) {
+      const published = await prisma.faqItem.count({ where: { isPublished: true } });
+      if (published >= FAQ_PUBLIC_LIMIT) {
+        throw new ApiError(
+          "FORBIDDEN",
+          `На главной максимум ${FAQ_PUBLIC_LIMIT} вопросов FAQ`,
+          409,
+        );
+      }
+    }
     const meta = requestMeta(req);
 
     const item = await prisma.faqItem.create({ data: input });

@@ -15,8 +15,8 @@ const unbounded = Unbounded({
 });
 
 export const metadata: Metadata = {
-  title: "Лемурия Парк — зоотеатр лемуров",
-  description: "Зоотеатр лемуров в Краснодаре — онлайн-покупка билетов по сеансам.",
+  title: "Лемурия Парк. Зоотеатр лемуров",
+  description: "Зоотеатр лемуров в Краснодаре. Онлайн-покупка билетов по сеансам.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

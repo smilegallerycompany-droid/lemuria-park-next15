@@ -1,5 +1,16 @@
 # Лемурия Парк — Next.js 15
 
+Четыре продукта, один backend, одна PostgreSQL: см. [`docs/ECOSYSTEM.md`](./docs/ECOSYSTEM.md).
+
+| Продукт | Хост | Код сейчас |
+|---|---|---|
+| Public | lemuriapark.ru | `/` |
+| Cashier | cashier.lemuriapark.ru | `/cashier` |
+| Director | admin.lemuriapark.ru | `/director` |
+| Owner | owner.lemuriapark.ru | `/admin` (черновик, не готовый продукт) |
+
+Инфраструктура: Yandex Cloud + ЮKassa. [`docs/yandex-cloud.md`](./docs/yandex-cloud.md).
+
 ## Stack
 
 Next.js 15, React 19, TypeScript, Tailwind, shadcn-compatible UI, Prisma/PostgreSQL.

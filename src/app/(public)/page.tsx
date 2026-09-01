@@ -9,7 +9,15 @@ import {
   WhereWeAreSection,
   type PublicLocationCard,
 } from "@/components/public/WhereWeAreSection";
-import { DEFAULT_ABOUT, DEFAULT_FAQ, DEFAULT_HERO } from "@/lib/cms/defaults";
+import { ReviewsMarquee } from "@/components/public/ReviewsMarquee";
+import {
+  DEFAULT_ABOUT,
+  DEFAULT_FAQ,
+  DEFAULT_HERO,
+  DEFAULT_REVIEWS,
+  FAQ_PUBLIC_LIMIT,
+  type GuestReview,
+} from "@/lib/cms/defaults";
 
 type CmsPayload = {
   site: { name: string; subtitle: string; ctaLabel: string };
@@ -35,7 +43,7 @@ type CmsPayload = {
     }>;
   };
   faq: Array<{ question: string; answer: string }>;
-  gallery: Array<{ imageUrl: string; altText: string; caption: string | null }>;
+  reviews: GuestReview[];
   contact: { phone: string; email: string | null; supportHours: string | null } | null;
   schedulePreview: Array<{ startsAt: string; localTime: string; remainingHint: string }>;
   locations: { sectionTitle: string; locations: PublicLocationCard[] };
@@ -92,8 +100,8 @@ export default function HomePage() {
     benefits: DEFAULT_ABOUT.aboutBenefits,
   };
 
-  const faq = cms?.faq?.length ? cms.faq : DEFAULT_FAQ;
-  const gallery = cms?.gallery ?? [];
+  const faq = (cms?.faq?.length ? cms.faq : DEFAULT_FAQ).slice(0, FAQ_PUBLIC_LIMIT);
+  const reviews = cms?.reviews?.length ? cms.reviews : DEFAULT_REVIEWS;
   const site = cms?.site ?? {
     name: "Лемурия Парк",
     subtitle: "Зоотеатр лемуров",
@@ -212,7 +220,7 @@ export default function HomePage() {
             </h2>
           </div>
           <p>
-            Короткий понятный маршрут: выберите сеанс, приходите вовремя — и наслаждайтесь программой
+            Короткий понятный маршрут: выберите сеанс, приходите вовремя и наслаждайтесь программой
             зоотеатра.
           </p>
         </div>
@@ -221,19 +229,19 @@ export default function HomePage() {
             <span className="visit-num">01</span>
             <Ticket className="visit-icon" size={22} aria-hidden />
             <h3>Купите билет онлайн</h3>
-            <p>Выберите дату и ближайшее время — места резервируются сразу после оплаты.</p>
+            <p>Выберите дату и ближайшее время. Места резервируются сразу после оплаты.</p>
           </article>
           <article className="visit-card">
             <span className="visit-num">02</span>
             <Clock3 className="visit-icon" size={22} aria-hidden />
             <h3>Приходите к началу сеанса</h3>
-            <p>Сеансы идут каждые 30 минут. Лучше быть на месте за 10 минут до старта.</p>
+            <p>Сеанс длится 20 минут. Лучше быть на месте за 10 минут до старта.</p>
           </article>
           <article className="visit-card">
             <span className="visit-num">03</span>
             <Users className="visit-icon" size={22} aria-hidden />
             <h3>Небольшие группы</h3>
-            <p>До 15 гостей на сеанс — всем комфортно смотреть программу и фотографировать.</p>
+            <p>До 15 гостей на сеанс. Всем комфортно смотреть программу и фотографировать.</p>
           </article>
           <article className="visit-card">
             <span className="visit-num">04</span>
@@ -263,25 +271,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {gallery.length > 0 ? (
-        <section id="gallery" className="section container">
-          <div className="section-head">
-            <div>
-              <span className="kicker">Галерея</span>
-              <h2>Атмосфера зоотеатра</h2>
-            </div>
-          </div>
-          <div className="gallery">
-            {gallery.map((g) => (
-              <figure key={g.imageUrl + g.altText}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={g.imageUrl} alt={g.altText} loading="lazy" />
-                {g.caption ? <figcaption>{g.caption}</figcaption> : null}
-              </figure>
-            ))}
-          </div>
-        </section>
-      ) : null}
+      <ReviewsMarquee reviews={reviews} />
 
       {locations.length > 0 ? (
         <WhereWeAreSection sectionTitle={sectionTitle} locations={locations} />
@@ -291,7 +281,7 @@ export default function HomePage() {
         <div className="section-head">
           <div>
             <span className="kicker">FAQ</span>
-            <h2>Ответы на частые вопросы</h2>
+            <h2>Перед покупкой</h2>
           </div>
         </div>
         <div className="faq">
