@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { requireCashier } from "@/server/auth/cashier-session";
+import { checkInLocationScope } from "@/server/auth/location-access";
 import { checkInTicket } from "@/server/services/check-in";
 import { clientIpFromRequest, consumeRateLimit } from "@/server/security/rate-limit";
 import { DomainError } from "@/server/domain/errors";
@@ -12,8 +13,7 @@ const bodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) throw new ApiError("NOT_FOUND", "Требуется вход кассира", 401);
+    const user = await requireCashier();
 
     const ip = clientIpFromRequest(req);
     const limit = consumeRateLimit(`check-in:${ip}:${user.id}`, {
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
       const result = await checkInTicket({
         qrToken: input.qrToken,
         cashierId: user.id,
-        allowedLocationIds: user.locationIds,
+        allowedLocationIds: checkInLocationScope(user),
       });
       return apiSuccess(result);
     } catch (error) {

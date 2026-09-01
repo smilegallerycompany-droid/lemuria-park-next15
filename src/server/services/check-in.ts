@@ -9,6 +9,7 @@ export type CheckInResultCode =
   | "INVALID"
   | "CANCELLED"
   | "EXPIRED"
+  | "REFUNDED"
   | "WRONG_DATE"
   | "WRONG_LOCATION";
 
@@ -71,9 +72,10 @@ export async function checkInTicket(params: {
       locationName: ticket.session.location.name,
     };
 
-    const allowed = params.allowedLocationIds ?? [];
-    if (allowed.length > 0 && !allowed.includes(ticket.session.locationId)) {
+    const allowed = params.allowedLocationIds;
+    if (Array.isArray(allowed) && !allowed.includes(ticket.session.locationId)) {
       await log(ticket.id, "INVALID", params.cashierId, "Wrong location");
+      await auditDenied(params.cashierId, ticket.id, "WRONG_LOCATION");
       return {
         result: "WRONG_LOCATION",
         message: `Билет для другой локации: ${ticket.session.location.name}`,
@@ -81,13 +83,21 @@ export async function checkInTicket(params: {
       };
     }
 
-    if (ticket.status === "CANCELLED" || ticket.status === "REFUNDED") {
-      await log(ticket.id, "CANCELLED", params.cashierId, "Билет отменён/возвращён");
+    if (ticket.status === "REFUNDED") {
+      await log(ticket.id, "CANCELLED", params.cashierId, "Билет возвращён");
+      await auditDenied(params.cashierId, ticket.id, "REFUNDED");
+      return { result: "REFUNDED", message: "Билет возвращён", ticket: baseTicket };
+    }
+
+    if (ticket.status === "CANCELLED") {
+      await log(ticket.id, "CANCELLED", params.cashierId, "Билет отменён");
+      await auditDenied(params.cashierId, ticket.id, "CANCELLED");
       return { result: "CANCELLED", message: "Билет отменён", ticket: baseTicket };
     }
 
     if (sessionDate !== today) {
       await log(ticket.id, "EXPIRED", params.cashierId, "Другая дата сеанса");
+      await auditDenied(params.cashierId, ticket.id, "WRONG_DATE");
       return {
         result: "WRONG_DATE",
         message: `Билет на ${sessionDate}, сегодня ${today}`,
@@ -97,6 +107,7 @@ export async function checkInTicket(params: {
 
     if (ticket.status === "USED" || ticket.usedAt) {
       await log(ticket.id, "ALREADY_USED", params.cashierId, "Повторное сканирование");
+      await auditDenied(params.cashierId, ticket.id, "ALREADY_USED");
       return {
         result: "ALREADY_USED",
         message: "Билет уже использован",
@@ -174,5 +185,15 @@ async function log(
 ) {
   await prisma.ticketCheckIn.create({
     data: { ticketId, result, scannedById: cashierId, note },
+  });
+}
+
+async function auditDenied(cashierId: string, ticketId: string, result: CheckInResultCode) {
+  await recordAuditLog(prisma, {
+    actorId: cashierId,
+    action: "TICKET_CHECK_IN_DENIED",
+    entityType: "Ticket",
+    entityId: ticketId,
+    metadata: { result },
   });
 }

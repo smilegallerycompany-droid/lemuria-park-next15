@@ -1,8 +1,6 @@
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/db/prisma";
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
+import { loginStaff } from "@/server/auth/login";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { cashierLoginSchema } from "@/lib/validation/cashier";
-import { createCashierSessionCookie } from "@/server/auth/cashier-session";
 import {
   clientIpFromRequest,
   consumeRateLimit,
@@ -26,37 +24,26 @@ export async function POST(req: Request) {
       throw new DomainError("RATE_LIMITED", "Слишком много попыток входа. Попробуйте позже.");
     }
 
-    const user = await prisma.user.findUnique({ where: { email: input.email } });
-    if (
-      !user ||
-      user.status !== "ACTIVE" ||
-      (user.role !== "CASHIER" &&
-        user.role !== "DIRECTOR" &&
-        user.role !== "ADMIN" &&
-        user.role !== "OWNER")
-    ) {
-      consumeRateLimit(rateKey, LOGIN_WINDOW);
-      return apiError("NOT_FOUND", "Неверный email или пароль", 401);
+    try {
+      const user = await loginStaff({
+        email: input.email,
+        password: input.password,
+        allowedRoles: ["CASHIER", "DIRECTOR", "ADMIN", "OWNER"],
+        ip,
+        ua: req.headers.get("user-agent"),
+      });
+      return apiSuccess({
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      });
+    } catch (error) {
+      if (error instanceof DomainError && error.code === "UNAUTHORIZED") {
+        consumeRateLimit(rateKey, LOGIN_WINDOW);
+      }
+      throw error;
     }
-
-    const ok = await bcrypt.compare(input.password, user.passwordHash);
-    if (!ok) {
-      consumeRateLimit(rateKey, LOGIN_WINDOW);
-      return apiError("NOT_FOUND", "Неверный email или пароль", 401);
-    }
-
-    await createCashierSessionCookie(user.id);
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
-
-    return apiSuccess({
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-    });
   } catch (error) {
     return handleApiError(error);
   }

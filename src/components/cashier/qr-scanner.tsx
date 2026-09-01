@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { ApiClientError } from "@/lib/api/client";
 import { cashierCheckIn, type CashierCheckInResult } from "@/lib/api/cashier";
 import { shouldAcceptScan } from "@/lib/cashier/scan-guard";
+import { scannerStatusTitle, scannerStatusTone } from "@/lib/cashier/scanner-status";
 
 type Phase = "idle" | "camera" | "result" | "manual";
 
@@ -45,30 +46,12 @@ function feedback(prefs: Prefs, ok: boolean) {
   }
 }
 
-function resultTone(result: CashierCheckInResult["result"]) {
-  if (result === "SUCCESS") return "valid";
-  if (result === "ALREADY_USED" || result === "EXPIRED" || result === "WRONG_DATE") return "used";
-  return "bad";
-}
-
-function resultTitle(result: CashierCheckInResult["result"]) {
-  switch (result) {
-    case "SUCCESS":
-      return "Вход разрешён";
-    case "ALREADY_USED":
-      return "Билет уже использован";
-    case "CANCELLED":
-      return "Билет отменён или возвращён";
-    case "EXPIRED":
-    case "WRONG_DATE":
-      return "Билет на другую дату";
-    case "WRONG_LOCATION":
-      return "Другая локация";
-    case "INVALID":
-      return "Билет не найден";
-    default:
-      return "Проверка не пройдена";
-  }
+function resultMark(result: CashierCheckInResult["result"]) {
+  const tone = scannerStatusTone(result);
+  if (tone === "valid") return "✓";
+  if (tone === "used") return "↻";
+  if (tone === "refunded") return "↩";
+  return "✕";
 }
 
 export function QrScanner() {
@@ -343,10 +326,17 @@ export function QrScanner() {
   }
 
   if (phase === "result" && result) {
-    const tone = resultTone(result.result);
+    const tone = scannerStatusTone(result.result);
     return (
-      <div className={`cashier-scan-result-screen tone-${tone}`} role="status">
-        <h1>{resultTitle(result.result)}</h1>
+      <div
+        className={`cashier-scan-result-screen tone-${tone}`}
+        role="status"
+        aria-live="assertive"
+      >
+        <p className="cashier-scan-result-mark" aria-hidden>
+          {resultMark(result.result)}
+        </p>
+        <h1>{scannerStatusTitle(result.result)}</h1>
         <p>{result.message}</p>
         {result.ticket ? (
           <>

@@ -1,12 +1,11 @@
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { cashierSaleSchema } from "@/lib/validation/cashier";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { requireCashier } from "@/server/auth/cashier-session";
 import { createCashierSale } from "@/server/services/cashier-sales";
 
 export async function POST(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("NOT_FOUND", "Требуется вход кассира", 401);
+    const user = await requireCashier();
 
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON в теле запроса", 400);

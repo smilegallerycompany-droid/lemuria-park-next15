@@ -1,12 +1,12 @@
-import { apiSuccess, apiError, handleApiError } from "@/lib/api/response";
+import { apiSuccess, handleApiError } from "@/lib/api/response";
 import { cashierOrdersQuerySchema } from "@/lib/validation/cashier";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { requireCashier } from "@/server/auth/cashier-session";
+import { locationIdsForActor } from "@/server/auth/location-access";
 import { listCashierOrders } from "@/server/services/cashier-workspace";
 
 export async function GET(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("NOT_FOUND", "Требуется вход кассира", 401);
+    const user = await requireCashier();
 
     const url = new URL(req.url);
     const query = cashierOrdersQuerySchema.parse({
@@ -14,7 +14,10 @@ export async function GET(req: Request) {
       search: url.searchParams.get("search") ?? undefined,
     });
 
-    const orders = await listCashierOrders(query);
+    const orders = await listCashierOrders(query, {
+      locationIds: locationIdsForActor(user),
+      cashierId: user.role === "CASHIER" ? user.id : undefined,
+    });
     return apiSuccess({ orders });
   } catch (error) {
     return handleApiError(error);

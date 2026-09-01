@@ -689,7 +689,14 @@
 }
 .cashier-scan-result-screen.tone-valid { background: #e7f6ec; color: #14532d; }
 .cashier-scan-result-screen.tone-used { background: #fef7e0; color: #854d0e; }
+.cashier-scan-result-screen.tone-refunded { background: #eef2ff; color: #312e81; }
 .cashier-scan-result-screen.tone-bad { background: #fee4e2; color: #7f1d1d; }
+.cashier-scan-result-mark {
+  margin: 0;
+  font-size: 56px;
+  line-height: 1;
+  font-weight: 800;
+}
 .cashier-scan-result-screen h1 { margin: 0; font-size: 1.8rem; }
 
 @media (max-width: 768px) {

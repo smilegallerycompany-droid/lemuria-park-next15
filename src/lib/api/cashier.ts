@@ -91,6 +91,7 @@ export type CashierCheckInResult = {
     | "INVALID"
     | "CANCELLED"
     | "EXPIRED"
+    | "REFUNDED"
     | "WRONG_DATE"
     | "WRONG_LOCATION";
   message: string;

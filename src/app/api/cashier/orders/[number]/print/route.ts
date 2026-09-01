@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { prisma } from "@/lib/db/prisma";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
-import { requireDirector } from "@/server/auth/staff-session";
+import { requireCashier } from "@/server/auth/staff-session";
+import { canAccessLocation } from "@/server/auth/location-access";
 import { logTicketPrint } from "@/server/services/ticket-print";
 
 const schema = z.object({
@@ -15,39 +15,39 @@ type RouteContext = { params: Promise<{ number: string }> };
 
 export async function POST(req: Request, context: RouteContext) {
   try {
+    const actor = await requireCashier();
     const { number } = await context.params;
     const json = await req.json().catch(() => ({}));
     const input = schema.parse(json);
 
-    let actorId: string;
-    let source: "cashier" | "director" | "admin" = input.source ?? "cashier";
+    const source: "cashier" | "director" | "admin" =
+      actor.role === "ADMIN" || actor.role === "OWNER"
+        ? "admin"
+        : actor.role === "DIRECTOR"
+          ? "director"
+          : "cashier";
 
-    const cashier = await getCashierSessionUser();
-    if (cashier) {
-      actorId = cashier.id;
-      source = "cashier";
-    } else {
-      const director = await requireDirector();
-      actorId = director.id;
-      source = director.role === "ADMIN" || director.role === "OWNER" ? "admin" : "director";
+    const order = await prisma.order.findUnique({
+      where: { number },
+      select: { id: true, cashierId: true, session: { select: { locationId: true } } },
+    });
+    if (!order || !canAccessLocation(actor, order.session.locationId)) {
+      throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
     }
-
-    const order = await prisma.order.findUnique({ where: { number }, select: { id: true } });
-    if (!order) throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    if (actor.role === "CASHIER" && order.cashierId && order.cashierId !== actor.id) {
+      throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    }
 
     const printLog = await logTicketPrint({
       orderId: order.id,
-      actorId,
+      actorId: actor.id,
       ticketId: input.ticketId,
-      source,
+      source: input.source ?? source,
       note: input.note,
     });
 
     return apiSuccess({ printLog });
   } catch (error) {
-    if (error instanceof Error && error.message.includes("Требуется")) {
-      return apiError("UNAUTHORIZED", "Требуется авторизация", 401);
-    }
     return handleApiError(error);
   }
 }

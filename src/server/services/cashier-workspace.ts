@@ -24,11 +24,13 @@ import { expireStaleReservations } from "@/server/services/reservation-cleanup";
 import { expireStalePaymentOrders } from "@/server/services/order-cleanup";
 import type { CashierOrdersQuery } from "@/lib/validation/cashier";
 
-export async function listCashierSessionsForToday() {
+export async function listCashierSessionsForToday(locationId?: string) {
   const now = new Date();
   await Promise.all([expireStaleReservations(prisma, now), expireStalePaymentOrders(prisma, now)]);
 
-  const location = await locationRepository.findDefaultActive(prisma, now);
+  const location = locationId
+    ? await locationRepository.findById(prisma, locationId)
+    : await locationRepository.findDefaultActive(prisma, now);
   if (!location) throw new DomainError("LOCATION_NOT_FOUND", "Активная локация не найдена");
 
   const date = todayInTimezone(location.timezone, now);
@@ -117,7 +119,10 @@ export async function listCashierSessionsForToday() {
   };
 }
 
-export async function listCashierOrders(query: CashierOrdersQuery) {
+export async function listCashierOrders(
+  query: CashierOrdersQuery,
+  scope?: { locationIds?: string[] | null; cashierId?: string },
+) {
   const now = new Date();
   const location = await locationRepository.findDefaultActive(prisma, now);
   const timezone = location?.timezone ?? "Europe/Moscow";
@@ -141,11 +146,18 @@ export async function listCashierOrders(query: CashierOrdersQuery) {
       break;
   }
 
+  const locationIds =
+    scope?.locationIds === null || scope?.locationIds === undefined
+      ? undefined
+      : scope.locationIds;
+
   const orders = await orderRepository.listForCashier(prisma, {
     status,
     from,
     search: query.search,
     take: 50,
+    locationIds,
+    cashierId: scope?.cashierId,
   });
 
   return orders.map((order) => ({

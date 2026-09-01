@@ -1,14 +1,14 @@
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { prisma } from "@/lib/db/prisma";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { requireCashier } from "@/server/auth/cashier-session";
+import { canAccessLocation } from "@/server/auth/location-access";
 import { formatDateInTimezone, formatTimeInTimezone } from "@/lib/datetime";
 
 type RouteContext = { params: Promise<{ number: string }> };
 
 export async function GET(_req: Request, context: RouteContext) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
+    const user = await requireCashier();
 
     const { number } = await context.params;
     const order = await prisma.order.findUnique({
@@ -23,7 +23,12 @@ export async function GET(_req: Request, context: RouteContext) {
         cashier: { select: { name: true, email: true } },
       },
     });
-    if (!order) throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    if (!order || !canAccessLocation(user, order.session.locationId)) {
+      throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    }
+    if (user.role === "CASHIER" && order.cashierId && order.cashierId !== user.id) {
+      throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    }
 
     const tz = order.session.location.timezone;
     return apiSuccess({

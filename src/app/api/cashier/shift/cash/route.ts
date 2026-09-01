@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
+import { requireCashier } from "@/server/auth/cashier-session";
 import { addCashOperation } from "@/server/services/cashier-shifts";
 import { clientIpFromRequest } from "@/server/security/rate-limit";
 
@@ -12,8 +12,7 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
+    const user = await requireCashier();
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });

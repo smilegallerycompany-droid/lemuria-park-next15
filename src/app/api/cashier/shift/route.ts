@@ -1,6 +1,7 @@
 import { z } from "zod";
-import { apiSuccess, apiError, handleApiError, ApiError } from "@/lib/api/response";
-import { getCashierSessionUser } from "@/server/auth/cashier-session";
+import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
+import { requireCashier } from "@/server/auth/cashier-session";
+import { assertLocationAccess } from "@/server/auth/location-access";
 import {
   closeCashierShift,
   computeShiftCashSummary,
@@ -14,8 +15,7 @@ import { prisma } from "@/lib/db/prisma";
 
 export async function GET() {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
+    const user = await requireCashier();
 
     const shift = await getOpenShiftForCashier(prisma, user.id);
     const lastClosed = await getLastClosedShiftForCashier(user.id);
@@ -39,17 +39,13 @@ const openSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
+    const user = await requireCashier();
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
     const input = openSchema.parse(json);
 
-    // Ensure cashier is allowed at location (or has no bindings = all)
-    if (user.locationIds.length > 0 && !user.locationIds.includes(input.locationId)) {
-      throw new ApiError("FORBIDDEN", "Нет доступа к локации", 403);
-    }
+    assertLocationAccess(user, input.locationId);
 
     const shift = await openCashierShift({
       userId: user.id,
@@ -73,8 +69,7 @@ const closeSchema = z.object({
 
 export async function PATCH(req: Request) {
   try {
-    const user = await getCashierSessionUser();
-    if (!user) return apiError("UNAUTHORIZED", "Требуется вход кассира", 401);
+    const user = await requireCashier();
     const json = await req.json().catch(() => {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
