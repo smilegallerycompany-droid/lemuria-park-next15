@@ -2,12 +2,13 @@ import { apiSuccess, handleApiError, ApiError } from "@/lib/api/response";
 import { prisma } from "@/lib/db/prisma";
 import { requireDirector } from "@/server/auth/staff-session";
 import { buildOrderTimeline } from "@/server/services/order-timeline";
+import { canAccessLocation } from "@/server/auth/location-access";
 
 type RouteContext = { params: Promise<{ number: string }> };
 
 export async function GET(_req: Request, context: RouteContext) {
   try {
-    await requireDirector();
+    const actor = await requireDirector();
     const { number } = await context.params;
     const order = await prisma.order.findUnique({
       where: { number },
@@ -25,6 +26,9 @@ export async function GET(_req: Request, context: RouteContext) {
       },
     });
     if (!order) {
+      throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
+    }
+    if (!canAccessLocation(actor, order.locationId ?? order.session.locationId)) {
       throw new ApiError("NOT_FOUND", "Заказ не найден", 404);
     }
     const timeline = await buildOrderTimeline(number);

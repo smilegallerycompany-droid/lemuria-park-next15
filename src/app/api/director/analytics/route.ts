@@ -3,6 +3,7 @@ import { analyticsQuerySchema } from "@/lib/validation/analytics";
 import { requireDirector } from "@/server/auth/staff-session";
 import { getDirectorAnalyticsReport } from "@/server/services/analytics-report";
 import { resolveAnalyticsPeriod } from "@/server/services/analytics-period";
+import { constrainLocationIds } from "@/server/auth/location-access";
 
 export async function GET(req: Request) {
   try {
@@ -17,9 +18,7 @@ export async function GET(req: Request) {
     }
 
     const query = parsed.data;
-    if (query.locationId && user.locationIds.length > 0 && !user.locationIds.includes(query.locationId)) {
-      return apiError("FORBIDDEN", "Нет доступа к выбранной локации", 403);
-    }
+    const scoped = constrainLocationIds(user, query.locationId);
 
     const { from, to, preset } = resolveAnalyticsPeriod({
       preset: query.preset,
@@ -40,7 +39,8 @@ export async function GET(req: Request) {
     const report = await getDirectorAnalyticsReport({
       from,
       to,
-      locationId: query.locationId,
+      locationId: scoped === null ? query.locationId : scoped.length === 1 ? scoped[0] : undefined,
+      locationIds: scoped && scoped.length !== 1 ? scoped : undefined,
       source: query.source,
       paymentMethod: query.paymentMethod,
       ticketTypeId: query.ticketTypeId,

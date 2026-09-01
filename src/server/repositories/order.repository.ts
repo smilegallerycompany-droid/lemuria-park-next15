@@ -163,16 +163,24 @@ export const orderRepository = {
       from?: Date;
       search?: string;
       take: number;
+      locationIds?: string[];
+      cashierId?: string;
     },
   ) {
     const search = params.search?.trim();
     return db.order.findMany({
       where: search
-        ? { number: { contains: search, mode: "insensitive" } }
+        ? {
+            number: { contains: search, mode: "insensitive" },
+            ...(params.locationIds ? { session: { locationId: { in: params.locationIds } } } : {}),
+            ...(params.cashierId ? { cashierId: params.cashierId } : {}),
+          }
         : {
             source: "CASHIER",
             ...(params.status && params.status !== "ALL" ? { status: params.status } : {}),
             ...(params.from ? { createdAt: { gte: params.from } } : {}),
+            ...(params.locationIds ? { session: { locationId: { in: params.locationIds } } } : {}),
+            ...(params.cashierId ? { cashierId: params.cashierId } : {}),
           },
       include: {
         items: true,

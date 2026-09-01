@@ -6,6 +6,10 @@ export const locationRepository = {
     return db.location.findFirst({ where: { slug, status: { in: ["ACTIVE", "UPCOMING"] } } });
   },
 
+  findById(db: DbClient, id: string) {
+    return db.location.findUnique({ where: { id } });
+  },
+
   /**
    * The one location the public site currently points to: status ACTIVE
    * and — if set — the given instant falls within [activeFrom, activeTo].

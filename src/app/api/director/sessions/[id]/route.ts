@@ -5,6 +5,8 @@ import { requireDirector } from "@/server/auth/staff-session";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
 import { DomainError } from "@/server/domain/errors";
+import { assertSessionStatusTransition } from "@/server/domain/session-status";
+import { assertLocationAccess } from "@/server/auth/location-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -43,6 +45,8 @@ export async function PATCH(req: Request, context: RouteContext) {
     if (!session) {
       throw new ApiError("NOT_FOUND", "Сеанс не найден", 404);
     }
+    assertLocationAccess(actor, session.locationId);
+    assertSessionStatusTransition(session.status, input.status);
 
     if (input.status === "CANCELLED" || input.status === "CLOSED") {
       // Closing/cancelling with PAID orders is refused (empty sessions OK).
@@ -88,6 +92,8 @@ export async function DELETE(req: Request, context: RouteContext) {
     if (!session) {
       throw new ApiError("NOT_FOUND", "Сеанс не найден", 404);
     }
+    assertLocationAccess(actor, session.locationId);
+    assertSessionStatusTransition(session.status, "CANCELLED");
 
     await assertNoPaidOrders(session.id);
 

@@ -53,6 +53,9 @@ const DOMAIN_ERROR_STATUS: Record<DomainErrorCode, number> = {
   INSUFFICIENT_CASH_BALANCE: 409,
   REFUND_NOT_ALLOWED: 403,
   REFUND_AMOUNT_INVALID: 422,
+  INVALID_STATUS_TRANSITION: 409,
+  STAGING_PAY_DISABLED: 404,
+  ORDER_NOT_PAYABLE: 409,
 };
 
 /** Throw this from services/route handlers to produce a well-formed API error response. */

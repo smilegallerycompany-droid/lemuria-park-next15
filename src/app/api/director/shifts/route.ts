@@ -4,10 +4,11 @@ import { prisma } from "@/lib/db/prisma";
 import { requireDirector } from "@/server/auth/staff-session";
 import { closeCashierShift } from "@/server/services/cashier-shifts";
 import { clientIpFromRequest } from "@/server/security/rate-limit";
+import { constrainLocationIds, assertLocationAccess } from "@/server/auth/location-access";
 
 export async function GET(req: Request) {
   try {
-    await requireDirector();
+    const actor = await requireDirector();
     const url = new URL(req.url);
     const status = url.searchParams.get("status");
     const locationId = url.searchParams.get("locationId");
@@ -15,11 +16,12 @@ export async function GET(req: Request) {
     const differenceOnly = url.searchParams.get("difference") === "1";
     const from = url.searchParams.get("from");
     const to = url.searchParams.get("to");
+    const scoped = constrainLocationIds(actor, locationId);
 
     const shifts = await prisma.cashierShift.findMany({
       where: {
         ...(status ? { status: status as never } : {}),
-        ...(locationId ? { locationId } : {}),
+        ...(scoped ? { locationId: { in: scoped } } : {}),
         ...(cashierId ? { userId: cashierId } : {}),
         ...(differenceOnly ? { cashDifferenceAmount: { not: 0 } } : {}),
         ...(from || to
@@ -76,6 +78,12 @@ export async function POST(req: Request) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
     const input = forceCloseSchema.parse(json);
+    const shift = await prisma.cashierShift.findUnique({
+      where: { id: input.shiftId },
+      select: { locationId: true },
+    });
+    if (!shift) throw new ApiError("NOT_FOUND", "Смена не найдена", 404);
+    assertLocationAccess(actor, shift.locationId);
 
     const result = await closeCashierShift({
       userId: actor.id,

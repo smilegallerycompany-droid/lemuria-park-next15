@@ -9,6 +9,7 @@ import { sessionOccupancyStatus } from "@/server/services/director-sessions-toda
 import { assertLocationAccess } from "@/server/auth/location-access";
 import { DomainError } from "@/server/domain/errors";
 import type { StaffUser } from "@/server/auth/staff-session";
+// Location RBAC unit cases also live in location-access.test.ts.
 
 function staff(partial: Partial<StaffUser> & Pick<StaffUser, "role">): StaffUser {
   return {

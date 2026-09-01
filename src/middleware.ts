@@ -7,6 +7,10 @@ import {
   shouldSkipHostAllowlist,
 } from "@/lib/config/allowed-hosts";
 import { isPrivateTimerRootPost } from "@/lib/config/cron-auth";
+import {
+  productSurfaceFromHostname,
+  rewritePathForProductHost,
+} from "@/lib/config/product-hosts";
 
 const STAFF_PREFIXES = ["/cashier", "/director", "/admin", "/staff"];
 
@@ -16,40 +20,18 @@ function isStaffPath(pathname: string): boolean {
   );
 }
 
-/**
- * Edge middleware: security headers for all responses + noindex for staff portals.
- * Does not rewrite public design or alter booking domain logic.
- */
-export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const timerRoot = isPrivateTimerRootPost(request.method, pathname, request.headers);
-  if (timerRoot) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/api/cron/cleanup";
-    return NextResponse.rewrite(url);
-  }
-  const allowed = parseAllowedHosts(process.env.ALLOWED_HOSTS);
-  if (allowed.length > 0 && !shouldSkipHostAllowlist(pathname)) {
-    const hostname = hostnameFromHostHeader(request.headers.get("host"));
-    if (!hostname || !isHostAllowed(hostname, allowed)) {
-      return new NextResponse("Unknown host", { status: 421 });
-    }
-  }
-
-  const response = NextResponse.next();
-
+function applySecurityHeaders(request: NextRequest, response: NextResponse, pathname: string) {
   response.headers.set("X-Frame-Options", "DENY");
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // Cashier QR scanner needs getUserMedia on same origin; keep camera denied elsewhere.
-  const cameraPolicy = pathname === "/cashier/scan" || pathname.startsWith("/cashier/scan/")
-    ? "camera=(self)"
-    : "camera=()";
+  const cameraPolicy =
+    pathname === "/cashier/scan" || pathname.startsWith("/cashier/scan/")
+      ? "camera=(self)"
+      : "camera=()";
   response.headers.set(
     "Permissions-Policy",
     `${cameraPolicy}, microphone=(), geolocation=(), payment=()`,
   );
-  // Basic CSP — allows self assets, inline styles from Next, and YooKassa checkout redirects.
   response.headers.set(
     "Content-Security-Policy",
     [
@@ -73,16 +55,42 @@ export function middleware(request: NextRequest) {
   if (stagingNoIndex || isStaffPath(pathname)) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
-
   return response;
+}
+
+/**
+ * Edge middleware: host allowlist, product-host rewrite of `/`, security headers.
+ * Hostname never grants a role — layouts and APIs re-check the session.
+ */
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const timerRoot = isPrivateTimerRootPost(request.method, pathname, request.headers);
+  if (timerRoot) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/api/cron/cleanup";
+    return NextResponse.rewrite(url);
+  }
+  const allowed = parseAllowedHosts(process.env.ALLOWED_HOSTS);
+  const hostname = hostnameFromHostHeader(request.headers.get("host"));
+  if (allowed.length > 0 && !shouldSkipHostAllowlist(pathname)) {
+    if (!hostname || !isHostAllowed(hostname, allowed)) {
+      return new NextResponse("Unknown host", { status: 421 });
+    }
+  }
+
+  const surface = productSurfaceFromHostname(hostname);
+  const rewritten = rewritePathForProductHost(pathname, surface);
+  if (rewritten) {
+    const url = request.nextUrl.clone();
+    url.pathname = rewritten;
+    return applySecurityHeaders(request, NextResponse.rewrite(url), rewritten);
+  }
+
+  return applySecurityHeaders(request, NextResponse.next(), pathname);
 }
 
 export const config = {
   matcher: [
-    /*
-     * Apply to all paths except Next internals and common static assets.
-     * robots.txt / favicon stay public without CSP noise.
-     */
     "/((?!_next/static|_next/image|favicon.ico|robots.txt|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

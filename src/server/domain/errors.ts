@@ -32,7 +32,10 @@ export type DomainErrorCode =
   | "SHIFT_ALREADY_CLOSED"
   | "INSUFFICIENT_CASH_BALANCE"
   | "REFUND_NOT_ALLOWED"
-  | "REFUND_AMOUNT_INVALID";
+  | "REFUND_AMOUNT_INVALID"
+  | "INVALID_STATUS_TRANSITION"
+  | "STAGING_PAY_DISABLED"
+  | "ORDER_NOT_PAYABLE";
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

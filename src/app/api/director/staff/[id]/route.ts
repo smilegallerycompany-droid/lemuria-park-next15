@@ -6,6 +6,7 @@ import { requireDirector, revokeAllUserSessions } from "@/server/auth/staff-sess
 import { hashPassword } from "@/server/auth/password";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
+import { assertCanAssignRole } from "@/server/auth/role-policy";
 
 const patchSchema = z.object({
   confirm: z.literal(true).optional(),
@@ -60,7 +61,10 @@ export async function PATCH(req: Request, context: RouteContext) {
 
     if (input.status) data.status = input.status;
     if (input.name) data.name = input.name;
-    if (input.role) data.role = input.role;
+    if (input.role) {
+      assertCanAssignRole(actor.role, input.role);
+      data.role = input.role;
+    }
 
     if (input.resetPassword) {
       generatedPassword = input.newPassword ?? tempPassword();

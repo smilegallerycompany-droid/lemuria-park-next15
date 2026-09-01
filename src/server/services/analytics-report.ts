@@ -18,6 +18,8 @@ export type AnalyticsReportParams = {
   from: Date;
   to: Date;
   locationId?: string;
+  /** When set, restricts all location filters to this set (including empty = none). */
+  locationIds?: string[];
   source?: AnalyticsSourceFilter;
   paymentMethod?: AnalyticsPaymentFilter;
   ticketTypeId?: string;
@@ -25,6 +27,12 @@ export type AnalyticsReportParams = {
   timeZone?: string;
   now?: Date;
 };
+
+function locationIdList(params: AnalyticsReportParams): string[] | undefined {
+  if (params.locationIds) return params.locationIds;
+  if (params.locationId) return [params.locationId];
+  return undefined;
+}
 
 function mapPaymentFilter(filter: AnalyticsPaymentFilter | undefined): PaymentMethod[] | null {
   if (!filter || filter === "ALL") return null;
@@ -35,12 +43,13 @@ function mapPaymentFilter(filter: AnalyticsPaymentFilter | undefined): PaymentMe
 
 function paidOrderWhere(params: AnalyticsReportParams): Prisma.OrderWhereInput {
   const paymentMethods = mapPaymentFilter(params.paymentMethod);
+  const locations = locationIdList(params);
   return {
     status: "PAID",
     createdAt: { gte: params.from, lte: params.to },
-    ...(params.locationId
+    ...(locations
       ? {
-          OR: [{ locationId: params.locationId }, { session: { locationId: params.locationId } }],
+          OR: [{ locationId: { in: locations } }, { session: { locationId: { in: locations } } }],
         }
       : {}),
     ...(params.source && params.source !== "ALL" ? { source: params.source } : {}),
@@ -62,9 +71,10 @@ async function kpiBundle(params: AnalyticsReportParams) {
   const where = paidOrderWhere(params);
   const tz = params.timeZone ?? "Europe/Moscow";
 
-  const locationScope = params.locationId
+  const locations = locationIdList(params);
+  const locationScope = locations
     ? {
-        OR: [{ locationId: params.locationId }, { session: { locationId: params.locationId } }],
+        OR: [{ locationId: { in: locations } }, { session: { locationId: { in: locations } } }],
       }
     : {};
 
@@ -107,7 +117,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
         scannedAt: { gte: params.from, lte: params.to },
         ticket: {
           order: where,
-          ...(params.locationId ? { session: { locationId: params.locationId } } : {}),
+          ...(locations ? { session: { locationId: { in: locations } } } : {}),
         },
       },
     }),
@@ -123,11 +133,11 @@ async function kpiBundle(params: AnalyticsReportParams) {
       where: {
         status: "REFUNDED",
         updatedAt: { gte: params.from, lte: params.to },
-        ...(params.locationId
+        ...(locations
           ? {
               OR: [
-                { locationId: params.locationId },
-                { session: { locationId: params.locationId } },
+                { locationId: { in: locations } },
+                { session: { locationId: { in: locations } } },
               ],
             }
           : {}),
@@ -153,7 +163,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
         order: where,
         session: {
           endsAt: { lt: params.now ?? new Date() },
-          ...(params.locationId ? { locationId: params.locationId } : {}),
+          ...(locations ? { locationId: { in: locations } } : {}),
         },
         checkIns: { none: { result: "SUCCESS" } },
       },
@@ -161,7 +171,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
     prisma.reservation.count({
       where: {
         createdAt: { gte: params.from, lte: params.to },
-        ...(params.locationId ? { session: { locationId: params.locationId } } : {}),
+        ...(locations ? { session: { locationId: { in: locations } } } : {}),
       },
     }),
     prisma.order.count({
@@ -176,7 +186,7 @@ async function kpiBundle(params: AnalyticsReportParams) {
     where: {
       startsAt: { gte: params.from, lte: params.to },
       status: { not: "CANCELLED" },
-      ...(params.locationId ? { locationId: params.locationId } : {}),
+      ...(locationIdList(params) ? { locationId: { in: locationIdList(params)! } } : {}),
     },
     select: { id: true, capacity: true, startsAt: true },
   });
@@ -304,7 +314,7 @@ export async function getDirectorAnalyticsReport(params: AnalyticsReportParams) 
       where: {
         startsAt: { gte: params.from, lte: params.to },
         status: { not: "CANCELLED" },
-        ...(params.locationId ? { locationId: params.locationId } : {}),
+        ...(locationIdList(params) ? { locationId: { in: locationIdList(params)! } } : {}),
       },
       select: {
         id: true,
@@ -317,7 +327,9 @@ export async function getDirectorAnalyticsReport(params: AnalyticsReportParams) 
       take: 500,
     }),
     prisma.location.findMany({
-      where: params.locationId ? { id: params.locationId } : { status: "ACTIVE" },
+      where: locationIdList(params)
+        ? { id: { in: locationIdList(params)! } }
+        : { status: "ACTIVE" },
       select: { id: true, name: true },
     }),
   ]);
