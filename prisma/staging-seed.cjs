@@ -252,8 +252,9 @@ async function main() {
 
     const start = todayMoscow();
     // Check-in compares session local date to today. Public hours skip Tuesday,
-    // but cashier smoke still needs a same-calendar-day OPEN session.
-    for (const time of ["12:00", "14:00"]) {
+    // and 12:00/14:00 become unbookable after they start. Keep a late TEST
+    // slot so cashier QR/check-in still works the same calendar day.
+    for (const time of ["12:00", "14:00", "23:50"]) {
       const startsAt = moscowInstant(start, time);
       const endsAt = new Date(startsAt.getTime() + 20 * 60 * 1000);
       await prisma.session.upsert({
