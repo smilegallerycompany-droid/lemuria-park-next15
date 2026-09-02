@@ -9,6 +9,11 @@ import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { formatMoneyFromKopecks, cn } from "@/lib/utils";
 import { getPublicConfig, getPublicSessions, createPublicReservation } from "@/lib/api/public";
 import { ApiClientError } from "@/lib/api/client";
+import {
+  canSubmitTicketSelection,
+  selectedTicketCount,
+  setTicketQuantity,
+} from "@/lib/booking/ticket-quantities";
 import type { PublicConfigDto } from "@/types/dto/config";
 import type { PublicSessionDto, PublicSessionsResponseDto } from "@/types/dto/session";
 
@@ -187,10 +192,7 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   const selectedSession =
     sessionsData?.sessions.find((session) => session.publicId === selectedSessionId) ?? null;
 
-  const totalQuantity = useMemo(
-    () => Object.values(quantities).reduce((sum, value) => sum + value, 0),
-    [quantities],
-  );
+  const totalQuantity = useMemo(() => selectedTicketCount(quantities), [quantities]);
 
   const totalAmount = useMemo(() => {
     if (!selectedSession) return 0;
@@ -203,7 +205,10 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
   const exceedsAvailability =
     Boolean(selectedSession) && totalQuantity > (selectedSession?.remainingSeats ?? 0);
   const canContinue =
-    Boolean(selectedSession) && totalQuantity > 0 && !exceedsAvailability && !submitting;
+    Boolean(selectedSession) &&
+    !selectedSession?.soldOut &&
+    !submitting &&
+    canSubmitTicketSelection(quantities, selectedSession?.remainingSeats ?? 0);
 
   const step = !selectedDate
     ? 1
@@ -284,7 +289,9 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
             ? `${totalQuantity} ${ticketWord(totalQuantity)}${
                 selectedSession ? ` · ${selectedSession.localTime}` : ""
               }`
-            : "Выберите сеанс и количество"}
+            : selectedSession
+              ? "Выберите хотя бы один билет"
+              : "Выберите сеанс и количество"}
         </p>
       </div>
 
@@ -657,17 +664,21 @@ export function BookingWidget({ compact = false }: { compact?: boolean }) {
                               size="md"
                               value={quantities[price.ticketTypeCode] ?? 0}
                               onChange={(next) => {
-                                const clamped = Math.max(
-                                  0,
-                                  Math.min(next, selectedSession.remainingSeats),
+                                setQuantities((prev) =>
+                                  setTicketQuantity({
+                                    quantities: prev,
+                                    code: price.ticketTypeCode,
+                                    next,
+                                    remainingSeats: selectedSession.remainingSeats,
+                                  }),
                                 );
-                                setQuantities((prev) => ({
-                                  ...prev,
-                                  [price.ticketTypeCode]: clamped,
-                                }));
                               }}
                               min={0}
-                              max={Math.max(0, selectedSession.remainingSeats)}
+                              max={Math.max(
+                                0,
+                                selectedSession.remainingSeats -
+                                  (totalQuantity - (quantities[price.ticketTypeCode] ?? 0)),
+                              )}
                               valueLabel={price.ticketTypeName}
                               decreaseLabel={`Уменьшить: ${price.ticketTypeName}`}
                               increaseLabel={`Увеличить: ${price.ticketTypeName}`}

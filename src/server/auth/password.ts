@@ -10,4 +10,3 @@ export async function verifyPassword(password: string, passwordHash: string): Pr
   return bcrypt.compare(password, passwordHash);
 }
 
-export const DEV_SEED_PASSWORD = "ChangeMe123!";

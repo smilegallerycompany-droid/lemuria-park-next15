@@ -29,6 +29,7 @@ docs/screenshots
 docs/qa-screenshots
 docs/qa-screenshots-rc2
 docs/qa-screenshots-rc3
+prisma/seed.ts
 e2e
 scripts
 playwright.config.ts

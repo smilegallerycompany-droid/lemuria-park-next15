@@ -38,7 +38,9 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma/schema.prisma ./prisma/schema.prisma
+COPY --from=builder /app/prisma/migrations ./prisma/migrations
+COPY --from=builder /app/prisma/staging-seed.cjs ./prisma/staging-seed.cjs
 COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY container-start.sh /app/container-start.sh
 COPY container-bootstrap.cjs /app/container-bootstrap.cjs

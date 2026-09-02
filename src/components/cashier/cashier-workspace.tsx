@@ -22,7 +22,6 @@ import { formatMoneyFromKopecks, cn } from "@/lib/utils";
 import { ApiClientError } from "@/lib/api/client";
 import {
   cashierCheckIn,
-  cashierLogin,
   createCashierSale,
   getCashierMe,
   getCashierOrders,
@@ -35,6 +34,12 @@ import {
 } from "@/lib/api/cashier";
 import { OpenShiftForm } from "@/components/cashier/OpenShiftForm";
 import { useCashierShift } from "@/components/cashier/CashierShiftProvider";
+import {
+  canSubmitTicketSelection,
+  lineTotalKopecks,
+  selectedTicketCount,
+  setTicketQuantity,
+} from "@/lib/booking/ticket-quantities";
 
 type Filter = "today" | "all" | "paid" | "cancelled";
 
@@ -60,69 +65,6 @@ function useClock(timezone: string) {
   };
 }
 
-function LoginScreen({ onSuccess }: { onSuccess: (user: CashierUser) => void }) {
-  const [email, setEmail] = useState("cashier@lemuriapark.ru");
-  const [password, setPassword] = useState("ChangeMe123!");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const submit = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const user = await cashierLogin(email, password);
-      onSuccess(user);
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Не удалось войти");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="jungle-bg grid min-h-screen place-items-center p-4">
-      <Card variant="glass" className="w-full max-w-md p-7">
-        <p className="text-xs font-extrabold uppercase tracking-[0.18em] text-orange">Касса</p>
-        <h1 className="mt-2 font-display text-3xl font-semibold text-forest">Вход кассира</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Продажа, смена, заказы и QR-погашение. Возврат билета делает администратор.
-        </p>
-        <form className="mt-6 grid gap-4" onSubmit={submit}>
-          <div className="grid gap-1.5">
-            <label htmlFor="cashier-email" className="text-sm font-bold">
-              Email
-            </label>
-            <Input
-              id="cashier-email"
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="grid gap-1.5">
-            <label htmlFor="cashier-password" className="text-sm font-bold">
-              Пароль
-            </label>
-            <Input
-              id="cashier-password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <Button type="submit" size="lg" disabled={loading}>
-            {loading ? "Входим…" : "Войти"}
-          </Button>
-        </form>
-      </Card>
-    </div>
-  );
-}
-
 export function CashierWorkspace() {
   const { shift, loading: shiftLoading, setSheet, reload: reloadShift } = useCashierShift();
   const [user, setUser] = useState<CashierUser | null>(null);
@@ -144,7 +86,9 @@ export function CashierWorkspace() {
   useEffect(() => {
     getCashierMe()
       .then(setUser)
-      .catch(() => setUser(null))
+      .catch(() => {
+        window.location.replace("/cashier/login");
+      })
       .finally(() => setBootstrapping(false));
   }, []);
 
@@ -184,21 +128,27 @@ export function CashierWorkspace() {
   const selectedSession: CashierSessionCard | null =
     sessionsData?.sessions.find((session) => session.publicId === selectedSessionId) ?? null;
 
-  const totalQuantity = useMemo(
-    () => Object.values(quantities).reduce((sum, value) => sum + value, 0),
-    [quantities],
-  );
+  const totalQuantity = useMemo(() => selectedTicketCount(quantities), [quantities]);
 
   const totalAmount = useMemo(() => {
     if (!sessionsData) return 0;
-    return sessionsData.ticketTypes.reduce(
-      (sum, ticketType) => sum + (quantities[ticketType.code] ?? 0) * (ticketType.unitPrice ?? 0),
-      0,
+    return lineTotalKopecks(
+      quantities,
+      sessionsData.ticketTypes.map((ticketType) => ({
+        code: ticketType.code,
+        unitPrice: ticketType.unitPrice ?? 0,
+      })),
     );
   }, [sessionsData, quantities]);
 
+  const canSell =
+    Boolean(selectedSession) &&
+    !selectedSession?.soldOut &&
+    !selling &&
+    canSubmitTicketSelection(quantities, selectedSession?.remaining ?? 0);
+
   const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
-    if (!selectedSession || totalQuantity <= 0 || selling) return;
+    if (!selectedSession || !canSell) return;
     setSelling(true);
     setError(null);
     setStatusMessage(null);
@@ -230,22 +180,11 @@ export function CashierWorkspace() {
     }
   };
 
-  if (bootstrapping) {
+  if (bootstrapping || !user) {
     return (
-      <div className="grid min-h-screen place-items-center">
+      <div className="grid min-h-[40vh] place-items-center">
         <Skeleton className="h-40 w-80" />
       </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <LoginScreen
-        onSuccess={(next) => {
-          setUser(next);
-          void reloadShift();
-        }}
-      />
     );
   }
 
@@ -473,8 +412,8 @@ export function CashierWorkspace() {
                           key={ticketType.code}
                           className="flex items-center justify-between gap-3 rounded-2xl border border-beige bg-white/70 p-3"
                         >
-                          <div>
-                            <p className="font-extrabold text-forest">{ticketType.name}</p>
+                          <div className="min-w-0">
+                            <p className="truncate font-extrabold text-forest">{ticketType.name}</p>
                             <p className="text-sm text-muted-foreground">
                               {ticketType.unitPrice != null
                                 ? formatMoneyFromKopecks(ticketType.unitPrice)
@@ -484,16 +423,20 @@ export function CashierWorkspace() {
                           <QuantityStepper
                             value={quantities[ticketType.code] ?? 0}
                             onChange={(next) =>
-                              setQuantities((prev) => ({
-                                ...prev,
-                                [ticketType.code]: Math.max(
-                                  0,
-                                  Math.min(next, selectedSession.remaining),
-                                ),
-                              }))
+                              setQuantities((prev) =>
+                                setTicketQuantity({
+                                  quantities: prev,
+                                  code: ticketType.code,
+                                  next,
+                                  remainingSeats: selectedSession.remaining,
+                                }),
+                              )
                             }
                             min={0}
-                            max={selectedSession.remaining}
+                            max={Math.max(
+                              0,
+                              selectedSession.remaining - (totalQuantity - (quantities[ticketType.code] ?? 0)),
+                            )}
                             valueLabel={ticketType.name}
                             decreaseLabel={`Уменьшить: ${ticketType.name}`}
                             increaseLabel={`Увеличить: ${ticketType.name}`}
@@ -511,10 +454,15 @@ export function CashierWorkspace() {
                     </div>
 
                     <div className="mt-4 grid gap-3">
+                      {!canSell && totalQuantity === 0 && !selectedSession.soldOut ? (
+                        <p className="text-sm text-muted-foreground" role="status">
+                          Выберите хотя бы один билет
+                        </p>
+                      ) : null}
                       <Button
                         size="lg"
                         className="h-14 text-base"
-                        disabled={selling || totalQuantity === 0 || selectedSession.soldOut}
+                        disabled={!canSell}
                         onClick={() => void sell("CASH")}
                       >
                         <Banknote aria-hidden />
@@ -524,7 +472,7 @@ export function CashierWorkspace() {
                         size="lg"
                         variant="outline"
                         className="h-14 text-base"
-                        disabled={selling || totalQuantity === 0 || selectedSession.soldOut}
+                        disabled={!canSell}
                         onClick={() => void sell("CARD_TERMINAL")}
                       >
                         <CreditCard aria-hidden />
@@ -534,7 +482,7 @@ export function CashierWorkspace() {
                         size="lg"
                         variant="outline"
                         className="h-14 text-base"
-                        disabled={selling || totalQuantity === 0 || selectedSession.soldOut}
+                        disabled={!canSell}
                         onClick={() => void sell("CARD_ONLINE")}
                       >
                         <Globe aria-hidden />

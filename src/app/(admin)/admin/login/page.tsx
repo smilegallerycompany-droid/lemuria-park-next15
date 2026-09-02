@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("owner@lemuriapark.ru");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -39,9 +39,15 @@ export default function AdminLoginPage() {
       <form className="director-login-card" onSubmit={onSubmit}>
         <h1>Admin</h1>
         <p>Вход для ADMIN и OWNER</p>
-        <label>
+            <label>
           Email
-          <input value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            required
+          />
         </label>
         <label>
           Пароль
@@ -50,9 +56,10 @@ export default function AdminLoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
+            required
           />
         </label>
-        {error ? <p className="director-error">{error}</p> : null}
+        {error ? <p className="director-error" role="alert">{error}</p> : null}
         <button className="director-btn" type="submit" disabled={loading}>
           {loading ? "Вход…" : "Войти"}
         </button>

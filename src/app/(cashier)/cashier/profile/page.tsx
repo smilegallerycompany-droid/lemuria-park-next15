@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ApiClientError, apiGet, apiPost } from "@/lib/api/client";
 import { cashierLogout } from "@/lib/api/cashier";
 import { ConfirmDialog, ErrorAlert, PageHeader, StatusBadge } from "@/components/internal";
@@ -77,7 +76,6 @@ function paymentLabel(method: string | null) {
 }
 
 export default function CashierProfilePage() {
-  const router = useRouter();
   const [data, setData] = useState<ProfileResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -116,7 +114,7 @@ export default function CashierProfilePage() {
     } catch {
       /* ignore */
     }
-    router.replace("/cashier/login");
+    window.location.replace("/cashier/login");
   }
 
   async function onPassword(e: FormEvent<HTMLFormElement>) {

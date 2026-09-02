@@ -39,7 +39,7 @@ export default function DirectorLoginPage() {
       <div className="director-login-card">
         <h1>Director</h1>
         <p>Панель управления билетной платформой Лемурия Парк.</p>
-        {error ? <div className="director-alert error">{error}</div> : null}
+        {error ? <div className="director-alert error" role="alert">{error}</div> : null}
         <form onSubmit={onSubmit}>
           <div className="director-field">
             <label htmlFor="email">Email</label>

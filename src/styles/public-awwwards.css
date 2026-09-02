@@ -405,6 +405,15 @@
   background: var(--green-soft);
   color: var(--green-deep);
 }
+.public-awwwards .ticket-copy {
+  min-width: 0;
+}
+.public-awwwards .ticket-copy strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .public-awwwards .ticket-copy small { color: var(--muted); }
 .public-awwwards .counter {
   display: flex;

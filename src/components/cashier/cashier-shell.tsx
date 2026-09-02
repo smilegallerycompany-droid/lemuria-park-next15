@@ -16,11 +16,6 @@ const NAV = [
 
 export function CashierShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const isLogin = pathname === "/cashier/login";
-
-  if (isLogin) {
-    return <div className="cashier-root">{children}</div>;
-  }
 
   return (
     <CashierShiftProvider>

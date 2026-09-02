@@ -4,6 +4,7 @@ import type { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { env } from "@/lib/config/env";
 import { DomainError } from "@/server/domain/errors";
+import { isStaffSessionAlive } from "@/server/auth/cashier-entry";
 
 export const STAFF_COOKIE_NAME = "lemuria_staff_session";
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -123,7 +124,7 @@ export async function getStaffSessionUser(): Promise<StaffUser | null> {
   const session = await prisma.staffSession.findUnique({
     where: { tokenHash: hashToken(token) },
   });
-  if (!session || session.revokedAt || session.expiresAt.getTime() < Date.now()) {
+  if (!session || !isStaffSessionAlive(session)) {
     return null;
   }
 

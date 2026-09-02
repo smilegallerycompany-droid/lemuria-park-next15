@@ -1,7 +1,6 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
 import { ApiClientError, apiGet, apiPatch, apiPost } from "@/lib/api/client";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 import type { LocationRow, ShiftDto, ShiftPayload } from "./shift-types";
@@ -38,9 +37,7 @@ export function useCashierShiftOptional() {
 }
 
 export function CashierShiftProvider({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const skip = pathname === "/cashier/login";
-  const [loading, setLoading] = useState(!skip);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shift, setShift] = useState<ShiftDto | null>(null);
   const [lastClosed, setLastClosed] = useState<ShiftDto | null>(null);
@@ -64,10 +61,6 @@ export function CashierShiftProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    if (skip) {
-      setLoading(false);
-      return;
-    }
     let cancelled = false;
     (async () => {
       try {
@@ -85,7 +78,7 @@ export function CashierShiftProvider({ children }: { children: React.ReactNode }
     return () => {
       cancelled = true;
     };
-  }, [skip, reload]);
+  }, [reload]);
 
   useEffect(() => {
     if (!toast) return;

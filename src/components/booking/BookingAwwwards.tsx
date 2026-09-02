@@ -12,7 +12,7 @@ import {
   Ticket,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createPublicReservation,
   getPublicConfig,
@@ -20,6 +20,13 @@ import {
 } from "@/lib/api/public";
 import { ApiClientError } from "@/lib/api/client";
 import { createIdempotencyKey, formatMoneyFromKopecks } from "@/lib/utils";
+import {
+  canSubmitTicketSelection,
+  emptyTicketQuantities,
+  lineTotalKopecks,
+  selectedTicketCount,
+  setTicketQuantity,
+} from "@/lib/booking/ticket-quantities";
 import type { PublicConfigDto } from "@/types/dto/config";
 import type { PublicSessionDto } from "@/types/dto/session";
 
@@ -92,6 +99,7 @@ export function BookingAwwwards() {
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [qty, setQty] = useState<QtyMap>({});
   const [submitting, setSubmitting] = useState(false);
+  const submitLock = useRef(false);
   const [locationSlug, setLocationSlug] = useState<string | undefined>(undefined);
 
   useEffect(() => {
@@ -104,13 +112,8 @@ export function BookingAwwwards() {
     try {
       const cfg = await getPublicConfig({ locationSlug: slug });
       setConfig(cfg);
-      const initial: QtyMap = {};
-      for (const t of cfg.ticketTypes) {
-        if (t.code === "ADULT") initial[t.code] = 2;
-        else if (t.code === "CHILD") initial[t.code] = 1;
-        else initial[t.code] = 0;
-      }
-      setQty(initial);
+      const paidTypes = cfg.ticketTypes.filter((t) => t.code !== "INFANT").map((t) => t.code);
+      setQty(emptyTicketQuantities(paidTypes));
       if (cfg.location && slug !== cfg.location.slug) {
         setLocationSlug(cfg.location.slug);
       }
@@ -199,21 +202,21 @@ export function BookingAwwwards() {
     return map;
   }, [activeSession]);
 
-  const totalGuests = useMemo(
-    () => Object.values(qty).reduce((sum, n) => sum + n, 0),
-    [qty],
+  const totalGuests = useMemo(() => selectedTicketCount(qty), [qty]);
+
+  const totalAmount = useMemo(
+    () =>
+      lineTotalKopecks(
+        qty,
+        [...priceByCode.entries()].map(([code, unitPrice]) => ({ code, unitPrice })),
+      ),
+    [qty, priceByCode],
   );
 
-  const totalAmount = useMemo(() => {
-    let sum = 0;
-    for (const [code, count] of Object.entries(qty)) {
-      sum += (priceByCode.get(code) ?? 0) * count;
-    }
-    return sum;
-  }, [qty, priceByCode]);
-
   async function handleCheckout() {
-    if (!activeSession || totalGuests <= 0 || activeSession.soldOut) return;
+    if (!activeSession || submitLock.current) return;
+    if (!canSubmitTicketSelection(qty, activeSession.remainingSeats) || activeSession.soldOut) return;
+    submitLock.current = true;
     setSubmitting(true);
     setError(null);
     try {
@@ -228,6 +231,7 @@ export function BookingAwwwards() {
     } catch (e) {
       setError(e instanceof ApiClientError ? e.message : "Не удалось зарезервировать места");
       setSubmitting(false);
+      submitLock.current = false;
     }
   }
 
@@ -352,7 +356,7 @@ export function BookingAwwwards() {
               .map((t) => (
                 <TicketRow
                   key={t.code}
-                  icon={t.code === "ADULT" ? <Users size={20} /> : <Ticket size={20} />}
+                  icon={<Ticket size={20} />}
                   title={t.name}
                   note={
                     priceByCode.has(t.code)
@@ -363,7 +367,16 @@ export function BookingAwwwards() {
                       : (t.description ?? "")
                   }
                   value={qty[t.code] ?? 0}
-                  setValue={(value) => setQty((prev) => ({ ...prev, [t.code]: value }))}
+                  setValue={(value) =>
+                    setQty((prev) =>
+                      setTicketQuantity({
+                        quantities: prev,
+                        code: t.code,
+                        next: value,
+                        remainingSeats: activeSession?.remainingSeats ?? 0,
+                      }),
+                    )
+                  }
                   max={Math.max(
                     0,
                     (activeSession?.remainingSeats ?? 0) - (totalGuests - (qty[t.code] ?? 0)),
@@ -430,16 +443,21 @@ export function BookingAwwwards() {
                 submitting ||
                 !activeSession ||
                 activeSession.soldOut ||
-                totalGuests <= 0 ||
-                totalGuests > (activeSession.remainingSeats ?? 0)
+                !canSubmitTicketSelection(qty, activeSession.remainingSeats)
               }
               onClick={() => void handleCheckout()}
             >
               {submitting ? "Резервируем…" : "Перейти к оплате"}
             </button>
-            <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
-              Места резервируются на 15 минут
-            </p>
+            {activeSession && totalGuests === 0 && !activeSession.soldOut ? (
+              <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }} role="status">
+                Выберите хотя бы один билет
+              </p>
+            ) : (
+              <p style={{ marginTop: 10, fontSize: 12, color: "var(--muted)" }}>
+                Места резервируются на 15 минут
+              </p>
+            )}
           </div>
         </aside>
       </div>
@@ -471,21 +489,28 @@ function TicketRow({
 }) {
   return (
     <div className="ticket-row">
-      <div className="ticket-icon">{icon}</div>
+      <div className="ticket-icon" aria-hidden>
+        {icon}
+      </div>
       <div className="ticket-copy">
-        <strong>{title}</strong>
+        <strong title={title}>{title}</strong>
         <br />
         <small>{note}</small>
       </div>
-      <div className="counter">
-        <button type="button" onClick={() => setValue(Math.max(0, value - 1))} aria-label="Меньше">
+      <div className="counter" role="group" aria-label={`Количество: ${title}`}>
+        <button
+          type="button"
+          onClick={() => setValue(Math.max(0, value - 1))}
+          aria-label={`Уменьшить: ${title}`}
+          disabled={value <= 0}
+        >
           <Minus size={15} />
         </button>
-        <strong>{value}</strong>
+        <strong aria-live="polite">{value}</strong>
         <button
           type="button"
           onClick={() => setValue(Math.min(max, value + 1))}
-          aria-label="Больше"
+          aria-label={`Увеличить: ${title}`}
           disabled={value >= max}
         >
           <Plus size={15} />

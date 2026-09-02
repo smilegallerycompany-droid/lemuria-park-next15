@@ -4,8 +4,8 @@ import { z } from "zod";
  * Environment for Lemuria Park on Yandex Cloud / local.
  * Payment and email never invent success when credentials are missing.
  *
- * Seed passwords such as ChangeMe123! are demo-only — never use them in
- * production. `prisma/seed.ts` refuses to run when NODE_ENV=production.
+ * Local demo seed passwords must never be used in production.
+ * `prisma/seed.ts` refuses to run when NODE_ENV=production.
  */
 const DEFAULT_AUTH_SECRET = "dev-only-auth-secret-change-me";
 const DEFAULT_QR_SECRET = "dev-qr-signing-secret-change-me";

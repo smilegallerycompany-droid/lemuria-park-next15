@@ -1,15 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 import { useCashierShift } from "./CashierShiftProvider";
 import { formatShiftTime } from "./shift-types";
 
 export function CashierShiftBar() {
   const { loading, shift, toast, error } = useCashierShift();
-  const pathname = usePathname();
-  if (pathname === "/cashier/login") return null;
   if (loading && !shift) return null;
 
   if (!shift) {
