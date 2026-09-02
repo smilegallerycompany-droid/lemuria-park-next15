@@ -64,10 +64,12 @@ export function addDaysUtc(date: Date, days: number): Date {
  * timezone — used for "today" filters without pulling in a date library.
  */
 export function startOfLocalDateInTimezone(dateKey: string, timeZone: string): Date {
-  const probe = new Date(`${dateKey}T12:00:00.000Z`);
-  for (let offsetHours = -14; offsetHours <= 14; offsetHours += 1) {
-    const candidate = new Date(probe.getTime() + offsetHours * 60 * 60 * 1000);
-    candidate.setUTCMinutes(0, 0, 0);
+  const probe = new Date(`${dateKey}T00:00:00.000Z`);
+  // ±18h covers all IANA offsets. 15-minute steps catch :00 local midnight
+  // (UTC+3 Moscow midnight is -3h from this probe — the old ±14h search
+  // from T12:00Z missed it and fell back to 03:00 MSK, dropping overnight sales).
+  for (let offsetMin = -18 * 60; offsetMin <= 18 * 60; offsetMin += 15) {
+    const candidate = new Date(probe.getTime() + offsetMin * 60 * 1000);
     if (
       formatDateInTimezone(candidate, timeZone) === dateKey &&
       formatTimeInTimezone(candidate, timeZone) === "00:00"
@@ -75,5 +77,5 @@ export function startOfLocalDateInTimezone(dateKey: string, timeZone: string): D
       return candidate;
     }
   }
-  return new Date(`${dateKey}T00:00:00.000Z`);
+  return probe;
 }

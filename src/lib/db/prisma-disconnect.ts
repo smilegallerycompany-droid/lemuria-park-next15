@@ -11,3 +11,17 @@ export function isPrismaServerClosed(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   return message.includes("Server has closed the connection");
 }
+
+/** One reconnect+retry for Odyssey idle disconnects. Other errors are not retried. */
+export async function withPrismaIdleRetry<T>(
+  fn: () => Promise<T>,
+  reconnect: () => Promise<void>,
+): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    if (!isPrismaServerClosed(error)) throw error;
+    await reconnect();
+    return fn();
+  }
+}

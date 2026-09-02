@@ -10,11 +10,25 @@ export default function CashierSessionsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getCashierSessions()
-      .then(setData)
-      .catch((err) =>
-        setError(err instanceof ApiClientError ? err.message : "Не удалось загрузить сеансы"),
-      );
+    let cancelled = false;
+    async function load(attempt = 0) {
+      try {
+        const next = await getCashierSessions();
+        if (!cancelled) setData(next);
+      } catch (err) {
+        if (attempt < 1) {
+          await new Promise((r) => setTimeout(r, 400));
+          if (!cancelled) return load(attempt + 1);
+        }
+        if (!cancelled) {
+          setError(err instanceof ApiClientError ? err.message : "Не удалось загрузить сеансы");
+        }
+      }
+    }
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (

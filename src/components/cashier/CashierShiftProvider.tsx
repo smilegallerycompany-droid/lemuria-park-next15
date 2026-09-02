@@ -65,15 +65,21 @@ export function CashierShiftProvider({ children }: { children: React.ReactNode }
     (async () => {
       try {
         await reload();
-        const locs = await apiGet<{ locations: LocationRow[] }>("/api/cashier/locations");
-        if (!cancelled) setLocations(locs.locations);
       } catch (err) {
         if (!cancelled && !(err instanceof ApiClientError && err.status === 401)) {
           setError(err instanceof ApiClientError ? err.message : "Ошибка смены");
         }
-      } finally {
-        if (!cancelled) setLoading(false);
       }
+      for (let attempt = 0; attempt < 3 && !cancelled; attempt += 1) {
+        try {
+          const locs = await apiGet<{ locations: LocationRow[] }>("/api/cashier/locations");
+          if (!cancelled) setLocations(locs.locations);
+          break;
+        } catch {
+          await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+        }
+      }
+      if (!cancelled) setLoading(false);
     })();
     return () => {
       cancelled = true;

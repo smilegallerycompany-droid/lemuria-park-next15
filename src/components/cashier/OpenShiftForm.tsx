@@ -7,7 +7,7 @@ import { useCashierShift } from "./CashierShiftProvider";
 import { rublesToKopecks } from "./shift-types";
 
 export function OpenShiftForm() {
-  const { locations, openShift, error, clearError } = useCashierShift();
+  const { locations, openShift, error, clearError, loading } = useCashierShift();
   const [cashierName, setCashierName] = useState("Кассир");
   const [locationId, setLocationId] = useState(locations[0]?.id ?? "");
   const [openingCash, setOpeningCash] = useState("0");
@@ -59,9 +59,12 @@ export function OpenShiftForm() {
       <h1>Открыть смену</h1>
       <p>Перед продажами нужно открыть кассовую смену.</p>
       {localError || error ? <div className="cashier-error">{localError || error}</div> : null}
+      {!loading && locations.length === 0 ? (
+        <div className="cashier-error">Не удалось загрузить локации. Обновите страницу.</div>
+      ) : null}
       <label>
         Локация
-        <select value={loc} onChange={(e) => setLocationId(e.target.value)}>
+        <select value={loc} onChange={(e) => setLocationId(e.target.value)} disabled={locations.length === 0}>
           {locations.map((l) => (
             <option key={l.id} value={l.id}>
               {l.city} — {l.name}

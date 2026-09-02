@@ -121,8 +121,10 @@ export function CashierWorkspace() {
 
   useEffect(() => {
     if (!user) return;
-    void refreshSessions();
-    void refreshOrders();
+    void (async () => {
+      await refreshSessions();
+      await refreshOrders();
+    })();
   }, [user, refreshSessions, refreshOrders]);
 
   const selectedSession: CashierSessionCard | null =
@@ -171,7 +173,13 @@ export function CashierWorkspace() {
       );
       setStatusMessage(`Продажа ${order.number} · ${formatMoneyFromKopecks(order.totalAmount)}`);
       setQuantities({});
-      await Promise.all([refreshSessions(), refreshOrders(), reloadShift()]);
+      try {
+        await refreshSessions();
+        await refreshOrders();
+        await reloadShift();
+      } catch {
+        /* sale already committed; avoid treating a pool timeout as a failed sale */
+      }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Продажа не выполнена");
       void refreshSessions();
@@ -535,9 +543,12 @@ function CashierCheckInPanel() {
       </div>
       <form className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch" onSubmit={(e) => void onScan(e)}>
         <Input
+          id="cashier-qr-token"
           value={token}
           onChange={(e) => setToken(e.target.value)}
           placeholder="Вставьте qrToken билета"
+          aria-label="Токен QR билета"
+          autoComplete="off"
           className="min-w-0 flex-1 font-mono text-sm"
           required
         />

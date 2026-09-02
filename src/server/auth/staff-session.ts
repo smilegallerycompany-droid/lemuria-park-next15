@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
 import type { UserRole, UserStatus } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { withPrismaIdleRetry } from "@/lib/db/prisma-disconnect";
 import { env } from "@/lib/config/env";
 import { DomainError } from "@/server/domain/errors";
 import { isStaffSessionAlive } from "@/server/auth/cashier-entry";
@@ -121,14 +122,21 @@ export async function getStaffSessionUser(): Promise<StaffUser | null> {
   const token = jar.get(STAFF_COOKIE_NAME)?.value;
   if (!token) return null;
 
-  const session = await prisma.staffSession.findUnique({
-    where: { tokenHash: hashToken(token) },
-  });
-  if (!session || !isStaffSessionAlive(session)) {
-    return null;
-  }
-
-  return loadUser(session.userId);
+  return withPrismaIdleRetry(
+    async () => {
+      const session = await prisma.staffSession.findUnique({
+        where: { tokenHash: hashToken(token) },
+      });
+      if (!session || !isStaffSessionAlive(session)) {
+        return null;
+      }
+      return loadUser(session.userId);
+    },
+    async () => {
+      await prisma.$disconnect();
+      await prisma.$connect();
+    },
+  );
 }
 
 export async function requireStaffUser(allowedRoles: UserRole[]): Promise<StaffUser> {
