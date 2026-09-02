@@ -683,7 +683,6 @@
 .director-main,
 .cashier-main {
   min-width: 0;
-  overflow-x: clip;
 }
 
 .director-shell {
