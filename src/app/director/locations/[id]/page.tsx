@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 import { WhereWeAreSection, type PublicLocationCard } from "@/components/public/WhereWeAreSection";
 
 type LocationDetail = {
@@ -130,10 +131,10 @@ export default function DirectorLocationDetailPage() {
               ["address", "Адрес"],
               ["addressLine2", "Ориентир / этаж"],
               ["phone", "Телефон"],
-              ["email", "Email"],
+              ["email", "Эл. почта"],
               ["mapLabel", "Подпись на карте"],
               ["routeUrl", "URL маршрута"],
-              ["mapUrl", "mapUrl (legacy)"],
+              ["mapUrl", "Ссылка на карту"],
             ] as const
           ).map(([key, label]) => (
             <label key={key} className="director-field">
@@ -152,14 +153,14 @@ export default function DirectorLocationDetailPage() {
             >
               {["UPCOMING", "ACTIVE", "PAUSED", "CLOSED"].map((s) => (
                 <option key={s} value={s}>
-                  {s}
+                  {labelStatus(s)}
                 </option>
               ))}
             </select>
           </label>
           <div className="director-grid-2">
             <label className="director-field">
-              Latitude
+              Широта
               <input
                 type="number"
                 step="any"
@@ -173,7 +174,7 @@ export default function DirectorLocationDetailPage() {
               />
             </label>
             <label className="director-field">
-              Longitude
+              Долгота
               <input
                 type="number"
                 step="any"
@@ -188,7 +189,7 @@ export default function DirectorLocationDetailPage() {
             </label>
           </div>
           <label className="director-field">
-            Map zoom
+            Масштаб карты
             <input
               type="number"
               min={1}

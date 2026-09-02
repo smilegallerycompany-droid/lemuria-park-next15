@@ -329,7 +329,7 @@ export function AnalyticsDashboard() {
     <div className="internal-analytics">
       <PageHeader
         title="Аналитика"
-        description={`Только оплаченные заказы (PAID). Часовой пояс: ${data?.filters.timezone ?? "Europe/Moscow"}. Все значения из БД.`}
+        description={`Только оплаченные заказы. Часовой пояс: ${data?.filters.timezone ?? "Europe/Moscow"}. Все значения из базы.`}
         actions={
           <button
             type="button"
@@ -457,12 +457,12 @@ export function AnalyticsDashboard() {
 
       {error ? <ErrorAlert message={error} /> : null}
 
-      <section className="internal-kpi-grid" aria-label="KPI">
+      <section className="internal-kpi-grid" aria-label="Показатели">
         <KpiCard
           label="Валовая выручка"
           value={formatMoneyFromKopecks(kpis?.grossRevenueKopecks ?? 0)}
           comparison={comparison?.grossRevenueKopecks}
-          formula="Сумма PAID Order до возвратов"
+          formula="Сумма оплаченных заказов до возвратов"
           loading={loading}
           deltaKind="money"
         />
@@ -470,7 +470,7 @@ export function AnalyticsDashboard() {
           label="Возвраты"
           value={formatMoneyFromKopecks(kpis?.refundedAmountKopecks ?? 0)}
           comparison={comparison?.refundedAmountKopecks}
-          formula="COMPLETED Refund"
+          formula="Завершённые возвраты"
           tone="danger"
           loading={loading}
           deltaKind="money"
@@ -479,7 +479,7 @@ export function AnalyticsDashboard() {
           label="Чистая выручка"
           value={formatMoneyFromKopecks(kpis?.netRevenueKopecks ?? 0)}
           comparison={comparison?.netRevenueKopecks}
-          formula="Gross − Refunded"
+          formula="Чистая выручка − возвраты"
           loading={loading}
           deltaKind="money"
         />
@@ -499,7 +499,7 @@ export function AnalyticsDashboard() {
           label="Средний чек"
           value={formatMoneyFromKopecks(kpis?.averageOrderValueKopecks ?? 0)}
           comparison={comparison?.averageOrderValueKopecks}
-          formula="Net / Paid Orders"
+          formula="Чистая / оплаченные заказы"
           loading={loading}
           deltaKind="money"
         />
@@ -507,29 +507,29 @@ export function AnalyticsDashboard() {
           label="Средняя цена билета"
           value={formatMoneyFromKopecks(kpis?.averageTicketPriceKopecks ?? 0)}
           comparison={comparison?.averageTicketPriceKopecks}
-          formula="Net / Tickets Sold"
+          formula="Чистая / проданные билеты"
           loading={loading}
           deltaKind="money"
         />
         <KpiCard
-          label="Check-in"
+          label="Проходы"
           value={String(kpis?.checkIns ?? 0)}
           comparison={comparison?.checkIns}
-          formula="Только SUCCESS"
+          formula="Только успешный проход"
           loading={loading}
         />
         <KpiCard
           label="Сканы возвратов"
           value={String(kpis?.checkInsRefunded ?? 0)}
           comparison={comparison?.checkInsRefunded}
-          formula="TicketCheckIn.result = REFUNDED"
+          formula="Сканы билетов со статусом «возврат»"
           loading={loading}
         />
         <KpiCard
           label="Посещаемость"
           value={pct(kpis?.attendanceRate ?? 0)}
           comparison={comparison?.attendanceRate}
-          formula="Check-in / действующие билеты"
+          formula="Проходы / действующие билеты"
           loading={loading}
           deltaKind="percent"
         />
@@ -537,7 +537,7 @@ export function AnalyticsDashboard() {
           label="Загрузка сеансов"
           value={pct(kpis?.occupancyRate ?? 0)}
           comparison={comparison?.occupancyRate}
-          formula="Оплаченные места / capacity"
+          formula="Оплаченные места / вместимость"
           loading={loading}
           deltaKind="percent"
         />
@@ -590,18 +590,18 @@ export function AnalyticsDashboard() {
           loading={loading}
         />
         <KpiCard
-          label="No-show"
+          label="Не пришли"
           value={String(kpis?.noShow ?? 0)}
           comparison={comparison?.noShow}
           tone="warning"
-          formula="VALID билеты прошедших сеансов без SUCCESS check-in"
+          formula="Действительные билеты прошедших сеансов без успешного прохода"
           loading={loading}
         />
         <KpiCard
-          label="Конверсия reservation"
+          label="Конверсия броней"
           value={pct(kpis?.reservationConversionRate ?? 0)}
           comparison={comparison?.reservationConversionRate}
-          formula="PAID из reservations / созданные reservations"
+          formula="Оплачено из броней / созданные брони"
           loading={loading}
           deltaKind="percent"
         />
@@ -731,12 +731,12 @@ export function AnalyticsDashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Check-in и no-show" loading={loading} empty={!data}>
+        <ChartCard title="Проходы и не явившиеся" loading={loading} empty={!data}>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart
               data={[
-                { name: "Check-in", value: data?.attendance.checkIns ?? 0 },
-                { name: "No-show", value: data?.attendance.noShow ?? 0 },
+                { name: "Проходы", value: data?.attendance.checkIns ?? 0 },
+                { name: "Не пришли", value: data?.attendance.noShow ?? 0 },
               ]}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5ebe3" />
@@ -785,7 +785,7 @@ export function AnalyticsDashboard() {
           <div className="internal-empty">Нет данных за период</div>
         ) : null}
         {!loading && heatmapGrid.times.length ? (
-          <div className="internal-heatmap" role="table" aria-label="Heatmap occupancy">
+          <div className="internal-heatmap" role="table" aria-label="Тепловая карта загрузки">
             <div className="internal-heatmap-row header">
               <div />
               {heatmapGrid.times.map((t) => (
@@ -842,7 +842,7 @@ export function AnalyticsDashboard() {
                 </th>
                 <th>
                   <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "capacity"))}>
-                    Capacity
+                    Вместимость
                   </button>
                 </th>
                 <th>Онлайн</th>
@@ -852,11 +852,11 @@ export function AnalyticsDashboard() {
                     Всего
                   </button>
                 </th>
-                <th>Check-in</th>
+                <th>Проходы</th>
                 <th>Свободно</th>
                 <th>
                   <button type="button" className="internal-sort" onClick={() => setSessionSort((s) => toggleSort(s.key, s.dir, "occupancy"))}>
-                    Occupancy
+                    Загрузка
                   </button>
                 </th>
                 <th className="num">
@@ -1053,7 +1053,7 @@ export function AnalyticsDashboard() {
                     Билеты
                   </button>
                 </th>
-                <th>Check-in</th>
+                <th>Проходы</th>
                 <th className="num">
                   <button type="button" className="internal-sort" onClick={() => setLocationSort((s) => toggleSort(s.key, s.dir, "revenueKopecks"))}>
                     Выручка

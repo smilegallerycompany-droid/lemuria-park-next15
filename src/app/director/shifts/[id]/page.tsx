@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ConfirmDialog, PageHeader } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelCashOp, labelStatus } from "@/lib/director/labels";
 import { useStaffBasePath } from "@/lib/staff-portal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
@@ -116,12 +117,12 @@ export default function DirectorShiftDetailPage() {
       </div>
       <PageHeader
         title={`Смена · ${shift.user.name}`}
-        description={`${shift.location.city} · ${shift.status} · ${summary.durationMinutes} мин`}
+        description={`${shift.location.city} · ${labelStatus(shift.status)} · ${summary.durationMinutes} мин`}
         actions={
           <div className="no-print" style={{ display: "flex", gap: 8 }}>
             {shift.status === "OPEN" ? (
               <button type="button" className="director-btn danger" onClick={() => setForceForm(true)}>
-                Force close
+                Принудительно закрыть
               </button>
             ) : null}
             <button type="button" className="director-btn secondary" onClick={() => window.print()}>
@@ -139,19 +140,19 @@ export default function DirectorShiftDetailPage() {
 
       <div className="director-card-grid">
         <div className="director-kpi">
-          <div className="director-kpi-label">Opening</div>
+          <div className="director-kpi-label">На открытии</div>
           <div className="director-kpi-value tabular-nums">
             {formatMoneyFromKopecks(shift.openingCashAmount)}
           </div>
         </div>
         <div className="director-kpi">
-          <div className="director-kpi-label">Expected</div>
+          <div className="director-kpi-label">Ожидается</div>
           <div className="director-kpi-value tabular-nums">
             {formatMoneyFromKopecks(summary.expectedCashAmount)}
           </div>
         </div>
         <div className="director-kpi">
-          <div className="director-kpi-label">Actual</div>
+          <div className="director-kpi-label">Факт</div>
           <div className="director-kpi-value tabular-nums">
             {shift.closingCashAmount != null
               ? formatMoneyFromKopecks(shift.closingCashAmount)
@@ -159,7 +160,7 @@ export default function DirectorShiftDetailPage() {
           </div>
         </div>
         <div className={`director-kpi ${diff && diff < 0 ? "tone-danger" : diff && diff > 0 ? "tone-warning" : ""}`}>
-          <div className="director-kpi-label">Difference</div>
+          <div className="director-kpi-label">Расхождение</div>
           <div className={`director-kpi-value tabular-nums diff ${kind}`}>
             {diff == null ? "—" : formatMoneyFromKopecks(diff)}
           </div>
@@ -168,7 +169,7 @@ export default function DirectorShiftDetailPage() {
 
       <section className="director-panel" style={{ marginTop: 18 }}>
         <div className="director-panel-head">
-          <h2>Summary</h2>
+          <h2>Итог смены</h2>
         </div>
         <ul className="director-plain-list">
           <li>
@@ -180,7 +181,7 @@ export default function DirectorShiftDetailPage() {
             <strong>{shift.closedAt ? formatDateTime(shift.closedAt) : "—"}</strong>
           </li>
           <li>
-            <span>Cash / Card / Online</span>
+            <span>Наличные / карта / онлайн</span>
             <strong>
               {formatMoneyFromKopecks(shift.cashSalesAmount)} /{" "}
               {formatMoneyFromKopecks(shift.cardSalesAmount)} /{" "}
@@ -188,13 +189,13 @@ export default function DirectorShiftDetailPage() {
             </strong>
           </li>
           <li>
-            <span>IN / OUT</span>
+            <span>Внесения / изъятия</span>
             <strong>
               {formatMoneyFromKopecks(summary.cashIn)} / {formatMoneyFromKopecks(summary.cashOut)}
             </strong>
           </li>
           <li>
-            <span>Orders / Tickets / Check-ins / Refunds</span>
+            <span>Заказы / билеты / проходы / возвраты</span>
             <strong>
               {shift.ordersCount} / {shift.ticketsCount} / {summary.checkIns} /{" "}
               {summary.refundsCount}
@@ -208,7 +209,7 @@ export default function DirectorShiftDetailPage() {
           ) : null}
           {shift.closeReason ? (
             <li>
-              <span>Force-close причина</span>
+              <span>Причина принудительного закрытия</span>
               <strong>{shift.closeReason}</strong>
             </li>
           ) : null}
@@ -217,7 +218,7 @@ export default function DirectorShiftDetailPage() {
 
       <section className="director-panel" style={{ marginTop: 18 }}>
         <div className="director-panel-head">
-          <h2>Cash operations</h2>
+          <h2>Операции с наличными</h2>
         </div>
         <div className="director-table-wrap">
           <table className="director-table">
@@ -235,7 +236,7 @@ export default function DirectorShiftDetailPage() {
               {shift.cashOperations.map((op) => (
                 <tr key={op.id} className={`cash-op-${op.type.toLowerCase()}`}>
                   <td>{formatDateTime(op.createdAt)}</td>
-                  <td>{op.type}</td>
+                  <td>{labelCashOp(op.type)}</td>
                   <td className="tabular-nums">{formatMoneyFromKopecks(op.amount)}</td>
                   <td>{op.comment ?? "—"}</td>
                   <td>{op.order?.number ?? "—"}</td>
@@ -249,7 +250,7 @@ export default function DirectorShiftDetailPage() {
 
       <section className="director-panel" style={{ marginTop: 18 }}>
         <div className="director-panel-head">
-          <h2>Orders</h2>
+          <h2>Заказы</h2>
         </div>
         <div className="director-table-wrap">
           <table className="director-table">
@@ -268,7 +269,7 @@ export default function DirectorShiftDetailPage() {
                     <a href={`${base}/orders/${o.number}`}>{o.number}</a>
                   </td>
                   <td className="tabular-nums">{formatMoneyFromKopecks(o.totalAmount)}</td>
-                  <td>{o.status}</td>
+                  <td>{labelStatus(o.status)}</td>
                   <td>{formatDateTime(o.createdAt)}</td>
                 </tr>
               ))}
@@ -286,7 +287,7 @@ export default function DirectorShiftDetailPage() {
       {forceForm ? (
         <div className="director-panel no-print" style={{ marginTop: 12 }} data-testid="force-close-form">
           <p>
-            Принудительное закрытие. Смена получит статус FORCE_CLOSED. Причина обязательна.
+            Принудительное закрытие. Смена получит статус «Принудительно закрыта». Причина обязательна.
           </p>
           <label>
             Фактически в кассе, ₽
@@ -325,8 +326,8 @@ export default function DirectorShiftDetailPage() {
       <ConfirmDialog
         open={forceConfirm}
         title="Принудительно закрыть смену?"
-        description="Смена будет FORCE_CLOSED. Это действие пишется в AuditLog."
-        confirmLabel="Force close"
+        description="Смена будет принудительно закрыта. Действие записывается в журнал аудита."
+        confirmLabel="Закрыть"
         danger
         busy={forceBusy}
         onCancel={() => setForceConfirm(false)}

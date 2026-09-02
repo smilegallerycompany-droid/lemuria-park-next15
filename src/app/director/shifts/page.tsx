@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KpiCard, PageHeader } from "@/components/internal";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 import { useStaffBasePath } from "@/lib/staff-portal";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
@@ -171,10 +172,10 @@ export default function DirectorShiftsPage() {
           <label>
             Статус
             <select value={status} onChange={(e) => setStatus(e.target.value)}>
-              <option value="">Open / Closed</option>
-              <option value="OPEN">Open</option>
-              <option value="CLOSED">Closed</option>
-              <option value="FORCE_CLOSED">Force closed</option>
+              <option value="">Все статусы</option>
+              <option value="OPEN">Открыта</option>
+              <option value="CLOSED">Закрыта</option>
+              <option value="FORCE_CLOSED">Принудительно закрыта</option>
             </select>
           </label>
           <label>
@@ -183,7 +184,7 @@ export default function DirectorShiftsPage() {
               checked={differenceOnly}
               onChange={(e) => setDifferenceOnly(e.target.checked)}
             />
-            Only differences
+            Только с расхождением
           </label>
         </div>
       </section>
@@ -199,8 +200,8 @@ export default function DirectorShiftsPage() {
               <th>Наличные</th>
               <th>Карта</th>
               <th>Заказы</th>
-              <th>Difference</th>
-              <th>Status</th>
+              <th>Расхождение</th>
+              <th>Статус</th>
             </tr>
           </thead>
           <tbody>
@@ -230,7 +231,7 @@ export default function DirectorShiftsPage() {
                     ? "—"
                     : formatMoneyFromKopecks(s.cashDifferenceAmount)}
                 </td>
-                <td>{s.status}</td>
+                <td>{labelStatus(s.status)}</td>
               </tr>
             ))}
           </tbody>

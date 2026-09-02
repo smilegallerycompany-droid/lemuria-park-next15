@@ -21,6 +21,7 @@ import {
   PageHeader,
 } from "@/components/internal";
 import { directorFetch, formatDateTime, formatPercent } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type Overview = {
@@ -101,13 +102,13 @@ export default function DirectorDashboardPage() {
 
   const channelData = data
     ? [
-        { name: "Online", value: data.charts.onlineVsCashier.online },
+        { name: "Онлайн", value: data.charts.onlineVsCashier.online },
         { name: "Касса", value: data.charts.onlineVsCashier.cashier },
       ]
     : [];
   const methodData = data
     ? [
-        { name: "YooKassa", value: data.charts.paymentMethods.yookassa },
+        { name: "ЮKassa", value: data.charts.paymentMethods.yookassa },
         { name: "Карта", value: data.charts.paymentMethods.card },
         { name: "Наличные", value: data.charts.paymentMethods.cash },
       ]
@@ -117,7 +118,7 @@ export default function DirectorDashboardPage() {
     <>
       <PageHeader
         title="Сегодня"
-        description="Оперативный обзор за 10 секунд. Только реальные данные из БД."
+        description="Живые цифры за сегодня из базы — без витринных заглушек."
         actions={
           <Link href="/director/analytics" className="internal-btn primary">
             Аналитика
@@ -128,7 +129,7 @@ export default function DirectorDashboardPage() {
       {loading ? <LoadingSkeleton variant="kpi" count={8} /> : null}
 
       {data ? (
-        <>
+        <div className="director-dashboard">
           <div className="internal-kpi-grid">
             <KpiCard
               label="Выручка сегодня"
@@ -180,14 +181,14 @@ export default function DirectorDashboardPage() {
           </div>
 
           {data.shifts ? (
-            <section className="internal-panel" style={{ marginBottom: 18 }}>
+            <section className="internal-panel">
               <div className="internal-table-head">
                 <h3>Смены сегодня</h3>
                 <Link href="/director/shifts" className="internal-btn secondary">
                   Все смены
                 </Link>
               </div>
-              <ul className="director-plain-list" style={{ padding: 12 }}>
+              <ul className="director-plain-list">
                 <li>
                   <span>Открытые смены</span>
                   <strong>{data.shifts.open.length}</strong>
@@ -228,12 +229,16 @@ export default function DirectorDashboardPage() {
                     </tbody>
                   </table>
                 </div>
-              ) : null}
+              ) : (
+                <p className="director-kpi-sub" style={{ margin: 0 }}>
+                  Сейчас нет открытых смен.
+                </p>
+              )}
             </section>
           ) : null}
 
           {data.alerts.length > 0 ? (
-            <section className="internal-panel" style={{ marginBottom: 18 }}>
+            <section className="internal-panel">
               <div className="internal-table-head">
                 <h3>Требует внимания</h3>
               </div>
@@ -251,7 +256,7 @@ export default function DirectorDashboardPage() {
             </section>
           ) : null}
 
-          <div className="director-grid-2" style={{ marginBottom: 18 }}>
+          <div className="director-grid-2">
             <section className="internal-panel">
               <div className="internal-table-head">
                 <h3>Выручка по часам</h3>
@@ -273,7 +278,7 @@ export default function DirectorDashboardPage() {
 
             <section className="internal-panel">
               <div className="internal-table-head">
-                <h3>Online vs касса · оплаты</h3>
+                <h3>Онлайн и касса · оплаты</h3>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", height: 180 }}>
                 <ResponsiveContainer>
@@ -313,11 +318,11 @@ export default function DirectorDashboardPage() {
                   <tr>
                     <th>Локация</th>
                     <th>Время</th>
-                    <th>Sold</th>
-                    <th>Reserved</th>
-                    <th>Free</th>
-                    <th>Occupancy</th>
-                    <th>Status</th>
+                    <th>Продано</th>
+                    <th>Бронь</th>
+                    <th>Свободно</th>
+                    <th>Загрузка</th>
+                    <th>Статус</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -336,7 +341,7 @@ export default function DirectorDashboardPage() {
                         <td className="num tabular-nums">{session.reserved}</td>
                         <td className="num tabular-nums">{session.free}</td>
                         <td className="num tabular-nums">{formatPercent(session.occupancy)}</td>
-                        <td>{session.status}</td>
+                        <td>{labelStatus(session.status)}</td>
                       </tr>
                     ))
                   )}
@@ -344,7 +349,7 @@ export default function DirectorDashboardPage() {
               </table>
             </div>
           </section>
-        </>
+        </div>
       ) : null}
     </>
   );

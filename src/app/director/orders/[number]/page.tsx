@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
 import { OrderTimeline } from "@/components/director/OrderTimeline";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type TimelineEvent = {
@@ -223,7 +224,7 @@ export default function DirectorOrderDetailPage() {
           <table className="director-table">
             <thead>
               <tr>
-                <th>Public ID</th>
+                <th>Номер билета</th>
                 <th>Тип</th>
                 <th>Статус</th>
                 <th>Цена</th>
@@ -234,7 +235,7 @@ export default function DirectorOrderDetailPage() {
                 <tr key={ticket.publicId}>
                   <td>{ticket.publicId}</td>
                   <td>{ticket.ticketType.name}</td>
-                  <td>{ticket.status}</td>
+                  <td>{labelStatus(ticket.status)}</td>
                   <td>{formatMoneyFromKopecks(ticket.orderItem.unitPriceAmount)}</td>
                 </tr>
               ))}

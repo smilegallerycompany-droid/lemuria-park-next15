@@ -228,7 +228,7 @@
 .internal-kpi-grid,
 .director-card-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: var(--internal-space-5);
 }
@@ -847,6 +847,13 @@
 .internal-filter-bar,
 .internal-page-header {
   min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .internal-kpi-grid,
+  .director-card-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 768px) {

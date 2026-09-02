@@ -47,8 +47,8 @@ export default function DirectorSettingsPage() {
   return (
     <>
       <PageHeader
-        title="Settings"
-        description="Операционные TTL, генерация сеансов и legal URLs."
+        title="Настройки"
+        description="Время брони и оплаты, генерация сеансов и ссылки на документы."
         actions={
           <button type="button" className="director-btn primary" onClick={save} disabled={!settings}>
             Сохранить
@@ -62,17 +62,17 @@ export default function DirectorSettingsPage() {
         <section className="director-panel">
           <div className="director-form-grid">
             <div className="director-field">
-              <label>Maintenance mode</label>
+              <label>Режим обслуживания</label>
               <select
                 value={settings.maintenanceMode ? "1" : "0"}
                 onChange={(e) => setSettings({ ...settings, maintenanceMode: e.target.value === "1" })}
               >
-                <option value="0">Off</option>
-                <option value="1">On</option>
+                <option value="0">Выкл</option>
+                <option value="1">Вкл</option>
               </select>
             </div>
             <div className="director-field">
-              <label>Reservation TTL (min)</label>
+              <label>Бронь истекает через, мин</label>
               <input
                 type="number"
                 value={settings.reservationTtlMinutes}
@@ -80,7 +80,7 @@ export default function DirectorSettingsPage() {
               />
             </div>
             <div className="director-field">
-              <label>Payment TTL (min)</label>
+              <label>Оплата истекает через, мин</label>
               <input
                 type="number"
                 value={settings.paymentTtlMinutes}
@@ -88,7 +88,7 @@ export default function DirectorSettingsPage() {
               />
             </div>
             <div className="director-field">
-              <label>Default capacity</label>
+              <label>Вместимость по умолчанию</label>
               <input
                 type="number"
                 value={settings.defaultCapacity}
@@ -96,7 +96,7 @@ export default function DirectorSettingsPage() {
               />
             </div>
             <div className="director-field">
-              <label>Session interval (min)</label>
+              <label>Интервал сеансов, мин</label>
               <input
                 type="number"
                 value={settings.defaultSessionInterval}
@@ -104,7 +104,7 @@ export default function DirectorSettingsPage() {
               />
             </div>
             <div className="director-field">
-              <label>Generation window (days)</label>
+              <label>Окно генерации, дней</label>
               <input
                 type="number"
                 value={settings.sessionGenerationDays}
@@ -112,14 +112,14 @@ export default function DirectorSettingsPage() {
               />
             </div>
             <div className="director-field">
-              <label>Policy URL</label>
+              <label>Ссылка на политику</label>
               <input
                 value={settings.policyUrl ?? ""}
                 onChange={(e) => setSettings({ ...settings, policyUrl: e.target.value || null })}
               />
             </div>
             <div className="director-field">
-              <label>Offer URL</label>
+              <label>Ссылка на оферту</label>
               <input
                 value={settings.offerUrl ?? ""}
                 onChange={(e) => setSettings({ ...settings, offerUrl: e.target.value || null })}

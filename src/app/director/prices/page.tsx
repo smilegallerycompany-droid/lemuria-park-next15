@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { labelActive, labelDayType } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type PriceRow = {
@@ -98,7 +99,7 @@ export default function DirectorPricesPage() {
   return (
     <>
       <PageHeader
-        title="Prices"
+        title="Цены"
         description="Правила цен в копейках на сервере; ввод и отображение — в рублях."
         actions={
           <select value={filterLocationId} onChange={(e) => setFilterLocationId(e.target.value)}>
@@ -139,10 +140,10 @@ export default function DirectorPricesPage() {
             </select>
           </div>
           <div className="director-field">
-            <label>Day type</label>
+            <label>Тип дня</label>
             <select value={form.dayType} onChange={(e) => setForm({ ...form, dayType: e.target.value })}>
-              <option value="WEEKDAY">WEEKDAY</option>
-              <option value="WEEKEND">WEEKEND</option>
+              <option value="WEEKDAY">Будни</option>
+              <option value="WEEKEND">Выходные</option>
             </select>
           </div>
           <div className="director-field">
@@ -168,7 +169,7 @@ export default function DirectorPricesPage() {
               <tr>
                 <th>Локация</th>
                 <th>Тип</th>
-                <th>Day</th>
+                <th>День</th>
                 <th>Цена</th>
                 <th>Статус</th>
                 <th />
@@ -182,11 +183,11 @@ export default function DirectorPricesPage() {
                     {price.ticketType.name}
                     <div style={{ fontSize: 12, color: "var(--dir-muted)" }}>{price.ticketType.code}</div>
                   </td>
-                  <td>{price.dayType}</td>
+                  <td>{labelDayType(price.dayType)}</td>
                   <td>{formatMoneyFromKopecks(price.priceAmount)}</td>
                   <td>
                     <span className={`director-badge ${price.isActive ? "green" : "neutral"}`}>
-                      {price.isActive ? "ACTIVE" : "OFF"}
+                      {labelActive(price.isActive)}
                     </span>
                   </td>
                   <td>

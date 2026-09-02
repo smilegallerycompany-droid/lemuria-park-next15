@@ -30,7 +30,7 @@ function formatAbsolute(value: number, kind: Props["deltaKind"]): string {
 function deltaText(comparison: KpiComparison | undefined, kind: Props["deltaKind"]): string {
   if (!comparison) return "";
   if (comparison.label === "no_baseline") return "Нет данных для сравнения";
-  if (comparison.label === "new") return "Новый показатель";
+  if (comparison.label === "new") return "Нет сравнения со вчера";
   const sign = comparison.absolute > 0 ? "+" : "";
   const abs = formatAbsolute(comparison.absolute, kind);
   const pct =

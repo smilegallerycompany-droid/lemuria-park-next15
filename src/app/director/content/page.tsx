@@ -119,7 +119,7 @@ export default function DirectorContentPage() {
         }),
       });
       setContent(updated);
-      setSaved("Hero / About / контакты сохранены");
+      setSaved("Главный экран, «О нас» и контакты сохранены");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось сохранить");
     } finally {
@@ -146,10 +146,10 @@ export default function DirectorContentPage() {
         }),
       });
       setFaqDraft({ question: "", answer: "" });
-      setSaved("FAQ добавлен");
+      setSaved("Вопрос добавлен");
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "FAQ create failed");
+      setError(err instanceof Error ? err.message : "Не удалось добавить вопрос");
     }
   }
 
@@ -164,9 +164,9 @@ export default function DirectorContentPage() {
         body: JSON.stringify(body),
       });
       await reload();
-      setSaved("FAQ обновлён");
+      setSaved("Вопрос обновлён");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "FAQ update failed");
+      setError(err instanceof Error ? err.message : "Не удалось обновить вопрос");
     }
   }
 
@@ -184,11 +184,11 @@ export default function DirectorContentPage() {
         credentials: "include",
       });
       const json = await res.json();
-      if (!json.ok) throw new Error(json.error?.message ?? "Upload failed");
+      if (!json.ok) throw new Error(json.error?.message ?? "Не удалось загрузить файл");
       setSaved("Изображение загружено");
       await reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(err instanceof Error ? err.message : "Не удалось загрузить файл");
     } finally {
       setUploading(false);
     }
@@ -201,9 +201,9 @@ export default function DirectorContentPage() {
         body: JSON.stringify(body),
       });
       await reload();
-      setSaved("Gallery обновлён");
+      setSaved("Галерея обновлена");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Gallery update failed");
+      setError(err instanceof Error ? err.message : "Не удалось обновить галерею");
     }
   }
 
@@ -212,8 +212,8 @@ export default function DirectorContentPage() {
   return (
     <>
       <PageHeader
-        title="Content CMS"
-        description="Hero, About, FAQ и Gallery публичного сайта. Preview справа."
+        title="Контент сайта"
+        description="Главный экран, блок «О нас», вопросы и галерея публичного сайта. Справа — как это увидит гость."
         actions={
           <button
             type="button"
@@ -221,7 +221,7 @@ export default function DirectorContentPage() {
             disabled={saving}
             onClick={saveSite}
           >
-            {saving ? "Сохранение…" : "Сохранить Hero/About"}
+            {saving ? "Сохранение…" : "Сохранить главный экран"}
           </button>
         }
       />
@@ -232,53 +232,53 @@ export default function DirectorContentPage() {
         <div>
           <section className="director-panel" style={{ marginBottom: 18 }}>
             <div className="director-panel-head">
-              <h2>Hero</h2>
+              <h2>Главный экран</h2>
             </div>
             <div className="director-form-grid">
               <div className="director-field">
-                <label>Badge</label>
+                <label>Плашка</label>
                 <input
                   value={site.heroBadge ?? ""}
                   onChange={(e) => patchSite({ heroBadge: e.target.value })}
                 />
               </div>
               <div className="director-field">
-                <label>CTA text</label>
+                <label>Текст кнопки</label>
                 <input
                   value={site.heroCtaLabel ?? ""}
                   onChange={(e) => patchSite({ heroCtaLabel: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>H1 (используйте \\n для переноса)</label>
+                <label>Заголовок (перенос — \\n)</label>
                 <input
                   value={site.heroTitle ?? ""}
                   onChange={(e) => patchSite({ heroTitle: e.target.value })}
                 />
               </div>
               <div className="director-field">
-                <label>Subtitle</label>
+                <label>Подзаголовок</label>
                 <input
                   value={site.heroSubtitle ?? ""}
                   onChange={(e) => patchSite({ heroSubtitle: e.target.value })}
                 />
               </div>
               <div className="director-field">
-                <label>CTA href / anchor</label>
+                <label>Ссылка кнопки</label>
                 <input
                   value={site.heroCtaHref ?? "#booking"}
                   onChange={(e) => patchSite({ heroCtaHref: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Description</label>
+                <label>Описание</label>
                 <textarea
                   value={site.heroDescription ?? ""}
                   onChange={(e) => patchSite({ heroDescription: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Hero image URL</label>
+                <label>Картинка главного экрана (URL)</label>
                 <input
                   value={site.heroImageUrl ?? ""}
                   onChange={(e) => patchSite({ heroImageUrl: e.target.value })}
@@ -290,32 +290,32 @@ export default function DirectorContentPage() {
                   checked={site.heroActive}
                   onChange={(e) => patchSite({ heroActive: e.target.checked })}
                 />
-                Hero active
+                Показывать блок
               </label>
             </div>
           </section>
 
           <section className="director-panel" style={{ marginBottom: 18 }}>
             <div className="director-panel-head">
-              <h2>About</h2>
+              <h2>О нас</h2>
             </div>
             <div className="director-form-grid">
               <div className="director-field">
-                <label>Eyebrow</label>
+                <label>Надзаголовок</label>
                 <input
                   value={site.aboutEyebrow ?? ""}
                   onChange={(e) => patchSite({ aboutEyebrow: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Title</label>
+                <label>Заголовок</label>
                 <input
                   value={site.aboutTitle ?? ""}
                   onChange={(e) => patchSite({ aboutTitle: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Description</label>
+                <label>Описание</label>
                 <textarea
                   value={site.aboutDescription ?? ""}
                   onChange={(e) => patchSite({ aboutDescription: e.target.value })}
@@ -327,7 +327,7 @@ export default function DirectorContentPage() {
               {benefits.map((b, idx) => (
                 <div key={idx} className="director-form-grid" style={{ marginTop: 8, borderTop: "1px solid #eee", paddingTop: 8 }}>
                   <div className="director-field">
-                    <label>Title</label>
+                    <label>Название</label>
                     <input
                       value={b.title}
                       onChange={(e) => {
@@ -338,7 +338,7 @@ export default function DirectorContentPage() {
                     />
                   </div>
                   <div className="director-field">
-                    <label>Icon key</label>
+                    <label>Ключ иконки</label>
                     <input
                       value={b.iconKey}
                       onChange={(e) => {
@@ -349,7 +349,7 @@ export default function DirectorContentPage() {
                     />
                   </div>
                   <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                    <label>Description</label>
+                    <label>Описание</label>
                     <input
                       value={b.description}
                       onChange={(e) => {
@@ -369,7 +369,7 @@ export default function DirectorContentPage() {
                         patchSite({ aboutBenefits: next });
                       }}
                     />
-                    Active
+                    Активно
                   </label>
                 </div>
               ))}
@@ -399,7 +399,7 @@ export default function DirectorContentPage() {
 
           <section className="director-panel" style={{ marginBottom: 18 }}>
             <div className="director-panel-head">
-              <h2>FAQ</h2>
+              <h2>Вопросы</h2>
             </div>
             <p style={{ margin: "0 0 12px", color: "#4f5b49", fontSize: 14 }}>
               На главной показываются только {FAQ_PUBLIC_LIMIT} вопросов — те, что снимают сомнения перед
@@ -407,14 +407,14 @@ export default function DirectorContentPage() {
             </p>
             <div className="director-form-grid">
               <div className="director-field">
-                <label>Question</label>
+                <label>Вопрос</label>
                 <input
                   value={faqDraft.question}
                   onChange={(e) => setFaqDraft({ ...faqDraft, question: e.target.value })}
                 />
               </div>
               <div className="director-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Answer</label>
+                <label>Ответ</label>
                 <textarea
                   value={faqDraft.answer}
                   onChange={(e) => setFaqDraft({ ...faqDraft, answer: e.target.value })}
@@ -422,15 +422,15 @@ export default function DirectorContentPage() {
               </div>
             </div>
             <button type="button" className="director-btn secondary" onClick={addFaq}>
-              Добавить FAQ
+              Добавить вопрос
             </button>
             <div className="director-table-wrap" style={{ marginTop: 12 }}>
               <table className="director-table">
                 <thead>
                   <tr>
-                    <th>Order</th>
-                    <th>Question</th>
-                    <th>Active</th>
+                    <th>Порядок</th>
+                    <th>Вопрос</th>
+                    <th>На сайте</th>
                     <th />
                   </tr>
                 </thead>
@@ -451,7 +451,7 @@ export default function DirectorContentPage() {
                         <div>{f.question}</div>
                         <small style={{ color: "#666" }}>{f.answer.slice(0, 80)}</small>
                       </td>
-                      <td>{f.isPublished ? "yes" : "archived"}</td>
+                      <td>{f.isPublished ? "да" : "в архиве"}</td>
                       <td style={{ whiteSpace: "nowrap" }}>
                         {f.isPublished ? (
                           <button
@@ -459,7 +459,7 @@ export default function DirectorContentPage() {
                             className="director-btn secondary"
                             onClick={() => patchFaq(f.id, { archive: true })}
                           >
-                            Archive
+                            В архив
                           </button>
                         ) : (
                           <button
@@ -467,7 +467,7 @@ export default function DirectorContentPage() {
                             className="director-btn secondary"
                             onClick={() => patchFaq(f.id, { restore: true })}
                           >
-                            Restore
+                            Вернуть
                           </button>
                         )}
                       </td>
@@ -480,7 +480,7 @@ export default function DirectorContentPage() {
 
           <section className="director-panel">
             <div className="director-panel-head">
-              <h2>Gallery</h2>
+              <h2>Галерея</h2>
             </div>
             <input
               type="file"
@@ -495,9 +495,9 @@ export default function DirectorContentPage() {
               <table className="director-table">
                 <thead>
                   <tr>
-                    <th>Preview</th>
-                    <th>Alt / caption</th>
-                    <th>Order</th>
+                    <th>Превью</th>
+                    <th>Подпись</th>
+                    <th>Порядок</th>
                     <th />
                   </tr>
                 </thead>
@@ -527,7 +527,7 @@ export default function DirectorContentPage() {
                           }}
                         />
                         <input
-                          placeholder="caption"
+                          placeholder="подпись"
                           value={g.caption ?? ""}
                           onBlur={(e) => {
                             const next = e.target.value || null;
@@ -561,7 +561,7 @@ export default function DirectorContentPage() {
                             className="director-btn secondary"
                             onClick={() => patchGallery(g.id, { archive: true })}
                           >
-                            Archive
+                            В архив
                           </button>
                         ) : (
                           <button
@@ -569,7 +569,7 @@ export default function DirectorContentPage() {
                             className="director-btn secondary"
                             onClick={() => patchGallery(g.id, { restore: true })}
                           >
-                            Restore
+                            Вернуть
                           </button>
                         )}
                       </td>
@@ -583,7 +583,7 @@ export default function DirectorContentPage() {
 
         <aside className="director-panel" style={{ position: "sticky", top: 16 }}>
           <div className="director-panel-head">
-            <h2>Preview</h2>
+            <h2>Как увидит гость</h2>
           </div>
           <div style={{ padding: 12, background: "#f6f8f4", borderRadius: 12 }}>
             <span className="kicker" style={{ fontSize: 12 }}>{site.heroBadge}</span>
@@ -595,7 +595,7 @@ export default function DirectorContentPage() {
               <small style={{ marginLeft: 8 }}>{site.heroCtaHref}</small>
             </div>
             {!site.heroActive ? (
-              <p style={{ color: "#a30", marginTop: 12 }}>Hero выключен (active=false)</p>
+              <p style={{ color: "#a30", marginTop: 12 }}>Главный экран скрыт</p>
             ) : null}
           </div>
         </aside>

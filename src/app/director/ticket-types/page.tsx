@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/director/PageHeader";
 import { directorFetch } from "@/lib/director/client";
+import { labelActive } from "@/lib/director/labels";
 
 type TicketTypeRow = {
   id: string;
@@ -61,13 +62,13 @@ export default function DirectorTicketTypesPage() {
 
   return (
     <>
-      <PageHeader title="Ticket types" description="Справочник типов билетов для pricing и заказов." />
+      <PageHeader title="Типы билетов" description="Справочник типов билетов для цен и заказов." />
       {error ? <div className="director-alert error">{error}</div> : null}
 
       <section className="director-panel" style={{ marginBottom: 18 }}>
         <div className="director-form-grid">
           <div className="director-field">
-            <label>Code</label>
+            <label>Код</label>
             <input value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} />
           </div>
           <div className="director-field">
@@ -94,7 +95,7 @@ export default function DirectorTicketTypesPage() {
           <table className="director-table">
             <thead>
               <tr>
-                <th>Code</th>
+                <th>Код</th>
                 <th>Название</th>
                 <th>Цены</th>
                 <th>Билеты</th>
@@ -111,7 +112,7 @@ export default function DirectorTicketTypesPage() {
                   <td>{row._count.tickets}</td>
                   <td>
                     <span className={`director-badge ${row.isActive ? "green" : "neutral"}`}>
-                      {row.isActive ? "ACTIVE" : "OFF"}
+                      {labelActive(row.isActive)}
                     </span>
                   </td>
                   <td>

@@ -15,6 +15,9 @@ const STATUS_LABELS: Record<string, string> = {
   CLOSED: "Закрыт",
   SCHEDULED: "Запланирован",
   OPEN: "Открыт",
+  COMPLETED: "Завершён",
+  FORCE_CLOSED: "Принудительно закрыта",
+  INVITED: "Приглашён",
   CANCELLED: "Отменён",
   PAID: "Оплачен",
   AWAITING_PAYMENT: "Ожидает оплаты",
@@ -65,6 +68,16 @@ export function labelPaymentMethod(value: string): string {
   return PAYMENT_METHOD_LABELS[value] ?? value;
 }
 
+const CASH_OP_LABELS: Record<string, string> = {
+  IN: "Внесение",
+  OUT: "Изъятие",
+  SALE: "Продажа",
+};
+
+export function labelCashOp(value: string): string {
+  return CASH_OP_LABELS[value] ?? value;
+}
+
 export function labelActive(isActive: boolean): string {
-  return isActive ? "Активно" : "Выкл";
+  return isActive ? "Активно" : "Выключено";
 }
