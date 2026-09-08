@@ -1,6 +1,7 @@
 # Яндекс Облако
 
-Канон: [`docs/ECOSYSTEM.md`](./ECOSYSTEM.md) §6–7.
+Канон: [`docs/ECOSYSTEM.md`](./ECOSYSTEM.md) §6–7.  
+Фактический инвентарь каталогов (2026-09-08): [`yandex-production-audit.md`](./yandex-production-audit.md), стоимость [`production-costs.md`](./production-costs.md), DNS snapshot [`dns-before-production.md`](./dns-before-production.md).
 
 Стек только из РФ, без VPN: ЮKassa, Managed PostgreSQL, Serverless Containers, Object Storage, Postbox, Cloud DNS, Certificate Manager, Audit Trails, Monium.
 
