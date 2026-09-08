@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { directorFetch } from "@/lib/director/client";
 import { KpiCard, PageHeader } from "@/components/internal";
+import { labelConfig, labelDashboardKey, labelStatus } from "@/lib/director/labels";
 
 type Dashboard = {
   locations: Record<string, number>;
@@ -35,8 +36,8 @@ export default function AdminHomePage() {
   return (
     <div className="director-page">
       <PageHeader
-        title="Администрирование"
-        description="Операционный обзор платформы. Секреты не отображаются."
+        title="Управление"
+        description="Операционный обзор платформы. Секреты не показываются."
       />
       {error ? <p className="director-error">{error}</p> : null}
       {!data ? (
@@ -44,35 +45,35 @@ export default function AdminHomePage() {
       ) : (
         <>
           <div className="director-kpi-grid">
-            <KpiCard label="Локации ACTIVE" value={String(data.locations.ACTIVE ?? 0)} />
-            <KpiCard label="PAID сегодня" value={String(data.sales.paidToday ?? 0)} />
-            <KpiCard label="AWAITING" value={String(data.sales.awaitingPayment ?? 0)} />
-            <KpiCard label="Ошибки 24ч" value={String(data.system.errors24h ?? 0)} tone="warning" />
+            <KpiCard label="Активные локации" value={String(data.locations.ACTIVE ?? 0)} />
+            <KpiCard label="Оплачено сегодня" value={String(data.sales.paidToday ?? 0)} />
+            <KpiCard label="Ожидают оплаты" value={String(data.sales.awaitingPayment ?? 0)} />
+            <KpiCard label="Ошибки за 24 ч" value={String(data.system.errors24h ?? 0)} tone="warning" />
           </div>
 
           <div className="director-grid-2" style={{ marginTop: 20 }}>
             <Block title="Локации">
-              <ul className="director-plain-list">
+              <ul className="director-kv-list">
                 {Object.entries(data.locations).map(([k, v]) => (
                   <li key={k}>
-                    <span>{k}</span>
+                    <span>{labelStatus(k)}</span>
                     <strong>{v}</strong>
                   </li>
                 ))}
               </ul>
             </Block>
             <Block title="Пользователи">
-              <ul className="director-plain-list">
+              <ul className="director-kv-list">
                 {Object.entries(data.users).map(([k, v]) => (
                   <li key={k}>
-                    <span>{k}</span>
+                    <span>{labelDashboardKey(k)}</span>
                     <strong>{v}</strong>
                   </li>
                 ))}
               </ul>
             </Block>
             <Block title="Платежи">
-              <ul className="director-plain-list">
+              <ul className="director-kv-list">
                 <li>
                   <span>Успешные сегодня</span>
                   <strong>{data.payments.succeededToday}</strong>
@@ -82,27 +83,27 @@ export default function AdminHomePage() {
                   <strong>{data.payments.pending}</strong>
                 </li>
                 <li>
-                  <span>Ошибки 24ч</span>
+                  <span>Ошибки за 24 ч</span>
                   <strong>{data.payments.failed24h}</strong>
                 </li>
               </ul>
             </Block>
             <Block title="Система">
-              <ul className="director-plain-list">
+              <ul className="director-kv-list">
                 <li>
-                  <span>Database</span>
-                  <strong>{String(data.system.database)}</strong>
+                  <span>База данных</span>
+                  <strong>{labelConfig(String(data.system.database ?? "—"))}</strong>
                 </li>
                 <li>
                   <span>ЮKassa</span>
-                  <strong>{String(data.system.payment)}</strong>
+                  <strong>{labelConfig(String(data.system.payment ?? "—"))}</strong>
                 </li>
                 <li>
-                  <span>Email</span>
-                  <strong>{String(data.system.email)}</strong>
+                  <span>Почта</span>
+                  <strong>{labelConfig(String(data.system.email ?? "—"))}</strong>
                 </li>
                 <li>
-                  <span>Shop ID</span>
+                  <span>Идентификатор магазина</span>
                   <strong>{String(data.system.paymentShopIdMasked ?? "—")}</strong>
                 </li>
               </ul>

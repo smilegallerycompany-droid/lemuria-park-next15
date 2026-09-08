@@ -128,7 +128,7 @@ export default function DirectorOrdersPage() {
               }
               disabled={orders.length === 0}
             >
-              CSV
+              Выгрузить
             </button>
           </>
         }

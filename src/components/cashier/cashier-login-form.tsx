@@ -50,7 +50,7 @@ export function CashierLoginForm() {
         <form className="mt-6 grid gap-4" method="post" onSubmit={(event) => void submit(event)}>
           <div className="grid gap-1.5">
             <label htmlFor="cashier-email" className="text-sm font-bold">
-              Email
+              Эл. почта
             </label>
             <Input
               id="cashier-email"

@@ -69,7 +69,7 @@ export default function DirectorTicketsPage() {
               }
               disabled={tickets.length === 0}
             >
-              CSV
+              Выгрузить
             </button>
           </>
         }

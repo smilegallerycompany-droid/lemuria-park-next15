@@ -50,13 +50,13 @@ const FILTERS: { id: Filter; label: string }[] = [
 function emailStatusLabel(status: string | undefined) {
   switch (status) {
     case "SENT":
-      return "Email отправлен";
+      return "Письмо отправлено";
     case "FAILED":
-      return "Email ошибка";
+      return "Письмо не отправилось";
     case "NOT_CONFIGURED":
-      return "Email не настроен";
+      return "Почта не настроена";
     default:
-      return "Email: нет записи";
+      return "Письмо не отправлялось";
   }
 }
 

@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/director/PageHeader";
 import { ConfirmCheckbox } from "@/components/director/ConfirmCheckbox";
 import { OrderTimeline } from "@/components/director/OrderTimeline";
 import { directorFetch, formatDateTime } from "@/lib/director/client";
-import { labelStatus } from "@/lib/director/labels";
+import { labelSource, labelStatus } from "@/lib/director/labels";
 import { formatMoneyFromKopecks } from "@/lib/utils";
 
 type TimelineEvent = {
@@ -131,7 +131,7 @@ export default function DirectorOrderDetailPage() {
         }),
       });
       setMessage(
-        `Возврат ${formatMoneyFromKopecks(result.refund.amount)} оформлен. Заказ: ${result.orderStatus}. ЮKassa и фискализация не вызывались.`,
+        `Возврат ${formatMoneyFromKopecks(result.refund.amount)} оформлен. Заказ: ${labelStatus(result.orderStatus)}. ЮKassa и фискализация не вызывались.`,
       );
       setConfirmRefund(false);
       setReason("");
@@ -148,7 +148,10 @@ export default function DirectorOrderDetailPage() {
 
   return (
     <>
-      <PageHeader title={`Заказ ${order.number}`} description={`${order.status} · ${order.source}`} />
+      <PageHeader
+        title={`Заказ ${order.number}`}
+        description={`${labelStatus(order.status)} · ${labelSource(order.source)}`}
+      />
       {error ? <div className="director-alert error" role="alert">{error}</div> : null}
       {message ? (
         <div className="director-alert success" role="status" aria-live="polite">
@@ -270,7 +273,7 @@ export default function DirectorOrderDetailPage() {
                       onChange={() => toggleTicket(ticket.publicId)}
                     />
                     <span>
-                      {ticket.publicId} · {ticket.ticketType.name} · {ticket.status} ·{" "}
+                      {ticket.publicId} · {ticket.ticketType.name} · {labelStatus(ticket.status)} ·{" "}
                       {formatMoneyFromKopecks(ticket.orderItem.unitPriceAmount)}
                     </span>
                   </label>
@@ -337,7 +340,7 @@ export default function DirectorOrderDetailPage() {
                   <tr key={`${refundRow.createdAt}-${index}`}>
                     <td>{formatDateTime(refundRow.createdAt)}</td>
                     <td>{formatMoneyFromKopecks(refundRow.amount)}</td>
-                    <td>{refundRow.status}</td>
+                    <td>{labelStatus(refundRow.status)}</td>
                     <td>{refundRow.reason ?? "—"}</td>
                   </tr>
                 ))}

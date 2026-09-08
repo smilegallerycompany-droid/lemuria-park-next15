@@ -85,15 +85,15 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
   const components: SystemComponent[] = [
     {
       key: "database",
-      label: "Database",
+      label: "База данных",
       status: database,
       lastSuccessfulAt: database === "OK" ? new Date().toISOString() : null,
       lastErrorAt: database === "ERROR" ? new Date().toISOString() : null,
-      lastErrorMessage: database === "ERROR" ? "Database query failed" : null,
+      lastErrorMessage: database === "ERROR" ? "Запрос к базе не выполнен" : null,
     },
     {
       key: "payment",
-      label: "Payment",
+      label: "Оплата",
       status: !paymentConfigured
         ? "NOT_CONFIGURED"
         : failedPayments24h > 0
@@ -102,11 +102,11 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
       lastSuccessfulAt: lastPayment?.createdAt.toISOString() ?? paymentOk.ok?.createdAt.toISOString() ?? null,
       lastErrorAt: paymentErr?.createdAt.toISOString() ?? null,
       lastErrorMessage: sanitizeMessage(paymentErr?.message),
-      detail: paymentConfigured ? "YooKassa credentials present" : null,
+      detail: paymentConfigured ? "Ключи ЮKassa заданы" : null,
     },
     {
       key: "email",
-      label: "Email",
+      label: "Почта",
       status: !emailConfigured
         ? "NOT_CONFIGURED"
         : emailErr
@@ -118,7 +118,7 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
     },
     {
       key: "cron",
-      label: "Cron",
+      label: "Планировщик",
       status: !cron.ok
         ? "UNKNOWN"
         : cron.ok.createdAt.getTime() < Date.now() - 36 * 60 * 60 * 1000
@@ -130,7 +130,7 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
     },
     {
       key: "webhook",
-      label: "Webhook",
+      label: "Вебхук",
       status: !webhook.ok && !webhook.err ? "UNKNOWN" : webhook.err ? "WARNING" : "OK",
       lastSuccessfulAt: webhook.ok?.createdAt.toISOString() ?? null,
       lastErrorAt: webhook.err?.createdAt.toISOString() ?? null,
@@ -138,7 +138,7 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
     },
     {
       key: "storage",
-      label: "Storage",
+      label: "Хранилище",
       status:
         storageStatus === "NOT_CONFIGURED"
           ? "NOT_CONFIGURED"
@@ -152,18 +152,18 @@ export async function getAdminSystemHealth(): Promise<{ components: SystemCompon
     },
     {
       key: "maps",
-      label: "Maps",
+      label: "Карты",
       status: mapsConfigured ? "OK" : "NOT_CONFIGURED",
       lastSuccessfulAt: null,
       lastErrorAt: null,
       lastErrorMessage: null,
       detail: mapsConfigured
-        ? "Yandex Maps public key present"
-        : "Public map fallback active",
+        ? "Публичный ключ Яндекс Карт задан"
+        : "Работает запасная карта без ключа",
     },
     {
       key: "error_monitoring",
-      label: "Error monitoring",
+      label: "Мониторинг ошибок",
       status: errorMonConfigured ? "OK" : "NOT_CONFIGURED",
       lastSuccessfulAt: null,
       lastErrorAt: null,

@@ -174,7 +174,7 @@ export default function CashierProfilePage() {
                 <dd>{data.profile.name}</dd>
               </div>
               <div>
-                <dt>Email</dt>
+                <dt>Эл. почта</dt>
                 <dd>{data.profile.email}</dd>
               </div>
               <div>
@@ -247,7 +247,7 @@ export default function CashierProfilePage() {
                 <strong>{formatMoneyFromKopecks(data.stats.averageOrderValueKopecks)}</strong>
               </div>
               <div>
-                <span>Check-in (7д)</span>
+                <span>Проходы (7 дн.)</span>
                 <strong>{data.stats.checkInsWeek}</strong>
               </div>
             </div>
@@ -277,7 +277,7 @@ export default function CashierProfilePage() {
                       <td>{paymentLabel(sale.paymentMethod)}</td>
                       <td>{sale.ticketCount}</td>
                       <td>{formatMoneyFromKopecks(sale.totalAmount)}</td>
-                      <td>{sale.status}</td>
+                      <td>{labelStatus(sale.status)}</td>
                     </tr>
                   ))}
                   {!data.sales.length ? (

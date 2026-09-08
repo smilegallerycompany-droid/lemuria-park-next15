@@ -64,26 +64,26 @@ export default function AdminUsersPage() {
     e.preventDefault();
     if (!selected || nextRole === selected.role) return;
     setConfirm({
-      title: `Сменить роль ${selected.name} на ${nextRole}?`,
+      title: `Сменить роль ${selected.name} на «${labelRole(nextRole)}»?`,
       run: () => patch(selected.id, { role: nextRole }),
     });
   }
 
   return (
     <div className="director-page">
-      <PageHeader title="Пользователи" description="ADMIN / OWNER управление ролями и доступом" />
+      <PageHeader title="Пользователи" description="Роли и доступ сотрудников. Владельца изменить нельзя." />
       {error ? <p className="director-error">{error}</p> : null}
       <div className="director-toolbar" style={{ display: "flex", gap: 8, marginBottom: 12 }}>
         <select value={role} onChange={(e) => setRole(e.target.value)} aria-label="Роль">
           <option value="">Все роли</option>
           {["OWNER", "ADMIN", "DIRECTOR", "CASHIER"].map((r) => (
             <option key={r} value={r}>
-              {r}
+              {labelRole(r)}
             </option>
           ))}
         </select>
         <input placeholder="Поиск" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Поиск" />
-        <button type="button" className="director-btn" onClick={() => load().catch(() => undefined)}>
+        <button type="button" className="director-btn primary" onClick={() => load().catch(() => undefined)}>
           Применить
         </button>
       </div>
@@ -92,11 +92,11 @@ export default function AdminUsersPage() {
           <thead>
             <tr>
               <th>ФИО</th>
-              <th>Email</th>
-              <th>Role</th>
-              <th>Locations</th>
-              <th>Status</th>
-              <th>Last login</th>
+              <th>Эл. почта</th>
+              <th>Роль</th>
+              <th>Локации</th>
+              <th>Статус</th>
+              <th>Последний вход</th>
               <th></th>
             </tr>
           </thead>
@@ -135,13 +135,13 @@ export default function AdminUsersPage() {
               >
                 {["CASHIER", "DIRECTOR", "ADMIN"].map((r) => (
                   <option key={r} value={r}>
-                    {r}
+                    {labelRole(r)}
                   </option>
                 ))}
-                {selected.role === "OWNER" ? <option value="OWNER">OWNER</option> : null}
+                {selected.role === "OWNER" ? <option value="OWNER">{labelRole("OWNER")}</option> : null}
               </select>
             </label>
-            <button type="submit" className="director-btn" disabled={busy || nextRole === selected.role}>
+            <button type="submit" className="director-btn primary" disabled={busy || nextRole === selected.role}>
               Сохранить роль
             </button>
             {selected.status === "ACTIVE" ? (
@@ -161,7 +161,7 @@ export default function AdminUsersPage() {
             ) : (
               <button
                 type="button"
-                className="director-btn"
+                className="director-btn primary"
                 disabled={busy}
                 onClick={() => void patch(selected.id, { status: "ACTIVE" })}
               >

@@ -50,7 +50,7 @@ export default function AdminPaymentDetailPage() {
     <div className="director-page">
       <PageHeader
         title="Платёж"
-        description="Без secrets / PAN / auth headers"
+        description="Без секретов, номеров карт и заголовков авторизации"
         actions={
           <Link href="/admin/payments" className="internal-btn secondary">
             К списку
@@ -60,43 +60,43 @@ export default function AdminPaymentDetailPage() {
       {error ? <div className="director-alert error">{error}</div> : null}
       {payment ? (
         <>
-          <ul className="director-plain-list">
+          <ul className="director-kv-list">
             <li>
-              <span>Order</span>
+              <span>Заказ</span>
               <strong>
                 <Link href={`/admin/orders/${payment.orderNumber}`}>{payment.orderNumber}</Link>
               </strong>
             </li>
             <li>
-              <span>Provider</span>
+              <span>Провайдер</span>
               <strong>{payment.provider ?? "—"}</strong>
             </li>
             <li>
-              <span>Amount</span>
+              <span>Сумма</span>
               <strong>{(payment.amount / 100).toLocaleString("ru-RU")} ₽</strong>
             </li>
             <li>
-              <span>Status</span>
+              <span>Статус</span>
               <strong>{labelStatus(payment.status)}</strong>
             </li>
             <li>
-              <span>Method</span>
+              <span>Способ</span>
               <strong>{labelPaymentMethod(payment.method)}</strong>
             </li>
             <li>
-              <span>Provider payment id</span>
+              <span>Номер у провайдера</span>
               <strong>{payment.providerPaymentId ?? "—"}</strong>
             </li>
             <li>
-              <span>Created</span>
+              <span>Создан</span>
               <strong>{new Date(payment.createdAt).toLocaleString("ru-RU")}</strong>
             </li>
             <li>
-              <span>Updated</span>
+              <span>Обновлён</span>
               <strong>{new Date(payment.updatedAt).toLocaleString("ru-RU")}</strong>
             </li>
             <li>
-              <span>Succeeded at</span>
+              <span>Оплачен</span>
               <strong>
                 {payment.succeededAt
                   ? new Date(payment.succeededAt).toLocaleString("ru-RU")
@@ -104,21 +104,21 @@ export default function AdminPaymentDetailPage() {
               </strong>
             </li>
             <li>
-              <span>Refunded</span>
+              <span>Возвращено</span>
               <strong>{(payment.refundedAmount / 100).toLocaleString("ru-RU")} ₽</strong>
             </li>
           </ul>
 
           <section className="director-panel" style={{ marginTop: 18 }}>
             <div className="director-panel-head">
-              <h2>Related tickets</h2>
+              <h2>Связанные билеты</h2>
             </div>
-            <ul className="director-plain-list">
+            <ul className="director-kv-list" style={{ padding: 12 }}>
               {payment.tickets.map((t) => (
                 <li key={t.publicId}>
                   <span>{t.ticketType.name}</span>
                   <strong>
-                    {t.publicId} · {t.status}
+                    {t.publicId} · {labelStatus(t.status)}
                   </strong>
                 </li>
               ))}
@@ -127,12 +127,12 @@ export default function AdminPaymentDetailPage() {
 
           <section className="director-panel" style={{ marginTop: 18 }}>
             <div className="director-panel-head">
-              <h2>Webhook / audit events</h2>
+              <h2>События вебхука</h2>
             </div>
-            <ul className="director-plain-list">
+            <ul className="director-kv-list" style={{ padding: 12 }}>
               {payment.webhookEvents.length === 0 ? (
                 <li>
-                  <span>Нет webhook-событий</span>
+                  <span>Нет событий вебхука</span>
                   <strong>—</strong>
                 </li>
               ) : (
@@ -148,7 +148,7 @@ export default function AdminPaymentDetailPage() {
 
           <section className="director-panel" style={{ marginTop: 18 }}>
             <div className="director-panel-head">
-              <h2>Order timeline</h2>
+              <h2>Хронология заказа</h2>
             </div>
             <div style={{ padding: 18 }}>
               <OrderTimeline events={timeline} />

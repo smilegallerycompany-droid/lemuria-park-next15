@@ -32,13 +32,13 @@ export default function AdminPaymentsPage() {
           <thead>
             <tr>
               <th>Дата</th>
-              <th>Order</th>
+              <th>Заказ</th>
               <th>Локация</th>
-              <th>Provider</th>
+              <th>Провайдер</th>
               <th>Метод</th>
               <th>Сумма</th>
-              <th>Status</th>
-              <th>Provider ID</th>
+              <th>Статус</th>
+              <th>Номер у провайдера</th>
             </tr>
           </thead>
           <tbody>

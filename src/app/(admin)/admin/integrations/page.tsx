@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/internal";
 import { directorFetch } from "@/lib/director/client";
+import { labelConfig, labelIntegration } from "@/lib/director/labels";
 
 export default function AdminIntegrationsPage() {
   const [data, setData] = useState<
@@ -23,21 +24,19 @@ export default function AdminIntegrationsPage() {
         {data
           ? Object.entries(data).map(([key, value]) => (
               <section key={key} className="director-card" style={{ padding: 16 }}>
-                <h2 style={{ marginTop: 0, fontSize: 16 }}>
-                  {key === "maps" ? "Yandex Maps" : key}
-                </h2>
+                <h2 style={{ marginTop: 0, fontSize: 16 }}>{labelIntegration(key)}</h2>
                 {"provider" in value && value.provider ? (
-                  <p>Provider: {value.provider}</p>
+                  <p>Сервис: {value.provider === "Yandex Maps" ? "Яндекс Карты" : value.provider}</p>
                 ) : null}
                 <p>
-                  Статус: <strong>{value.status}</strong>
+                  Статус: <strong>{labelConfig(value.status)}</strong>
                 </p>
                 {"shopIdMasked" in value && value.shopIdMasked ? (
-                  <p>Shop ID: {value.shopIdMasked}</p>
+                  <p>Идентификатор магазина: {value.shopIdMasked}</p>
                 ) : null}
-                {key === "maps" && value.status === "Not configured" ? (
+                {key === "maps" && (value.status === "Not configured" || value.status === "NOT_CONFIGURED") ? (
                   <p style={{ fontSize: 13, opacity: 0.8 }}>
-                    Публичный fallback карты продолжает работать без API key.
+                    На сайте показывается запасная карта без ключа API.
                   </p>
                 ) : null}
               </section>

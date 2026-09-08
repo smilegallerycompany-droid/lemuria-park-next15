@@ -75,11 +75,11 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
           <div className="director-brand">
             <div className="director-brand-mark">A</div>
             <div className="director-brand-copy">
-              <strong>Админ</strong>
+              <strong>Управляющий</strong>
               <small>Все локации</small>
             </div>
           </div>
-          <nav className="director-nav" aria-label="Навигация admin">
+          <nav className="director-nav" aria-label="Навигация управляющего">
             {NAV.map((item) => {
               const active =
                 item.href === "/admin"
@@ -126,11 +126,11 @@ export function AdminLayoutClient({ children }: { children: React.ReactNode }) {
             >
               Меню
             </button>
-            <strong>Лемурия · Администрирование</strong>
+            <strong>Лемурия · Управление</strong>
           </div>
           {pathname !== "/admin" ? (
             <nav className="admin-breadcrumb" aria-label="Навигация раздела">
-              <Link href="/admin">Администрирование</Link>
+              <Link href="/admin">Управление</Link>
               <span aria-hidden>/</span>
               <span>{crumb}</span>
             </nav>

@@ -1,5 +1,7 @@
 "use client";
 
+import { labelTimelineType } from "@/lib/director/labels";
+
 type TimelineEvent = {
   type: string;
   at: string;
@@ -9,7 +11,7 @@ type TimelineEvent = {
 
 export function OrderTimeline({ events }: { events: TimelineEvent[] }) {
   if (!events.length) {
-    return <div className="director-empty">Нет событий timeline</div>;
+    return <div className="director-empty">Нет событий</div>;
   }
 
   return (
@@ -21,7 +23,7 @@ export function OrderTimeline({ events }: { events: TimelineEvent[] }) {
             <div className="internal-timeline-title">{ev.title}</div>
             <div className="internal-timeline-meta">
               <time dateTime={ev.at}>{new Date(ev.at).toLocaleString("ru-RU")}</time>
-              <span className="internal-timeline-type">{ev.type}</span>
+              <span className="internal-timeline-type">{labelTimelineType(ev.type)}</span>
             </div>
             {ev.detail ? <div className="internal-timeline-detail">{ev.detail}</div> : null}
           </div>

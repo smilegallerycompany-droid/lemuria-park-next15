@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { labelPaymentMethod, labelStatus } from "@/lib/director/labels";
 
 export type TimelineEvent = {
   type: string;
@@ -29,7 +30,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
     events.push({
       type: "RESERVATION_CREATED",
       at: order.reservation.createdAt.toISOString(),
-      title: "Reservation created",
+      title: "Бронь создана",
       detail: order.reservation.publicId,
     });
   }
@@ -37,7 +38,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
   events.push({
     type: "ORDER_CREATED",
     at: order.createdAt.toISOString(),
-    title: "Order created",
+    title: "Заказ создан",
     detail: order.number,
   });
 
@@ -45,14 +46,14 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
     events.push({
       type: "PAYMENT_CREATED",
       at: payment.createdAt.toISOString(),
-      title: "Payment created",
-      detail: `${payment.method} · ${payment.status}`,
+      title: "Платёж создан",
+      detail: `${labelPaymentMethod(payment.method)} · ${labelStatus(payment.status)}`,
     });
     if (payment.status === "SUCCEEDED") {
       events.push({
         type: "PAYMENT_SUCCEEDED",
         at: payment.updatedAt.toISOString(),
-        title: "Payment succeeded",
+        title: "Оплата прошла",
         detail: payment.providerPaymentId,
       });
     }
@@ -60,7 +61,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
       events.push({
         type: "PAYMENT_CANCELLED",
         at: payment.updatedAt.toISOString(),
-        title: "Payment cancelled",
+        title: "Платёж отменён",
       });
     }
   }
@@ -70,7 +71,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
     events.push({
       type: "TICKETS_ISSUED",
       at: firstTicket.createdAt.toISOString(),
-      title: "Tickets issued",
+      title: "Билеты выданы",
       detail: `${order.tickets.length} шт.`,
     });
   }
@@ -84,7 +85,12 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
             ? "EMAIL_FAILED"
             : "EMAIL_ATTEMPT",
       at: delivery.createdAt.toISOString(),
-      title: `Email ${delivery.status.toLowerCase()}`,
+      title:
+        delivery.status === "SENT"
+          ? "Письмо отправлено"
+          : delivery.status === "FAILED"
+            ? "Письмо не отправилось"
+            : "Попытка отправить письмо",
       detail: delivery.toAddress,
     });
   }
@@ -95,7 +101,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
         events.push({
           type: "CHECK_IN",
           at: checkIn.scannedAt.toISOString(),
-          title: "Check-in",
+          title: "Проход",
           detail: ticket.publicId,
         });
       }
@@ -106,7 +112,7 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
     events.push({
       type: "ORDER_CANCELLED",
       at: order.updatedAt.toISOString(),
-      title: "Order cancelled",
+      title: "Заказ отменён",
     });
   }
 
@@ -114,14 +120,14 @@ export async function buildOrderTimeline(orderNumber: string): Promise<TimelineE
     events.push({
       type: "REFUND_CREATED",
       at: refund.createdAt.toISOString(),
-      title: "Refund created",
+      title: "Возврат создан",
       detail: refund.reason,
     });
     if (refund.status === "COMPLETED" || refund.status === "SUCCEEDED") {
       events.push({
         type: "REFUND_SUCCEEDED",
         at: refund.updatedAt.toISOString(),
-        title: "Refund succeeded",
+        title: "Возврат выполнен",
       });
     }
   }

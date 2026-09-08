@@ -171,7 +171,7 @@ export default function DirectorShiftDetailPage() {
         <div className="director-panel-head">
           <h2>Итог смены</h2>
         </div>
-        <ul className="director-plain-list">
+        <ul className="director-kv-list">
           <li>
             <span>Открыта</span>
             <strong>{formatDateTime(shift.openedAt)}</strong>

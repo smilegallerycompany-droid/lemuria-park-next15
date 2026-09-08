@@ -47,7 +47,7 @@ export default function DirectorAuditPage() {
             }
             disabled={logs.length === 0}
           >
-            CSV
+            Выгрузить
           </button>
         }
       />

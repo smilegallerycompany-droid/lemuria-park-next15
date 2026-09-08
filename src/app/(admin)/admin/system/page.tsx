@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader, StatusBadge } from "@/components/internal";
 import { directorFetch } from "@/lib/director/client";
+import { labelStatus } from "@/lib/director/labels";
 
 type Component = {
   key: string;
@@ -34,7 +35,7 @@ export default function AdminSystemPage() {
     <div className="director-page">
       <PageHeader
         title="Система"
-        description="Operational health без секретов. NOT_CONFIGURED — не fake OK."
+        description="Работоспособность сервисов. «Не настроено» — это не успех."
       />
       <div className="director-table-wrap">
         <table className="director-table">
@@ -42,9 +43,9 @@ export default function AdminSystemPage() {
             <tr>
               <th>Компонент</th>
               <th>Статус</th>
-              <th>Last success</th>
-              <th>Last error</th>
-              <th>Message</th>
+              <th>Последний успех</th>
+              <th>Последняя ошибка</th>
+              <th>Сообщение</th>
             </tr>
           </thead>
           <tbody>
@@ -60,7 +61,7 @@ export default function AdminSystemPage() {
                   ) : null}
                 </td>
                 <td>
-                  <StatusBadge label={c.status} tone={tone(c.status)} />
+                  <StatusBadge label={labelStatus(c.status)} tone={tone(c.status)} />
                 </td>
                 <td>
                   {c.lastSuccessfulAt

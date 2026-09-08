@@ -121,7 +121,7 @@ export default function DirectorShiftsPage() {
               ["today", "Сегодня"],
               ["7d", "7 дней"],
               ["30d", "30 дней"],
-              ["custom", "Custom"],
+              ["custom", "Произвольный"],
             ] as const
           ).map(([id, label]) => (
             <button

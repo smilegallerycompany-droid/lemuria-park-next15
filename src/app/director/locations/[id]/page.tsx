@@ -113,7 +113,7 @@ export default function DirectorLocationDetailPage() {
         title={location.name}
         description="Публичная локация, карта и маршрут"
         actions={
-          <button type="button" className="director-btn" onClick={save} disabled={saving}>
+          <button type="button" className="director-btn primary" onClick={save} disabled={saving}>
             {saving ? "Сохранение…" : "Сохранить"}
           </button>
         }

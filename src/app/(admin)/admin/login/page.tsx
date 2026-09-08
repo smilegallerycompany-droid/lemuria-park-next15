@@ -37,30 +37,36 @@ export default function AdminLoginPage() {
   return (
     <div className="director-login">
       <form className="director-login-card" onSubmit={onSubmit}>
-        <h1>Admin</h1>
-        <p>Вход для ADMIN и OWNER</p>
-            <label>
-          Email
+        <h1>Управляющий</h1>
+        <p>Вход для администратора и владельца.</p>
+        <div className="director-field">
+          <label htmlFor="admin-email">Эл. почта</label>
           <input
+            id="admin-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="username"
             required
           />
-        </label>
-        <label>
-          Пароль
+        </div>
+        <div className="director-field">
+          <label htmlFor="admin-password">Пароль</label>
           <input
+            id="admin-password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
           />
-        </label>
-        {error ? <p className="director-error" role="alert">{error}</p> : null}
-        <button className="director-btn" type="submit" disabled={loading}>
+        </div>
+        {error ? (
+          <p className="director-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <button className="director-btn primary" type="submit" disabled={loading} style={{ width: "100%" }}>
           {loading ? "Вход…" : "Войти"}
         </button>
       </form>

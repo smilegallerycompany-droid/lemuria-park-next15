@@ -823,7 +823,7 @@ export function AnalyticsDashboard() {
         <div className="internal-table-head">
           <h3>Сеансы</h3>
           <button type="button" className="internal-btn secondary" onClick={exportSessionsCsv}>
-            CSV
+            Выгрузить
           </button>
         </div>
         <div className="internal-table-scroll">
@@ -917,7 +917,7 @@ export function AnalyticsDashboard() {
         <div className="internal-table-head">
           <h3>Кассиры</h3>
           <button type="button" className="internal-btn secondary" onClick={exportCashiersCsv}>
-            CSV
+            Выгрузить
           </button>
         </div>
         <div className="internal-table-scroll">
@@ -979,7 +979,7 @@ export function AnalyticsDashboard() {
         <div className="internal-table-head">
           <h3>Типы билетов</h3>
           <button type="button" className="internal-btn secondary" onClick={exportTicketTypesCsv}>
-            CSV
+            Выгрузить
           </button>
         </div>
         <div className="internal-table-scroll">
@@ -1031,7 +1031,7 @@ export function AnalyticsDashboard() {
         <div className="internal-table-head">
           <h3>Локации</h3>
           <button type="button" className="internal-btn secondary" onClick={exportLocationsCsv}>
-            CSV
+            Выгрузить
           </button>
         </div>
         <div className="internal-table-scroll">
