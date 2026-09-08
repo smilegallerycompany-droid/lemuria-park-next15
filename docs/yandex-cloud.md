@@ -29,11 +29,14 @@
 | Наблюдение | Monium |
 | Аудит ресурсов | Audit Trails |
 | Секреты | Lockbox → env |
-| Оплата | ЮKassa, webhook `https://lemuriapark.ru/api/webhooks/yookassa` |
+| Оплата | ЮKassa, webhook `https://парклемурия.рф/api/webhooks/yookassa` (ASCII: `https://xn--80akjgfhqje3a8k.xn--p1ai/api/webhooks/yookassa`) |
 
 ## Хосты
 
-`lemuriapark.ru` · `cashier.lemuriapark.ru` · `admin.lemuriapark.ru` · `owner.lemuriapark.ru` · `stage.lemuriapark.ru`
+Канон: [`idn-domain.md`](./idn-domain.md).
+
+`парклемурия.рф` · `www.парклемурия.рф` (redirect) · `cashier.парклемурия.рф` · `admin.парклемурия.рф` · `stage.парклемурия.рф`  
+`owner.парклемурия.рф` — не публиковать, пока Owner UI не готов.
 
 Внутренние порталы: noindex.
 
@@ -41,7 +44,7 @@
 
 ```bash
 docker build -t cr.yandex/<REGISTRY_ID>/lemuria-park:<git-sha> \
-  --build-arg NEXT_PUBLIC_APP_URL=https://lemuriapark.ru \
+  --build-arg NEXT_PUBLIC_APP_URL=https://xn--80akjgfhqje3a8k.xn--p1ai \
   --build-arg DOCKER_BUILD=1 .
 docker push cr.yandex/<REGISTRY_ID>/lemuria-park:<git-sha>
 ```

@@ -10,6 +10,7 @@ import { isPrivateTimerRootPost } from "@/lib/config/cron-auth";
 import {
   productSurfaceFromHostname,
   rewritePathForProductHost,
+  wwwApexHostname,
 } from "@/lib/config/product-hosts";
 
 const STAFF_PREFIXES = ["/cashier", "/director", "/admin", "/staff"];
@@ -52,7 +53,7 @@ function applySecurityHeaders(request: NextRequest, response: NextResponse, path
     process.env.APP_ENV === "staging" ||
     process.env.NEXT_PUBLIC_APP_ENV === "staging" ||
     process.env.STAGING === "1";
-  if (stagingNoIndex || isStaffPath(pathname)) {
+  if (stagingNoIndex || isStaffPath(pathname) || pathname === "/owner-unavailable") {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
   return response;
@@ -76,6 +77,19 @@ export function middleware(request: NextRequest) {
     if (!hostname || !isHostAllowed(hostname, allowed)) {
       return new NextResponse("Unknown host", { status: 421 });
     }
+  }
+
+  const apex = wwwApexHostname(hostname);
+  if (apex && allowed.length > 0 && isHostAllowed(apex, allowed)) {
+    const url = request.nextUrl.clone();
+    url.hostname = apex;
+    url.protocol = "https:";
+    url.port = "";
+    return applySecurityHeaders(request, NextResponse.redirect(url, 308), pathname);
+  }
+
+  if (shouldSkipHostAllowlist(pathname)) {
+    return applySecurityHeaders(request, NextResponse.next(), pathname);
   }
 
   const surface = productSurfaceFromHostname(hostname);

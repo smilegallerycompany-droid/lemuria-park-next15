@@ -18,7 +18,7 @@ Sources: Managed PostgreSQL console tariff line; other services are usage-based 
 | Object Storage 0 objects / 50 GB quota | ~0–100 ₽ | Pay for stored GB + egress. |
 | Lockbox (8 secrets) | ~0–50 ₽ | |
 | Cloud Logging 3-day default group | ~0–200 ₽ | Raise retention only if needed. |
-| Cloud DNS service zones | ~0 | No public zone yet. |
+| Cloud DNS public zone `xn--80akjgfhqje3a8k.xn--p1ai` | ~43–141 ₽ | Zone created 2026-09-08; not authoritative until NS cutover. Console showed ~141 ₽ at 1 QPS. |
 | Certificate Manager | 0 | Let’s Encrypt via YCM is not a VM cost. |
 | Postbox | 0 | Not created. After setup: per-email, usually << PG. |
 | Public IPv4 | 0 | None reserved. Do not add without need. |

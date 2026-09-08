@@ -35,6 +35,14 @@ test("isHostAllowed matches exact hosts and wildcard suffixes", () => {
   assert.equal(isHostAllowed("evil.com", allowed), false);
 });
 
+test("IDN Unicode and Punycode are the same allowlist entry", () => {
+  const allowed = parseAllowedHosts("парклемурия.рф,cashier.парклемурия.рф");
+  assert.equal(isHostAllowed("xn--80akjgfhqje3a8k.xn--p1ai", allowed), true);
+  assert.equal(isHostAllowed("парклемурия.рф", allowed), true);
+  assert.equal(isHostAllowed("cashier.xn--80akjgfhqje3a8k.xn--p1ai", allowed), true);
+  assert.equal(isHostAllowed("www.xn--80akjgfhqje3a8k.xn--p1ai", allowed), false);
+});
+
 test("health probes skip the host allowlist", () => {
   assert.equal(shouldSkipHostAllowlist("/api/health/live"), true);
   assert.equal(shouldSkipHostAllowlist("/api/health/ready"), true);

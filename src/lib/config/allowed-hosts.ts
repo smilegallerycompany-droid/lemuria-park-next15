@@ -2,13 +2,25 @@
  * Host allowlist for the public + staff products behind one Next.js container.
  * Do not trust X-Forwarded-Host for authorization. The API Gateway must pass
  * the original Host; we compare that incoming Host against ALLOWED_HOSTS.
+ *
+ * IDN: compare ASCII/Punycode only. Unicode and xn-- forms of the same name match.
  */
+
+import { toAsciiHostname } from "@/lib/config/idn-host";
 
 export function parseAllowedHosts(raw: string | undefined | null): string[] {
   if (!raw) return [];
   return raw
     .split(",")
-    .map((part) => part.trim().toLowerCase())
+    .map((part) => {
+      const trimmed = part.trim().toLowerCase();
+      if (!trimmed) return "";
+      if (trimmed.startsWith("*.")) {
+        const suffix = toAsciiHostname(trimmed.slice(2));
+        return suffix ? `*.${suffix}` : "";
+      }
+      return toAsciiHostname(trimmed);
+    })
     .filter(Boolean);
 }
 
@@ -19,18 +31,18 @@ export function hostnameFromHostHeader(host: string | null | undefined): string 
   if (!trimmed) return null;
   if (trimmed.startsWith("[")) {
     const end = trimmed.indexOf("]");
-    return end >= 0 ? trimmed.slice(1, end) : trimmed;
+    const inner = end >= 0 ? trimmed.slice(1, end) : trimmed;
+    return inner || null;
   }
   const colon = trimmed.lastIndexOf(":");
-  if (colon > -1 && /^\d+$/.test(trimmed.slice(colon + 1))) {
-    return trimmed.slice(0, colon);
-  }
-  return trimmed;
+  const withoutPort =
+    colon > -1 && /^\d+$/.test(trimmed.slice(colon + 1)) ? trimmed.slice(0, colon) : trimmed;
+  return toAsciiHostname(withoutPort) || null;
 }
 
 export function isHostAllowed(hostname: string, allowed: string[]): boolean {
   if (allowed.length === 0) return true;
-  const host = hostname.toLowerCase();
+  const host = toAsciiHostname(hostname);
   return allowed.some((entry) => {
     if (entry.startsWith("*.")) {
       const suffix = entry.slice(1);

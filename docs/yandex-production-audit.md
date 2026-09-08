@@ -160,7 +160,7 @@ Listing is not public. CMS media is not in the bucket yet (0 objects). Do not cr
 
 ## 9. DNS
 
-- Folder `lemuria-production`: **no Cloud DNS zones**.  
+- Folder `lemuria-production`: public zone `lemuria-idn-public` / `dnsc1mtn8giolgemiiar` for `xn--80akjgfhqje3a8k.xn--p1ai.` — **not live** (registrar still Tilda). See [`dns-before-cutover.md`](./dns-before-cutover.md).  
 - Folder `lemuria-staging`: dashboard counts 3 zones / 9 records — UI lists them as **service zones** (VPC internal), not `lemuriapark.ru`.  
 - Public resolver `77.88.8.8`: **`lemuriapark.ru` NXDOMAIN**. No A/MX/TXT/NS. Subdomains `cashier` / `admin` / `owner` / `www` / `stage` also empty.
 
