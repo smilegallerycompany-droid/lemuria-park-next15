@@ -43,7 +43,7 @@ const prisma = new PrismaClient({log:[]});
   return {identity,locations,sessions};
  },{timeout:15000});
  console.log(JSON.stringify(result));
-})().catch(e=>{console.error('DB_CHECK_FAILED',e.code||e.name);process.exitCode=1}).finally(()=>prisma.$disconnect());
+})().catch(e=>{const m=String(e.message);console.error('DB_CHECK_FAILED',e.code||e.errorCode||e.name,m.includes('could not locate')?'ENGINE_PATH':m.includes('Unable to require')?'ENGINE_LOAD':m.includes("reach database")?'NETWORK':m.includes('Authentication failed')?'AUTH':'OTHER');process.exitCode=1}).finally(()=>prisma.$disconnect());
 '''
 
 STAGING_MAP = r'''
@@ -58,7 +58,7 @@ const prisma = new PrismaClient({log:[]});
  if(!fs.existsSync(backup))fs.writeFileSync(backup,JSON.stringify(before,null,2));
  const location=await prisma.location.update({where:{slug:'saratov'},data:{latitude:51.62132,longitude:45.972246,mapUrl:'https://yandex.ru/maps/-/CXfwJNLa'},select:{slug:true,latitude:true,longitude:true,mapUrl:true}});
  console.log(JSON.stringify({database,location}));
-})().catch(e=>{console.error('STAGING_MAP_FAILED',e.code||e.name);process.exitCode=1}).finally(()=>prisma.$disconnect());
+})().catch(e=>{const m=String(e.message);console.error('STAGING_MAP_FAILED',e.code||e.errorCode||e.name,m.includes('could not locate')?'ENGINE_PATH':m.includes('Unable to require')?'ENGINE_LOAD':m.includes("reach database")?'NETWORK':m.includes('Authentication failed')?'AUTH':'OTHER');process.exitCode=1}).finally(()=>prisma.$disconnect());
 '''
 
 target = sys.argv[1]
