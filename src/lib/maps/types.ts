@@ -13,6 +13,8 @@ export type LocationMapPoint = {
 export type LocationMapProps = LocationMapPoint & {
   className?: string;
   height?: number;
+  /** Optional generated Yandex iframe widget URL, used if JS API key is absent. */
+  embedUrl?: string | null;
 };
 
 export function resolveRouteUrl(point: Pick<LocationMapPoint, "latitude" | "longitude" | "routeUrl" | "address">) {
