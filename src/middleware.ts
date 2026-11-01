@@ -61,7 +61,7 @@ function applySecurityHeaders(request: NextRequest, response: NextResponse, path
         ? [
             "worker-src 'self' blob: data: https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net",
             "child-src 'self' blob: https://mc.yandex.ru",
-            "frame-src 'self' blob: https://mc.yandex.ru",
+            "frame-src 'self' blob: https://mc.yandex.ru https://yandex.ru https://api-maps.yandex.ru",
           ]
         : []),
       "frame-ancestors 'none'",
