@@ -34,7 +34,7 @@ type QtyMap = Record<string, number>;
 
 /** Enough for the full exhibition window (1 Aug – 15 Sep), excluding closed days. */
 const NEAREST_DATES_LIMIT = 60;
-const NEAREST_SESSIONS_LIMIT = 8;
+
 
 const JS_WEEKDAY_TO_ENUM = [
   "SUNDAY",
@@ -173,13 +173,12 @@ export function BookingAwwwards() {
     void loadSessions(selectedDate, config.location.slug);
   }, [selectedDate, config, loadSessions]);
 
-  /** Only upcoming (not past) and not sold-out — nearest N times. */
+  /** Every upcoming non-sold-out session for the selected day; no arbitrary display cap. */
   const nearestSessions = useMemo(() => {
     const now = Date.now();
     return sessions
       .filter((s) => !s.soldOut && new Date(s.startsAt).getTime() > now)
-      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
-      .slice(0, NEAREST_SESSIONS_LIMIT);
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
   }, [sessions]);
 
   useEffect(() => {
@@ -334,7 +333,7 @@ export function BookingAwwwards() {
             </p>
           )}
           {!loadingSessions && nearestSessions.length > 0 && (
-            <p className="booking-hint">Показаны ближайшие свободные сеансы на выбранный день</p>
+            <p className="booking-hint">Показаны все свободные сеансы на выбранный день</p>
           )}
           {config?.location ? (
             <p className="booking-hint muted">
@@ -464,7 +463,7 @@ export function BookingAwwwards() {
 
       <div className="trust-strip">
         <Trust icon={<ShieldCheck />} text="Онлайн-оплата билетов" />
-        <Trust icon={<Clock3 />} text="Только ближайшие сеансы" />
+        <Trust icon={<Clock3 />} text="Все доступные сеансы" />
         <Trust icon={<Users />} text="До 15 гостей на сеанс" />
         <Trust icon={<CalendarDays />} text="Интересные факты о Лемурах и их жизни" />
       </div>
