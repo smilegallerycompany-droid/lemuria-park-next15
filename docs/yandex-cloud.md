@@ -45,9 +45,14 @@
 ```bash
 docker build -t cr.yandex/<REGISTRY_ID>/lemuria-park:<git-sha> \
   --build-arg NEXT_PUBLIC_APP_URL=https://xn--80akjgfhqje3a8k.xn--p1ai \
+  --build-arg NEXT_PUBLIC_YANDEX_MAPS_API_KEY="$YANDEX_MAPS_PUBLIC_KEY" \
+  --build-arg NEXT_PUBLIC_YANDEX_METRIKA_ID="$YANDEX_METRIKA_COUNTER_ID" \
   --build-arg DOCKER_BUILD=1 .
 docker push cr.yandex/<REGISTRY_ID>/lemuria-park:<git-sha>
 ```
+
+
+`YANDEX_MAPS_PUBLIC_KEY` — ключ JavaScript API 3.0 с разрешённым HTTP Referer для публичного домена. `YANDEX_METRIKA_COUNTER_ID` — числовой номер счётчика Метрики. Оба значения встраиваются в браузерный код при сборке; установка только переменных окружения Serverless Container после сборки не обновит клиентский bundle. Сайт продолжит работать без них, но карта покажет запасной блок, а Метрика не будет включена.
 
 В контейнере: `npx prisma migrate deploy`.  
 `prisma db seed` в production запрещён.
