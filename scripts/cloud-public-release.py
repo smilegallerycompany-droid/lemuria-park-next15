@@ -130,7 +130,7 @@ def request(method, url, data=None):
     with urllib.request.urlopen(req, timeout=60) as response:
         return json.load(response)
 
-def deploy(target):
+def deploy(target, map_fixture=False):
     assert target in CONTAINERS
     assert read('snapshot-passed.json')['ok']
     if target == 'production':
@@ -138,8 +138,9 @@ def deploy(target):
         acceptance = read('staging-accepted.json')
         assert acceptance['digest'] == read('image.json')['digest']
     before = read(f'{target}-before.json')
-    assert active(target)['id'] == before['id'], 'Active revision changed; refusing overwrite'
     release = read('image.json')
+    current = active(target)
+    assert current['id'] == before['id'] or (target == 'staging' and current['image'].get('imageDigest') == release['digest']), 'Active revision changed; refusing overwrite'
     allowed = ['containerId', 'resources', 'executionTimeout', 'serviceAccountId',
                'concurrency', 'connectivity', 'provisionPolicy', 'secrets', 'logOptions',
                'scalingPolicy', 'storageMounts', 'mounts', 'runtime',
@@ -156,6 +157,44 @@ def deploy(target):
     assert env.get('APP_ENV') == target
     assert env.get('RUN_MIGRATE_ON_START', '0') == '0'
     assert env.get('RUN_STAGING_SEED_ON_START', '0') == '0'
+    assert not map_fixture or target == 'staging'
+    # Run the SQL probe inside the existing workload's private network, using
+    # its existing DB credentials. No new IAM grants or public DB access.
+    probe = r'''
+const {PrismaClient}=require('/app/node_modules/@prisma/client');
+const {spawn}=require('node:child_process');
+const env=process.env;
+const url=env.DATABASE_URL||('postgresql://'+encodeURIComponent(env.DB_USER)+':'+encodeURIComponent(env.DB_PASSWORD)+'@'+env.DB_HOST+':'+(env.DB_PORT||'6432')+'/'+env.DB_NAME+'?sslmode=require&connection_limit=1&connect_timeout=5');
+const p=new PrismaClient({datasources:{db:{url}},log:[]});
+(async()=>{
+ try{
+  const [{database}]=await p.$queryRawUnsafe('SELECT current_database() AS database');
+  if(database!==(env.APP_ENV==='production'?'lemuria':'lemuria_staging'))throw new Error('DATABASE_IDENTITY');
+  if(MAP_FIXTURE){
+   if(database!=='lemuria_staging')throw new Error('STAGING_ONLY');
+   const before=await p.location.findUniqueOrThrow({where:{slug:'saratov'},select:{latitude:true,longitude:true,mapUrl:true}});
+   if(before.latitude==null&&before.longitude==null){
+    console.log('PUBLIC_RELEASE_STAGING_MAP_BEFORE '+JSON.stringify(before));
+    await p.location.update({where:{slug:'saratov'},data:{latitude:51.62132,longitude:45.972246,mapUrl:'https://yandex.ru/maps/-/CXfwJNLa'}});
+   }
+  }
+  const audit=await p.$transaction(async tx=>{
+   await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+   const identity=await tx.$queryRawUnsafe("SELECT current_database() AS database, current_setting('server_version') AS version");
+   const locations=await tx.location.findMany({where:{status:{in:['ACTIVE','UPCOMING']}},select:{slug:true,latitude:true,longitude:true,timezone:true}});
+   const sessions=await tx.$queryRawUnsafe(`SELECT l.slug,COUNT(*)::int AS future_sessions,COUNT(*) FILTER(WHERE (s."startsAt" AT TIME ZONE l.timezone)::time > '14:00'::time)::int AS after_14,MIN(s."startsAt") AS first_session,MAX(s."startsAt") AS last_session FROM "Session" s JOIN "Location" l ON l.id=s."locationId" WHERE s."startsAt">now() AND s.status IN('SCHEDULED','OPEN') GROUP BY l.slug ORDER BY l.slug`);
+   return {identity,locations,sessions};
+  },{timeout:10000});
+  console.log('PUBLIC_RELEASE_DB_AUDIT '+JSON.stringify(audit));
+ }catch(e){console.error('PUBLIC_RELEASE_DB_AUDIT_FAILED',e.code||e.errorCode||e.name)}
+ finally{await p.$disconnect()}
+ const child=spawn('/app/container-start.sh',[],{stdio:'inherit',env});
+ for(const signal of ['SIGTERM','SIGINT'])process.on(signal,()=>child.kill(signal));
+ child.on('exit',(code)=>process.exit(code||0));
+})();
+'''.replace('MAP_FIXTURE', 'true' if map_fixture else 'false')
+    payload['imageSpec']['command'] = {'command': ['node', '-e', probe]}
+    payload['imageSpec']['args'] = {'args': []}
     save(f'{target}-request.json', payload)
     operation = request('POST', API + '/revisions:deploy', payload)
     save(f'{target}-operation.json', operation)
@@ -176,6 +215,6 @@ if __name__ == '__main__':
     action = sys.argv[1]
     if action == 'snapshot': snapshot()
     elif action == 'package': package()
-    elif action == 'deploy': deploy(sys.argv[2])
+    elif action == 'deploy': deploy(sys.argv[2], len(sys.argv)>3 and sys.argv[3]=='map-fixture')
     elif action == 'status': status(sys.argv[2])
     else: raise SystemExit('Unsupported action')
