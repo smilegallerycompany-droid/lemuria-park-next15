@@ -16,7 +16,9 @@ import tarfile
 import urllib.request
 from urllib.parse import urlparse
 
-WORK = Path('/tmp/lemuria-release')
+# Cloud Shell clears /tmp when its VM restarts. Rollback state must survive it.
+WORK = Path(os.environ.get('LEMURIA_RELEASE_DIR', str(Path.home() / 'lemuria-release-20261101')))
+WORK.mkdir(parents=True, exist_ok=True, mode=0o700)
 APP = WORK / 'rootfs/app'
 CRANE = '/tmp/lemuria-tools/crane'
 REPO = 'cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app'
@@ -25,7 +27,7 @@ CONTAINERS = {'staging': 'bba8dkct9jn9885jcd6n', 'production': 'bbaqa5r6njb9nrqh
 API = 'https://serverless-containers.api.cloud.yandex.net/containers/v1'
 
 def run(args):
-    return subprocess.check_output(args, text=True).strip()
+    return subprocess.check_output(args, text=True, timeout=30).strip()
 
 def save(name, data):
     target = WORK / name
