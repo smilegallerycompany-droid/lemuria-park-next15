@@ -33,16 +33,37 @@ function applySecurityHeaders(request: NextRequest, response: NextResponse, path
     "Permissions-Policy",
     `${cameraPolicy}, microphone=(), geolocation=(), payment=()`,
   );
+  // Analytics and Yandex Maps load only on public pages. Keep staff CSP separate.
+  const publicPage =
+    !isStaffPath(pathname) &&
+    !pathname.startsWith("/api/") &&
+    pathname !== "/owner-unavailable";
+  const publicScriptSrc = publicPage
+    ? " https://mc.yandex.ru https://mc.yandex.com https://mc.webvisor.com https://mc.webvisor.org https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net"
+    : "";
+  const publicConnectSrc = publicPage
+    ? " https://mc.yandex.ru https://mc.yandex.com https://mc.webvisor.com https://mc.webvisor.org wss://mc.yandex.ru https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://*.maps.yandex.net"
+    : "";
+  const publicStyleSrc = publicPage
+    ? " https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net"
+    : "";
   response.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
+      `script-src 'self' 'unsafe-inline' 'unsafe-eval'${publicScriptSrc}`,
+      `style-src 'self' 'unsafe-inline'${publicStyleSrc}`,
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob:",
       "font-src 'self' data:",
-      "connect-src 'self' https://api.yookassa.ru",
+      `connect-src 'self' https://api.yookassa.ru${publicConnectSrc}`,
+      ...(publicPage
+        ? [
+            "worker-src 'self' blob: data: https://api-maps.yandex.ru https://*.api-maps.yandex.ru https://yastatic.net",
+            "child-src 'self' blob: https://mc.yandex.ru",
+            "frame-src 'self' blob: https://mc.yandex.ru",
+          ]
+        : []),
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
