@@ -16,7 +16,7 @@ const unbounded = Unbounded({
 });
 
 function metadataBaseUrl(): URL {
-  const raw = process.env.NEXT_PUBLIC_APP_URL || "https://xn--80akjgfhqje3a8k.xn--p1ai";
+  const raw = process.env.NEXT_PUBLIC_APP_URL || "https://xn--80ajjjbhwgdz8k.xn--p1ai";
   try {
     return new URL(displayOriginFromUrl(raw));
   } catch {
