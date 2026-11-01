@@ -65,7 +65,7 @@
 - Управление конфигурацией: `scripts/cloud-public-release.py`. Полный новый образ одинаков в staging и production; проверки перед promotion привязаны к digest.
 - TypeScript локально прошёл; тесты: 166 passed, 9 skipped (тесты с отдельной БД), 0 failed. GitHub Actions для commit `64934adf4637ff0b893963e45f0472ca8dc1fbfc`: run `41297572857`, success — typecheck, tests, Next.js build. Это проверки GitHub-снимка, а не полная пересборка октябрьского production.
 - Предыдущая production revision `bba22mg3efqv7u8jrr5b` сохранена и видна как Obsolete; её образ с digest `sha256:864ec15ed7cff7a28df1a45a9f6e1c404bad992fb58e234c1fc235280bb864f1` остаётся в реестре.
-- Снимки конфигурации, digest нового образа, staging acceptance и проверка production сохранены в Cloud Shell: `/home/cloudshell-user/lemuria-release-20261101`. Файлы со снимками конфигурации имеют права 0600. В них не раскрываются значения Lockbox.
+- Снимки конфигурации, digest нового образа, staging acceptance и проверка production сохранены в Cloud Shell: `/home/cloudshell-user/lemuria-release-20261101`. В снимках сохранены ссылки на Lockbox без значений секретов. Режим доступа к файлам управляется файловой системой Cloud Shell.
 - Откат приложения: вернуть предыдущую ревизию активной или создать ревизию из сохранённой конфигурации и прежнего digest. Возврат схемы БД не требуется — схема этим релизом не менялась.
 
 PR №1 оставлен draft: полноценный rebuild/merge как источник будущего production требует сначала синхронизировать отсутствующие октябрьские исходники. Публичный hotfix уже работает; этот статус PR не означает отсутствие публикации.
