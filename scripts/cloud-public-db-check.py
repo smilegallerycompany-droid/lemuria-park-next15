@@ -8,7 +8,7 @@ import subprocess
 import sys
 from urllib.parse import quote, urlparse
 
-ROOT = Path('/tmp/lemuria-release')
+ROOT = Path(os.environ.get('LEMURIA_RELEASE_DIR', str(Path.home() / 'lemuria-release-20261101')))
 
 def secret(row, name):
     env = row['image'].get('environment', {})
