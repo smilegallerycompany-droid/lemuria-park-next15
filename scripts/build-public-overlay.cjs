@@ -70,14 +70,18 @@ for (const [filename, original] of files) {
   if (body.includes("location-map-embed-footer")) {
     // Preserve explicit trusted widget URLs and the existing map/route logic.
     // If only a normal Maps link is configured, use the DB's validated point.
-    const widget = /(\w+)=null!=\((\w+)=(\w+)\((\w+)\.mapUrl\)\)\?\2:\3\(\4\.routeUrl\)/g;
+    const widget = /(\w+)=null!=\((\w+)=(\w+)\((\w+)\.mapUrl\)\)\?\2:\3\(\4\.routeUrl\)|(\w+)=(\w+)\((\w+)\.mapUrl\)\?\?\6\(\7\.routeUrl\)/g;
     const matches = [...body.matchAll(widget)];
     if (matches.length) {
       assert.equal(matches.length, 1, `Ambiguous map widget: ${filename}`);
-      body = body.replace(widget, (_, result, unused, trusted, location) =>
-        `${result}=${trusted}(${location}.mapUrl)||${trusted}(${location}.routeUrl)||` +
+      body = body.replace(widget, (_, clientResult, unused, clientTrusted, clientLocation, serverResult, serverTrusted, serverLocation) => {
+        const result = clientResult || serverResult;
+        const trusted = clientTrusted || serverTrusted;
+        const location = clientLocation || serverLocation;
+        return `${result}=${trusted}(${location}.mapUrl)||${trusted}(${location}.routeUrl)||` +
         `((typeof ${location}.latitude==="number"&&Number.isFinite(${location}.latitude)&&Math.abs(${location}.latitude)<=90&&typeof ${location}.longitude==="number"&&Number.isFinite(${location}.longitude)&&Math.abs(${location}.longitude)<=180)?` +
-        `"https://yandex.ru/map-widget/v1/?ll="+encodeURIComponent(${location}.longitude+","+${location}.latitude)+"&pt="+encodeURIComponent(${location}.longitude+","+${location}.latitude+",pm2rdm")+"&z="+Math.min(21,Math.max(1,${location}.mapZoom||16)):null)`);
+        `"https://yandex.ru/map-widget/v1/?ll="+encodeURIComponent(${location}.longitude+","+${location}.latitude)+"&pt="+encodeURIComponent(${location}.longitude+","+${location}.latitude+",pm2rdm")+"&z="+Math.min(21,Math.max(1,${location}.mapZoom||16)):null)`;
+      });
       if (filename.startsWith(".next/static/")) mapClient++; else mapServer++;
     }
   }
