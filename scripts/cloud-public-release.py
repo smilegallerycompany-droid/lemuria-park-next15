@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tarfile
 import urllib.request
+from urllib.parse import urlparse
 
 WORK = Path('/tmp/lemuria-release')
 APP = WORK / 'rootfs/app'
@@ -42,13 +43,35 @@ def active(target):
 def read(name):
     return json.loads((WORK / name).read_text())
 
+def database_identity(row):
+    env = row['image'].get('environment', {})
+    if env.get('DB_NAME') and env.get('DB_HOST'):
+        return {'name': env['DB_NAME'], 'host': env['DB_HOST']}
+    url = env.get('DATABASE_URL')
+    if not url:
+        refs = [item for item in row.get('secrets', []) if item.get('environmentVariable') == 'DATABASE_URL']
+        assert len(refs) == 1, 'A single database connection source is required'
+        ref = refs[0]
+        args = ['yc', 'lockbox', 'payload', 'get', '--id', ref['id'], '--format', 'json-rest']
+        if ref.get('versionId'):
+            args.extend(['--version-id', ref['versionId']])
+        payload = json.loads(run(args))
+        matches = [entry for entry in payload['entries'] if entry['key'] == ref['key']]
+        assert len(matches) == 1
+        url = matches[0].get('textValue', matches[0].get('text_value'))
+    parsed = urlparse(url)
+    assert parsed.scheme in ['postgres', 'postgresql'] and parsed.hostname
+    return {'name': parsed.path.lstrip('/'), 'host': parsed.hostname}
+
 def snapshot():
     snapshots = {}
     for target in CONTAINERS:
         row = active(target)
         assert 'containerId' in row and 'image' in row, 'REST JSON required'
-        assert not (WORK / f'{target}-before.json').exists(), 'Do not overwrite rollback snapshot'
-        save(f'{target}-before.json', row)
+        if (WORK / f'{target}-before.json').exists():
+            assert read(f'{target}-before.json')['id'] == row['id'], 'Never overwrite a different rollback snapshot'
+        else:
+            save(f'{target}-before.json', row)
         env = row['image'].get('environment', {})
         snapshots[target] = row
         print(json.dumps({'target': target, 'revision': row['id'],
@@ -62,7 +85,11 @@ def snapshot():
     prod_env = snapshots['production']['image'].get('environment', {})
     stage_env = snapshots['staging']['image'].get('environment', {})
     assert stage_env.get('APP_ENV') == 'staging', 'Staging must be marked staging'
-    assert stage_env.get('DB_NAME') and stage_env.get('DB_NAME') != prod_env.get('DB_NAME'), 'Database isolation must be explicit'
+    identities = {target: database_identity(row) for target, row in snapshots.items()}
+    print(json.dumps({'databaseIdentities': identities}))
+    assert identities['staging'] != identities['production'], 'Staging must not connect to production database'
+    assert identities['staging']['name'] == 'lemuria_staging', 'Unexpected staging database'
+    assert identities['production']['name'] == 'lemuria', 'Unexpected production database'
     assert stage_env.get('RUN_MIGRATE_ON_START', '0') == '0'
     assert stage_env.get('RUN_STAGING_SEED_ON_START', '0') == '0'
     save('snapshot-passed.json', {'ok': True})
