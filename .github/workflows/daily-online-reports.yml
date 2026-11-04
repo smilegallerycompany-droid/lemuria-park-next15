@@ -116,12 +116,40 @@ jobs:
                   raise RuntimeError(stage + "_NETWORK_OR_RESPONSE_ERROR") from None
           
           
+          def deliver_reports(bot_api, ids, message):
+              # Deliver to the existing owner first. A new recipient must never suppress it.
+              delivered = 0
+              for index, chat_id in enumerate(ids):
+                  try:
+                      if index == 1:
+                          profile = call(bot_api + "getChat", stage="SMM_IDENTITY", data={"chat_id": str(chat_id)})
+                          chat = profile.get("result", {})
+                          if (not profile.get("ok") or chat.get("type") != "private"
+                                  or str(chat.get("username", "")).casefold() != "voznyuk_v"):
+                              raise RuntimeError("UNEXPECTED_SMM_RECIPIENT")
+                      result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
+                          "chat_id": str(chat_id), "text": message, "parse_mode": "HTML",
+                          "link_preview_options": {"is_disabled": True},
+                      })
+                      if not result.get("ok"):
+                          raise RuntimeError("TELEGRAM_SEND_FAILED")
+                      delivered += 1
+                  except RuntimeError:
+                      if index == 0:
+                          raise
+                      # No recipient IDs or financial figures in diagnostics.
+                      print("SMM_DELIVERY_NOT_CONFIRMED")
+              return delivered
+          
+          
           def main():
               iam = os.environ["YC_IAM_TOKEN"]
               print("::add-mask::" + iam)
               ids = json.loads(os.environ["REPORT_CHAT_IDS"])
-              # Initial release is owner only; expanding this requires an explicit change.
-              if not isinstance(ids, list) or len(ids) != 1 or not re.fullmatch(r"\d+", str(ids[0])):
+              # Initial owner plus the one explicitly approved SMM; no auto-subscription.
+              if (not isinstance(ids, list) or not 1 <= len(ids) <= 2
+                      or any(not re.fullmatch(r"\d+", str(value)) for value in ids)
+                      or len(set(map(str, ids))) != len(ids)):
                   raise RuntimeError("OWNER_RECIPIENT_NOT_CONFIGURED")
               worker = os.environ["REPORT_WORKER_URL"]
               if worker != "https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/":
@@ -145,13 +173,10 @@ jobs:
               identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
               if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
                   raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
-              result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
-                  "chat_id": str(ids[0]), "text": message, "parse_mode": "HTML",
-                  "link_preview_options": {"is_disabled": True},
-              })
-              if not result.get("ok"):
-                  raise RuntimeError("TELEGRAM_SEND_FAILED")
-              print("REPORT_DELIVERED date=" + report["date"] + " recipients=1")
+              delivered = deliver_reports(bot_api, ids, message)
+              print("REPORT_DELIVERED date=" + report["date"] + " recipients=" + str(delivered))
+              if delivered != len(ids):
+                  raise RuntimeError("SMM_DELIVERY_NOT_CONFIRMED_OWNER_DELIVERED")
           
           
           if __name__ == "__main__":
