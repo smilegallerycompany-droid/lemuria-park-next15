@@ -57,7 +57,7 @@ jobs:
           import urllib.request
           
           
-          def call(url, *, token=None, data=None):
+          def call(url, *, stage, token=None, data=None):
               headers = {"Content-Type": "application/json"}
               if token:
                   headers["Authorization"] = "Bearer " + token
@@ -69,10 +69,10 @@ jobs:
                   with urllib.request.urlopen(request, timeout=35) as response:
                       return json.load(response)
               except urllib.error.HTTPError as error:
-                  raise RuntimeError(f"HTTP_{error.code}") from None
+                  raise RuntimeError(f"{stage}_HTTP_{error.code}") from None
               except Exception:
                   # urllib exceptions may contain credential-bearing URLs. Never log them.
-                  raise RuntimeError("NETWORK_OR_RESPONSE_ERROR") from None
+                  raise RuntimeError(stage + "_NETWORK_OR_RESPONSE_ERROR") from None
           
           
           def main():
@@ -85,23 +85,23 @@ jobs:
               worker = os.environ["REPORT_WORKER_URL"]
               if worker != "https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/":
                   raise RuntimeError("UNEXPECTED_REPORT_SOURCE")
-              report = call(worker, token=iam, data={"mode": "preview"})
+              report = call(worker, stage="REPORT_SOURCE", token=iam, data={"mode": "preview"})
               if not report.get("ok") or not isinstance(report.get("text"), str):
                   raise RuntimeError("REPORT_NOT_READY")
               if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
                   raise RuntimeError("INVALID_REPORT_DATE")
               payload = call(
                   "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/"
-                  "e6qo0gctoaoatlf5rtct/payload", token=iam,
+                  "e6qo0gctoaoatlf5rtct/payload", stage="LOCKBOX", token=iam,
               )
               bot_token = next(entry["textValue"] for entry in payload["entries"]
                                if entry["key"] == "TELEGRAM_BOT_TOKEN")
               print("::add-mask::" + bot_token)
               bot_api = "https://api.telegram.org/bot" + bot_token + "/"
-              identity = call(bot_api + "getMe")
+              identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
               if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
                   raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
-              result = call(bot_api + "sendMessage", data={
+              result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
                   "chat_id": str(ids[0]), "text": report["text"],
                   "link_preview_options": {"is_disabled": True},
               })
