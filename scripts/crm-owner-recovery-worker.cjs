@@ -23,6 +23,19 @@ function start(env=process.env) {
   res.setHeader('Content-Type','application/json'); res.setHeader('Cache-Control','no-store');
   try {
    assertWindow(env.RECOVERY_EXPIRES_AT);
+   if(req.method==='GET'&&req.url==='/preflight') {
+    const status=await db.$transaction(async tx=>{
+     await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');
+     const [identity]=await tx.$queryRawUnsafe('SELECT current_database() AS database');
+     if(identity.database!=='lemuria')throw new Error('WRONG_DATABASE');
+     const users=await tx.user.findMany({where:{email:{equals:email,mode:'insensitive'}},select:{id:true,email:true,role:true,status:true}});
+     if(users.length!==1)throw new Error('TARGET_NOT_UNIQUE');
+     assertTarget(users[0],email);
+     const prior=await tx.auditLog.findFirst({where:{action:'OWNER_ACCESS_RECOVERED',entityId:users[0].id,metadata:{path:['recoveryRequestId'],equals:env.RECOVERY_REQUEST_ID}},select:{id:true}});
+     return {targetVerified:true,alreadyCompleted:!!prior,activeSessions:await tx.staffSession.count({where:{userId:users[0].id,revokedAt:null}})};
+    });
+    res.end(JSON.stringify({ok:true,...status,expiresAt:env.RECOVERY_EXPIRES_AT}));return;
+   }
    if(req.method!=='POST'||req.url!=='/recover-owner'){res.writeHead(404);res.end('{"ok":false}');return;}
    let body='';for await(const part of req){body+=part;if(body.length>4096)throw new Error('BODY_TOO_LARGE');}
    const input=JSON.parse(body);assertPassword(input.password);
