@@ -1,6 +1,12 @@
 name: Лемурия Парк — онлайн-заказы
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: 'Send report or verify the approved SMM recipient'
+        type: choice
+        default: send
+        options: [send, verify-smm]
   schedule:
     # 09:00 Europe/Moscow; previous complete Europe/Saratov day.
     - cron: "0 6 * * *"
@@ -40,15 +46,17 @@ jobs:
         uses: docker://ghcr.io/yc-actions/yc-iam-token-fed:1.0.0
         with:
           yc-sa-id: ${{ vars.LEMURIA_REPORT_SERVICE_ACCOUNT_ID }}
-      - name: Deliver private owner report
+      - name: Deliver approved online ticket reports
         env:
           YC_IAM_TOKEN: ${{ steps.auth.outputs.token }}
           REPORT_WORKER_URL: https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/
           REPORT_CHAT_IDS: ${{ secrets.LEMURIA_REPORT_CHAT_IDS }}
+          SMM_REPORT_CHAT_ID: ${{ secrets.LEMURIA_SMM_REPORT_CHAT_ID }}
+          REPORT_OPERATION: ${{ inputs.operation || 'send' }}
         shell: bash
         run: |
           python3 - <<'PYCLIENT'
-          """Owner-only external sender using the approved restricted GitHub OIDC scope.
+          """Approved-recipient external sender using restricted GitHub OIDC.
           
           No database access, local credential files, report artifacts, or financial logging.
           """
@@ -120,18 +128,12 @@ jobs:
               iam = os.environ["YC_IAM_TOKEN"]
               print("::add-mask::" + iam)
               ids = json.loads(os.environ["REPORT_CHAT_IDS"])
-              # Initial release is owner only; expanding this requires an explicit change.
+              # Preserve the owner recipient. SMM is explicitly approved for online totals only.
               if not isinstance(ids, list) or len(ids) != 1 or not re.fullmatch(r"\d+", str(ids[0])):
                   raise RuntimeError("OWNER_RECIPIENT_NOT_CONFIGURED")
               worker = os.environ["REPORT_WORKER_URL"]
               if worker != "https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/":
                   raise RuntimeError("UNEXPECTED_REPORT_SOURCE")
-              report = call(worker, stage="REPORT_SOURCE", token=iam, data={"mode": "preview"})
-              if not report.get("ok") or not isinstance(report.get("text"), str):
-                  raise RuntimeError("REPORT_NOT_READY")
-              if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
-                  raise RuntimeError("INVALID_REPORT_DATE")
-              message = format_html(report)
               payload = call(
                   "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/"
                   "e6qo0gctoaoatlf5rtct/payload", stage="LOCKBOX", token=iam,
@@ -145,13 +147,53 @@ jobs:
               identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
               if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
                   raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
-              result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
-                  "chat_id": str(ids[0]), "text": message, "parse_mode": "HTML",
-                  "link_preview_options": {"is_disabled": True},
-              })
-              if not result.get("ok"):
-                  raise RuntimeError("TELEGRAM_SEND_FAILED")
-              print("REPORT_DELIVERED date=" + report["date"] + " recipients=1")
+              operation = os.environ.get("REPORT_OPERATION", "send")
+              if operation == "verify-smm":
+                  updates = call(bot_api + "getUpdates", stage="SMM_UPDATES",
+                                 data={"timeout": 0, "limit": 100})
+                  candidates = set()
+                  for update in updates.get("result", []):
+                      msg = update.get("message", {})
+                      sender, chat = msg.get("from", {}), msg.get("chat", {})
+                      if (sender.get("username", "").lower() == "voznyuk_v"
+                              and chat.get("type") == "private"
+                              and sender.get("id") == chat.get("id")):
+                          candidates.add(str(chat["id"]))
+                  if len(candidates) != 1:
+                      raise RuntimeError("SMM_START_REQUIRED")
+                  smm_id = candidates.pop()
+                  profile = call(bot_api + "getChat", stage="SMM_IDENTITY",
+                                 data={"chat_id": smm_id}).get("result", {})
+                  if profile.get("username", "").lower() != "voznyuk_v" or profile.get("type") != "private":
+                      raise RuntimeError("SMM_IDENTITY_MISMATCH")
+                  print("APPROVED_SMM username=voznyuk_v chat_id=" + smm_id)
+                  return
+              if operation != "send":
+                  raise RuntimeError("INVALID_OPERATION")
+              report = call(worker, stage="REPORT_SOURCE", token=iam, data={"mode": "preview"})
+              if not report.get("ok") or not isinstance(report.get("text"), str):
+                  raise RuntimeError("REPORT_NOT_READY")
+              if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
+                  raise RuntimeError("INVALID_REPORT_DATE")
+              message = format_html(report)
+              targets = [str(ids[0])]
+              smm_id = os.environ.get("SMM_REPORT_CHAT_ID", "").strip()
+              if smm_id:
+                  if not re.fullmatch(r"\d+", smm_id) or smm_id in targets:
+                      raise RuntimeError("INVALID_SMM_RECIPIENT")
+                  profile = call(bot_api + "getChat", stage="SMM_IDENTITY",
+                                 data={"chat_id": smm_id}).get("result", {})
+                  if profile.get("username", "").lower() != "voznyuk_v" or profile.get("type") != "private":
+                      raise RuntimeError("SMM_IDENTITY_MISMATCH")
+                  targets.append(smm_id)
+              for target in targets:
+                  result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
+                      "chat_id": target, "text": message, "parse_mode": "HTML",
+                      "link_preview_options": {"is_disabled": True},
+                  })
+                  if not result.get("ok"):
+                      raise RuntimeError("TELEGRAM_SEND_FAILED")
+              print("REPORT_DELIVERED date=" + report["date"] + " recipients=" + str(len(targets)))
           
           
           if __name__ == "__main__":
