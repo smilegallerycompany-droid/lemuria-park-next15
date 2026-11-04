@@ -18,12 +18,18 @@ async function audit() {
   const [identity]=await tx.$queryRawUnsafe('SELECT current_database() AS database');
   if(identity.database!=='lemuria') throw new Error('WRONG_DATABASE');
   const userModel=Prisma.dmmf.datamodel.models.find(m=>m.name==='User');
-  const allowed=['id','email','name','fullName','role','status','isActive','disabledAt','locationId','createdAt','updatedAt','mustChangePassword','passwordChangedAt'];
+  const allowed=['id','email','name','fullName','role','status','readOnly','lastLoginAt','isActive','disabledAt','locationId','createdAt','updatedAt','mustChangePassword','passwordChangedAt'];
   const select=Object.fromEntries(userModel.fields.filter(f=>allowed.includes(f.name)).map(f=>[f.name,true]));
   const users=await tx.user.findMany({select,orderBy:{createdAt:'asc'},take:150});
   const locations=await tx.location.findMany({select:{id:true,name:true,slug:true,status:true,timezone:true}});
+  const assignments=await tx.userLocation.findMany({select:{userId:true,locationId:true}});
+  const packageNames=['next','react','react-dom','@prisma/client','bcryptjs','zod','qrcode','@zxing/browser'];
+  const packages=Object.fromEntries(packageNames.map(name=>{
+   try{return [name,JSON.parse(fs.readFileSync('/app/node_modules/'+name+'/package.json','utf8')).version];}
+   catch{return [name,'not-in-image-root'];}
+  }));
   const models=Prisma.dmmf.datamodel.models.map(m=>({name:m.name,fields:m.fields.map(f=>({name:f.name,type:f.type,kind:f.kind}))}));
-  return {ok:true,identity,users,locations,models,enums:Prisma.dmmf.datamodel.enums,routes:routes()};
+  return {ok:true,identity,users,locations,assignments,packages,models,enums:Prisma.dmmf.datamodel.enums,routes:routes()};
  },{timeout:25000});
 }
 http.createServer(async(req,res)=>{
