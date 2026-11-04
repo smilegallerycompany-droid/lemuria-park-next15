@@ -44,7 +44,7 @@ for(const [file,original]of files){let body=original;
  if(file==='.next/server/app/api/director/finance/pdf/route.js'){
   body=patchGet(body);counts.financePdfGet++;
   body=replaceOne(body,'title:"Итого в сейфе"','title:"Итого в сейфе (факт, не прибыль)"','PDF balance heading');
-  body=replaceOne(body,',{text:"Сейф - фактически подтверждённая сумма, а не расчёт прибыли.",emphasis:!0}','','PDF orphan paragraph');counts.pdfLayout++;
+  body=replaceOne(body,',{text:"Сейф - фактически подтверждённая сумма, а не расчёт прибыли."}','','PDF orphan paragraph');counts.pdfLayout++;
  }
  if(file==='.next/server/app/director/finance/page.js'){
   const guard=/"DIRECTOR"!==(\w+)\.role&&"OWNER"!==\1\.role/g;assert.equal([...body.matchAll(guard)].length,1);
