@@ -12,7 +12,7 @@ import subprocess
 import sys
 import urllib.request
 
-WORK = Path.home() / 'lemuria-crm-report-fix-20261104'
+WORK = Path(os.environ.get('LEMURIA_CRM_RELEASE_DIR', str(Path.home() / 'lemuria-crm-report-fix-20261104')))
 API = 'https://serverless-containers.api.cloud.yandex.net/containers/v1'
 CONTAINERS = {'production': 'bbaqa5r6njb9nrqhaohq', 'staging': 'bba8dkct9jn9885jcd6n'}
 FIELDS = ['containerId', 'resources', 'executionTimeout', 'serviceAccountId',
@@ -50,6 +50,10 @@ def accept_staging():
     with urllib.request.urlopen(origin + '/crm-release.json', timeout=30) as response:
         manifest = json.load(response)
     assert manifest['releaseId'] == release['releaseId']
+    if release['releaseId'].startswith('crm-admin-reports-'):
+        qa = read('readonly-qa-staging-result.json')
+        assert qa['ok'] and qa['database'] == 'lemuria_staging'
+        assert qa['adminScope']['ownLocationAllowed'] and qa['adminScope']['foreignLocationDenied']
     save('staging-accepted.json', {'ok': True, 'digest': release['digest'],
                                  'rollbackFixture': fixture, 'databaseHealth': 'ok'})
     print(json.dumps({'stagingAccepted': True, 'digest': release['digest']}))
@@ -92,6 +96,9 @@ def deploy(rollback=False):
         assert read('staging-accepted.json')['digest'] == release['digest']
         qa = read('readonly-qa-production-result.json')
         assert qa['ok'] and qa['database'] == 'lemuria' and qa['offlineScopeVerified']
+        if release['releaseId'].startswith('crm-admin-reports-'):
+            assert qa['adminScope']['actualAccountChecked']
+            assert qa['adminScope']['ownLocationAllowed'] and qa['adminScope']['foreignLocationDenied']
     value = payload(before, None if rollback else release)
     action = 'production-rollback' if rollback else 'production'
     save(action + '-request.json', value)
