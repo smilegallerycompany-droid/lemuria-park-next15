@@ -8,7 +8,10 @@ const modules={},cache={};
 for(const file of fs.readdirSync(path.join(root,'.next/server/chunks'))){
  if(!file.endsWith('.js'))continue;
  const chunk=require(path.join(root,'.next/server/chunks',file));
- Object.assign(modules,chunk.modules||{});
+ for(const [id,body] of Object.entries(chunk.modules||{})){
+  // Next emits route-specific export subsets; prefer the complete definition.
+  if(!modules[id]||body.toString().length>modules[id].toString().length)modules[id]=body;
+ }
 }
 function load(id){
  if(cache[id])return cache[id].exports;
@@ -17,19 +20,20 @@ function load(id){
 }
 load.d=(target,definitions)=>{for(const key in definitions)Object.defineProperty(target,key,{enumerable:true,get:definitions[key]});};
 const policy=load(83961);
-assert.equal(typeof policy.ec,'function');assert.equal(typeof policy.Sz,'function');
+const locationScope=namedGuard('locationIds');
+const assertLocation=namedGuard('Нет доступа к этой локации');
 let checks=0;
 const deny=action=>{assert.throws(action,error=>error.code==='FORBIDDEN');checks++;};
 for(const role of ['CASHIER','ADMIN','DIRECTOR','ONLINE_MANAGER']){
  const actor={role,locationIds:['saratov'],readOnly:false};
- assert.deepEqual(policy.ec(actor),['saratov']);checks++;
- policy.Sz(actor,'saratov');checks++;
- deny(()=>policy.Sz(actor,'volgograd'));
+ assert.deepEqual(locationScope(actor),['saratov']);checks++;
+ assertLocation(actor,'saratov');checks++;
+ deny(()=>assertLocation(actor,'volgograd'));
 }
 for(const readOnly of [false,true]){
  const actor={role:'OWNER',locationIds:['saratov'],readOnly};
- assert.equal(policy.ec(actor),null);checks++;
- policy.Sz(actor,'volgograd');checks++;
+ assert.equal(locationScope(actor),null);checks++;
+ assertLocation(actor,'volgograd');checks++;
 }
 function namedGuard(text){
  const matches=[...new Set(Object.values(policy))].filter(fn=>typeof fn==='function'&&fn.toString().includes(text));
