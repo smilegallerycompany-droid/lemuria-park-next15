@@ -6,6 +6,7 @@ import {
   resolveRouteUrl,
   type LocationMapProps,
 } from "@/lib/maps/types";
+import { trustedYandexMapWidgetUrl } from "@/lib/maps/widget-url";
 
 /**
  * Yandex Maps JS API v3-lite embed via script tag.
@@ -17,6 +18,7 @@ export function LocationMap(props: LocationMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY ?? "";
+  const widgetUrl = trustedYandexMapWidgetUrl(props.embedUrl);
   const ready = hasCoordinates(props);
   const route = resolveRouteUrl(props);
   const height = props.height ?? 420;
@@ -77,6 +79,18 @@ export function LocationMap(props: LocationMapProps) {
   }, [apiKey, failed, props.address, props.latitude, props.longitude, props.title, props.zoom, ready, route]);
 
   if (!ready || !apiKey || failed) {
+    if (widgetUrl) {
+      return (
+        <iframe
+          title={`Яндекс Карта: ${props.title}`}
+          src={widgetUrl}
+          className={`location-map-canvas ${props.className ?? ""}`}
+          style={{ width: "100%", height, border: 0 }}
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      );
+    }
     return (
       <div className={`location-map-fallback ${props.className ?? ""}`} style={{ minHeight: height }}>
         <div className="location-map-fallback-inner">

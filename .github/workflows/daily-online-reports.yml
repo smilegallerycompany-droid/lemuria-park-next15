@@ -1,0 +1,189 @@
+name: Лемурия Парк — онлайн-заказы
+on:
+  workflow_dispatch:
+  schedule:
+    # 09:00 Europe/Moscow; previous complete Europe/Saratov day.
+    - cron: "0 6 * * *"
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: lemuria-online-daily-report
+  cancel-in-progress: false
+jobs:
+  report:
+    if: vars.LEMURIA_REPORTING_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify exact repository and branch identity
+        shell: bash
+        run: |
+          python3 - <<'PYIDENTITY'
+          import base64, json, os, urllib.parse, urllib.request
+          audience = 'https://github.com/smilegallerycompany-droid'
+          url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=' + urllib.parse.quote(audience, safe='')
+          req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(req, timeout=20) as response:
+              jwt = json.load(response)['value']
+          print('::add-mask::' + jwt)
+          segment = jwt.split('.')[1]
+          claims = json.loads(base64.urlsafe_b64decode(segment + '=' * (-len(segment) % 4)))
+          identity = {key: claims.get(key) for key in ('iss', 'aud', 'sub', 'repository', 'ref')}
+          print('OIDC_IDENTITY ' + json.dumps(identity))
+          assert identity['iss'] == 'https://token.actions.githubusercontent.com'
+          assert identity['aud'] == audience
+          assert identity['sub'] == 'repo:smilegallerycompany-droid@230834415/lemuria-park-next15@1311503609:ref:refs/heads/main'
+          PYIDENTITY
+      - name: Get short-lived Yandex IAM token
+        id: auth
+        uses: docker://ghcr.io/yc-actions/yc-iam-token-fed:1.0.0
+        with:
+          yc-sa-id: ${{ vars.LEMURIA_REPORT_SERVICE_ACCOUNT_ID }}
+      - name: Deliver private owner report
+        env:
+          YC_IAM_TOKEN: ${{ steps.auth.outputs.token }}
+          REPORT_WORKER_URL: https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/
+          REPORT_CHAT_IDS: ${{ secrets.LEMURIA_REPORT_CHAT_IDS }}
+        shell: bash
+        run: |
+          python3 - <<'PYCLIENT'
+          """Owner-only external sender using the approved restricted GitHub OIDC scope.
+          
+          No database access, local credential files, report artifacts, or financial logging.
+          """
+          import json
+          from datetime import date
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          
+          
+          def format_html(report):
+              """Render only validated aggregate numbers; never interpolate customer data."""
+              day = date.fromisoformat(report["date"])
+              if report.get("timeZone") != "Europe/Saratov":
+                  raise RuntimeError("UNEXPECTED_REPORT_TIMEZONE")
+              row = report["row"]
+              def number(key):
+                  value = str(row[key])
+                  if not re.fullmatch(r"\d+", value):
+                      raise RuntimeError("INVALID_REPORT_TOTAL")
+                  return int(value)
+              def rub(kopecks):
+                  whole = f"{abs(kopecks) // 100:,}".replace(",", " ")
+                  return ("−" if kopecks < 0 else "") + f"{whole},{abs(kopecks) % 100:02d} ₽"
+              months = ("января", "февраля", "марта", "апреля", "мая", "июня",
+                        "июля", "августа", "сентября", "октября", "ноября", "декабря")
+              paid, refunded = number("paid_amount"), number("refund_amount")
+              lines = [
+                  "🌿 <b>ЛЕМУРИЯ ПАРК</b>",
+                  f"<b>Онлайн-заказы · {day.day} {months[day.month - 1]} {day.year}</b>",
+                  "", "🛒 <b>Заказы</b>",
+                  f"Создано: <b>{number('created_orders')}</b>",
+                  f"Оплачено: <b>{number('paid_orders')}</b>",
+                  "", "💳 <b>Сумма оплат</b>", f"<b>{rub(paid)}</b>",
+                  "", "↩️ <b>Возвраты</b>",
+                  f"Количество: <b>{number('refund_count')}</b>",
+                  f"Сумма: <b>{rub(refunded)}</b>",
+                  "", "💰 <b>Оплаты минус возвраты</b>", f"<b>{rub(paid - refunded)}</b>",
+                  "", "<i>Период: 00:00–24:00 · Саратов (МСК+1).</i>",
+                  "<i>Только онлайн-продажи. Возвраты — по дате завершения, в том числе по заказам прошлых дней.</i>",
+              ]
+              payment_fallbacks = number("payment_time_fallbacks")
+              refund_fallbacks = number("refund_time_fallbacks")
+              if payment_fallbacks or refund_fallbacks:
+                  lines += ["", f"<i>Уточнение: для {payment_fallbacks} оплат и {refund_fallbacks} возвратов без даты подтверждения использовано время обновления записи.</i>"]
+              return "\n".join(lines)
+          
+          
+          def call(url, *, stage, token=None, data=None):
+              headers = {"Content-Type": "application/json"}
+              if token:
+                  headers["Authorization"] = "Bearer " + token
+              request = urllib.request.Request(
+                  url, data=None if data is None else json.dumps(data).encode(), headers=headers,
+                  method="GET" if data is None else "POST",
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=35) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  raise RuntimeError(f"{stage}_HTTP_{error.code}") from None
+              except Exception:
+                  # urllib exceptions may contain credential-bearing URLs. Never log them.
+                  raise RuntimeError(stage + "_NETWORK_OR_RESPONSE_ERROR") from None
+          
+          
+          def deliver_reports(bot_api, ids, message):
+              # Deliver to the existing owner first. A new recipient must never suppress it.
+              delivered = 0
+              for index, chat_id in enumerate(ids):
+                  try:
+                      if index == 1:
+                          profile = call(bot_api + "getChat", stage="SMM_IDENTITY", data={"chat_id": str(chat_id)})
+                          chat = profile.get("result", {})
+                          if (not profile.get("ok") or chat.get("type") != "private"
+                                  or str(chat.get("username", "")).casefold() != "voznyuk_v"):
+                              raise RuntimeError("UNEXPECTED_SMM_RECIPIENT")
+                      result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
+                          "chat_id": str(chat_id), "text": message, "parse_mode": "HTML",
+                          "link_preview_options": {"is_disabled": True},
+                      })
+                      if not result.get("ok"):
+                          raise RuntimeError("TELEGRAM_SEND_FAILED")
+                      delivered += 1
+                  except RuntimeError:
+                      if index == 0:
+                          raise
+                      # No recipient IDs or financial figures in diagnostics.
+                      print("SMM_DELIVERY_NOT_CONFIRMED")
+              return delivered
+          
+          
+          def main():
+              iam = os.environ["YC_IAM_TOKEN"]
+              print("::add-mask::" + iam)
+              ids = json.loads(os.environ["REPORT_CHAT_IDS"])
+              # Initial owner plus the one explicitly approved SMM; no auto-subscription.
+              if (not isinstance(ids, list) or not 1 <= len(ids) <= 2
+                      or any(not re.fullmatch(r"\d+", str(value)) for value in ids)
+                      or len(set(map(str, ids))) != len(ids)):
+                  raise RuntimeError("OWNER_RECIPIENT_NOT_CONFIGURED")
+              worker = os.environ["REPORT_WORKER_URL"]
+              if worker != "https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/":
+                  raise RuntimeError("UNEXPECTED_REPORT_SOURCE")
+              report = call(worker, stage="REPORT_SOURCE", token=iam, data={"mode": "preview"})
+              if not report.get("ok") or not isinstance(report.get("text"), str):
+                  raise RuntimeError("REPORT_NOT_READY")
+              if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
+                  raise RuntimeError("INVALID_REPORT_DATE")
+              message = format_html(report)
+              payload = call(
+                  "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/"
+                  "e6qo0gctoaoatlf5rtct/payload", stage="LOCKBOX", token=iam,
+              )
+              bot_token = next(entry["textValue"] for entry in payload["entries"]
+                               if entry["key"] == "TELEGRAM_BOT_TOKEN")
+              print("::add-mask::" + bot_token)
+              if not re.fullmatch(r"9226581371:[A-Za-z0-9_-]{35}", bot_token):
+                  raise RuntimeError("BOT_KEY_FORMAT_INVALID")
+              bot_api = "https://api.telegram.org/bot" + bot_token + "/"
+              identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
+              if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
+                  raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
+              delivered = deliver_reports(bot_api, ids, message)
+              print("REPORT_DELIVERED date=" + report["date"] + " recipients=" + str(delivered))
+              if delivered != len(ids):
+                  raise RuntimeError("SMM_DELIVERY_NOT_CONFIRMED_OWNER_DELIVERED")
+          
+          
+          if __name__ == "__main__":
+              try:
+                  main()
+              except Exception as error:
+                  # No traceback: never emit URL/token/body/recipient/financial details.
+                  code = str(error) if re.fullmatch(r"[A-Z0-9_]+", str(error)) else "REPORT_FAILED"
+                  raise SystemExit(code) from None
+          PYCLIENT

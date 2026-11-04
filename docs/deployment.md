@@ -11,7 +11,7 @@ SHA=$(git rev-parse --short HEAD)
 REL="release-${SHA}-$(date -u +%Y%m%d%H%M%S)"
 docker build --platform linux/amd64 \
   --build-arg GIT_SHA="$SHA" \
-  --build-arg NEXT_PUBLIC_APP_URL=https://lemuriapark.ru \
+  --build-arg NEXT_PUBLIC_APP_URL=https://xn--80ajjjbhwgdz8k.xn--p1ai \
   -t "cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app:$REL" .
 docker push "cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app:$REL"
 # pin the digest in Serverless Containers — never only :latest

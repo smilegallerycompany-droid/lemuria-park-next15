@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MapPin, Phone, Clock3, Navigation } from "lucide-react";
 import { LocationMap } from "@/components/public/LocationMap";
 import { resolveRouteUrl, hasCoordinates } from "@/lib/maps/types";
+import { trustedYandexMapWidgetUrl } from "@/lib/maps/widget-url";
 
 export type PublicLocationCard = {
   slug: string;
@@ -54,6 +55,7 @@ export function WhereWeAreSection({
   });
 
   const title = location.mapLabel || location.name;
+  const embeddedMapUrl = trustedYandexMapWidgetUrl(location.mapUrl);
 
   return (
     <section id="location" className="section location-where container">
@@ -151,7 +153,17 @@ export function WhereWeAreSection({
               title={title}
               address={[location.address, location.addressLine2].filter(Boolean).join(", ")}
               routeUrl={location.routeUrl || location.mapUrl}
+              embedUrl={embeddedMapUrl}
               height={420}
+            />
+          ) : embeddedMapUrl ? (
+            <iframe
+              title={`Яндекс Карта: ${title}`}
+              src={embeddedMapUrl}
+              className="location-map-canvas"
+              style={{ width: "100%", height: 420, border: 0 }}
+              loading="lazy"
+              referrerPolicy="strict-origin-when-cross-origin"
             />
           ) : (
             <div className="location-map-fallback" style={{ minHeight: 420 }} role="status">
