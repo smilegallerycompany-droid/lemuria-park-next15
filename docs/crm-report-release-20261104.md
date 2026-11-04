@@ -10,7 +10,7 @@ refunds; keep onsite tickets, feed, photos, Balabas and existing expenses.
 |---|---|
 | Release | `crm-cashier-reports-20261104-90150ff6` |
 | Production revision | `bbavrno949hepsdr5n2h` |
-| Image digest | `sha256:85059a1fbc2d7925bbb45a33de363d7b9b82300c4cef07dc731f7b00369a123` |
+| Image digest | `sha256:85059a1fbc2d7925bbb45a33de363d7b9b82300c04cef07dc731f7b00369a123` |
 | Builder source | `90150ff6da5b2ba02905f2201f0818d2010c498d` |
 | Preserved base | `sha256:da1b62ffa61ffd6a7b63cdc96776efc1556ba31e9a433294bf16870b02e079fe` |
 | Previous production revision | `bbade818m89f6qe0u4a3` |
