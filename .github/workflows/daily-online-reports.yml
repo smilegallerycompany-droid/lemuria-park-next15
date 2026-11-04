@@ -1,7 +1,9 @@
-name: Lemuria online reports (pending activation)
+name: Лемурия Парк — онлайн-заказы
 on:
   workflow_dispatch:
-# Add cron "0 6 * * *" only after successful delivery and explicit activation.
+  schedule:
+    # 09:00 Europe/Moscow; previous complete Europe/Saratov day.
+    - cron: "0 6 * * *"
 permissions:
   contents: read
   id-token: write
@@ -46,7 +48,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PYCLIENT'
-          """Proposed external sender. Runs only after the GitHub OIDC scope is approved.
+          """Owner-only external sender using the approved restricted GitHub OIDC scope.
           
           No database access, local credential files, report artifacts, or financial logging.
           """
@@ -97,6 +99,8 @@ jobs:
               bot_token = next(entry["textValue"] for entry in payload["entries"]
                                if entry["key"] == "TELEGRAM_BOT_TOKEN")
               print("::add-mask::" + bot_token)
+              if not re.fullmatch(r"9226581371:[A-Za-z0-9_-]{35}", bot_token):
+                  raise RuntimeError("BOT_KEY_FORMAT_INVALID")
               bot_api = "https://api.telegram.org/bot" + bot_token + "/"
               identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
               if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
