@@ -3,10 +3,49 @@
 No database access, local credential files, report artifacts, or financial logging.
 """
 import json
+from datetime import date
 import os
 import re
 import urllib.error
 import urllib.request
+
+
+def format_html(report):
+    """Render only validated aggregate numbers; never interpolate customer data."""
+    day = date.fromisoformat(report["date"])
+    if report.get("timeZone") != "Europe/Saratov":
+        raise RuntimeError("UNEXPECTED_REPORT_TIMEZONE")
+    row = report["row"]
+    def number(key):
+        value = str(row[key])
+        if not re.fullmatch(r"\d+", value):
+            raise RuntimeError("INVALID_REPORT_TOTAL")
+        return int(value)
+    def rub(kopecks):
+        whole = f"{abs(kopecks) // 100:,}".replace(",", " ")
+        return ("−" if kopecks < 0 else "") + f"{whole},{abs(kopecks) % 100:02d} ₽"
+    months = ("января", "февраля", "марта", "апреля", "мая", "июня",
+              "июля", "августа", "сентября", "октября", "ноября", "декабря")
+    paid, refunded = number("paid_amount"), number("refund_amount")
+    lines = [
+        "🌿 <b>ЛЕМУРИЯ ПАРК</b>",
+        f"<b>Онлайн-заказы · {day.day} {months[day.month - 1]} {day.year}</b>",
+        "", "🛒 <b>Заказы</b>",
+        f"Создано: <b>{number('created_orders')}</b>",
+        f"Оплачено: <b>{number('paid_orders')}</b>",
+        "", "💳 <b>Сумма оплат</b>", f"<b>{rub(paid)}</b>",
+        "", "↩️ <b>Возвраты</b>",
+        f"Количество: <b>{number('refund_count')}</b>",
+        f"Сумма: <b>{rub(refunded)}</b>",
+        "", "💰 <b>Оплаты минус возвраты</b>", f"<b>{rub(paid - refunded)}</b>",
+        "", "<i>Период: 00:00–24:00 · Саратов (МСК+1).</i>",
+        "<i>Только онлайн-продажи. Возвраты — по дате завершения, в том числе по заказам прошлых дней.</i>",
+    ]
+    payment_fallbacks = number("payment_time_fallbacks")
+    refund_fallbacks = number("refund_time_fallbacks")
+    if payment_fallbacks or refund_fallbacks:
+        lines += ["", f"<i>Уточнение: для {payment_fallbacks} оплат и {refund_fallbacks} возвратов без даты подтверждения использовано время обновления записи.</i>"]
+    return "\n".join(lines)
 
 
 def call(url, *, stage, token=None, data=None):
@@ -42,6 +81,7 @@ def main():
         raise RuntimeError("REPORT_NOT_READY")
     if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
         raise RuntimeError("INVALID_REPORT_DATE")
+    message = format_html(report)
     payload = call(
         "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/"
         "e6qo0gctoaoatlf5rtct/payload", stage="LOCKBOX", token=iam,
@@ -56,7 +96,7 @@ def main():
     if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
         raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
     result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
-        "chat_id": str(ids[0]), "text": report["text"],
+        "chat_id": str(ids[0]), "text": message, "parse_mode": "HTML",
         "link_preview_options": {"is_disabled": True},
     })
     if not result.get("ok"):
