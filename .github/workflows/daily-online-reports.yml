@@ -1,7 +1,9 @@
-name: Lemuria online reports (pending activation)
+name: Лемурия Парк — онлайн-заказы
 on:
   workflow_dispatch:
-# Add cron "0 6 * * *" only after successful delivery and explicit activation.
+  schedule:
+    # 09:00 Europe/Moscow; previous complete Europe/Saratov day.
+    - cron: "0 6 * * *"
 permissions:
   contents: read
   id-token: write
@@ -14,6 +16,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Verify exact repository and branch identity
+        shell: bash
+        run: |
+          python3 - <<'PYIDENTITY'
+          import base64, json, os, urllib.parse, urllib.request
+          audience = 'https://github.com/smilegallerycompany-droid'
+          url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=' + urllib.parse.quote(audience, safe='')
+          req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(req, timeout=20) as response:
+              jwt = json.load(response)['value']
+          print('::add-mask::' + jwt)
+          segment = jwt.split('.')[1]
+          claims = json.loads(base64.urlsafe_b64decode(segment + '=' * (-len(segment) % 4)))
+          identity = {key: claims.get(key) for key in ('iss', 'aud', 'sub', 'repository', 'ref')}
+          print('OIDC_IDENTITY ' + json.dumps(identity))
+          assert identity['iss'] == 'https://token.actions.githubusercontent.com'
+          assert identity['aud'] == audience
+          assert identity['sub'] == 'repo:smilegallerycompany-droid@230834415/lemuria-park-next15@1311503609:ref:refs/heads/main'
+          PYIDENTITY
       - name: Get short-lived Yandex IAM token
         id: auth
         uses: docker://ghcr.io/yc-actions/yc-iam-token-fed:1.0.0
@@ -27,7 +48,7 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PYCLIENT'
-          """Proposed external sender. Runs only after the GitHub OIDC scope is approved.
+          """Owner-only external sender using the approved restricted GitHub OIDC scope.
           
           No database access, local credential files, report artifacts, or financial logging.
           """
@@ -38,7 +59,7 @@ jobs:
           import urllib.request
           
           
-          def call(url, *, token=None, data=None):
+          def call(url, *, stage, token=None, data=None):
               headers = {"Content-Type": "application/json"}
               if token:
                   headers["Authorization"] = "Bearer " + token
@@ -50,10 +71,10 @@ jobs:
                   with urllib.request.urlopen(request, timeout=35) as response:
                       return json.load(response)
               except urllib.error.HTTPError as error:
-                  raise RuntimeError(f"HTTP_{error.code}") from None
+                  raise RuntimeError(f"{stage}_HTTP_{error.code}") from None
               except Exception:
                   # urllib exceptions may contain credential-bearing URLs. Never log them.
-                  raise RuntimeError("NETWORK_OR_RESPONSE_ERROR") from None
+                  raise RuntimeError(stage + "_NETWORK_OR_RESPONSE_ERROR") from None
           
           
           def main():
@@ -66,23 +87,25 @@ jobs:
               worker = os.environ["REPORT_WORKER_URL"]
               if worker != "https://bbar83r32o43u8ipsbo3.containers.yandexcloud.net/":
                   raise RuntimeError("UNEXPECTED_REPORT_SOURCE")
-              report = call(worker, token=iam, data={"mode": "preview"})
+              report = call(worker, stage="REPORT_SOURCE", token=iam, data={"mode": "preview"})
               if not report.get("ok") or not isinstance(report.get("text"), str):
                   raise RuntimeError("REPORT_NOT_READY")
               if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", report.get("date", "")):
                   raise RuntimeError("INVALID_REPORT_DATE")
               payload = call(
                   "https://payload.lockbox.api.cloud.yandex.net/lockbox/v1/secrets/"
-                  "e6qo0gctoaoatlf5rtct/payload", token=iam,
+                  "e6qo0gctoaoatlf5rtct/payload", stage="LOCKBOX", token=iam,
               )
               bot_token = next(entry["textValue"] for entry in payload["entries"]
                                if entry["key"] == "TELEGRAM_BOT_TOKEN")
               print("::add-mask::" + bot_token)
+              if not re.fullmatch(r"9226581371:[A-Za-z0-9_-]{35}", bot_token):
+                  raise RuntimeError("BOT_KEY_FORMAT_INVALID")
               bot_api = "https://api.telegram.org/bot" + bot_token + "/"
-              identity = call(bot_api + "getMe")
+              identity = call(bot_api + "getMe", stage="TELEGRAM_IDENTITY")
               if identity.get("result", {}).get("username") != "lemuriapark_reports_bot":
                   raise RuntimeError("UNEXPECTED_TELEGRAM_BOT")
-              result = call(bot_api + "sendMessage", data={
+              result = call(bot_api + "sendMessage", stage="TELEGRAM_SEND", data={
                   "chat_id": str(ids[0]), "text": report["text"],
                   "link_preview_options": {"is_disabled": True},
               })
