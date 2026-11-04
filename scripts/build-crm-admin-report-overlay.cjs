@@ -21,7 +21,7 @@ function patchGet(body){
  const exported=body.match(/GET:\(\)=>([A-Za-z0-9_$]+)/);assert.ok(exported);
  const start=body.indexOf('async function '+exported[1]+'(',exported.index);assert.ok(start>=0);
  let end=body.indexOf('async function ',start+15);if(end<0)end=body.length;
- const get=replaceOne(body.slice(start,end),'Td(["DIRECTOR","OWNER"])','Td(["ADMIN","DIRECTOR","OWNER"])','GET role guard');
+ const get=replaceOne(body.slice(start,end),'Td)(["DIRECTOR","OWNER"])','Td)(["ADMIN","DIRECTOR","OWNER"])','GET role guard');
  return body.slice(0,start)+get+body.slice(end);
 }
 for(const [file,original]of files){let body=original;
@@ -38,7 +38,7 @@ for(const [file,original]of files){let body=original;
  if(file==='.next/server/app/api/director/finance/route.js'){
   body=patchGet(body);counts.financeGet++;
   // The POST confirmation must retain the old director/owner-only guard.
-  assert.equal((body.match(/Td\(\["DIRECTOR","OWNER"\]\)/g)||[]).length,1);
+  assert.equal((body.match(/Td\)\(\["DIRECTOR","OWNER"\]\)/g)||[]).length,1);
   assert.ok(body.includes('Подтверждать остатки может директор или собственник'));
  }
  if(file==='.next/server/app/api/director/finance/pdf/route.js'){
