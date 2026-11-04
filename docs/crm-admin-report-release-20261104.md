@@ -14,7 +14,7 @@ The live cashier-only payment/refund filter is preserved. Feed, photos, Balabas 
 - Actual compiled finance service: ADMIN assigned location allowed; foreign location forbidden; CASHIER and ONLINE_MANAGER global finance forbidden.
 - Staging fixture transaction: onsite ticket 100000 kopecks, feed 30000, cash refund 20000, expense 5000; expected net 105000. Online payment 500000 and online refund 30000 excluded. Deliberate transaction rollback, zero fixture orders committed.
 - Production read-only preflight used the newly created active administrator profile and its real single-location assignment. All location-scope assertions passed. No credential hash selected and no application login impersonated.
-- Production real-day comparison excluded 310000 kopecks of online payments from cash-register finance.
+- Production read-only comparison confirmed that online payments are excluded from cash-register finance; business totals are omitted from this public record.
 - Public site and CRM readiness endpoints confirmed PostgreSQL health. Eight actual JS/CSS assets returned HTTP 200; the checked Saratov date exposed 21 sessions through 20:30 local time.
 - Owner UI finance rendering and PDF download checked after deployment. Empty-day report has one page and expected zero financial totals.
 - Temporary private QA and account-recovery endpoints both return HTTP 410; diagnostic database secrets and networking removed.
