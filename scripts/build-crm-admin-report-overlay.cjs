@@ -6,7 +6,7 @@ const root=path.resolve(process.argv[2]||''),commit=process.argv[3];
 assert.match(commit||'',/^[a-f0-9]{40}$/);
 const prior=JSON.parse(fs.readFileSync(path.join(root,'public/crm-release.json'),'utf8'));
 assert.equal(prior.releaseId,'crm-cashier-reports-20261104-90150ff6');
-const baseDigest='sha256:85059a1fbc2d7925bbb45a33de363d7b9b82300c4cef07dc731f7b00369a123';
+const baseDigest='sha256:85059a1fbc2d7925bbb45a33de363d7b9b82300c04cef07dc731f7b00369a123';
 const releaseId='crm-admin-reports-20261104-'+commit.slice(0,8);
 const files=new Map(),originals=new Map();
 const hash=text=>crypto.createHash('sha256').update(text).digest('hex');
