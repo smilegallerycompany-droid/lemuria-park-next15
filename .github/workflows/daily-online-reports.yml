@@ -14,6 +14,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Verify exact repository and branch identity
+        shell: bash
+        run: |
+          python3 - <<'PYIDENTITY'
+          import base64, json, os, urllib.parse, urllib.request
+          audience = 'https://github.com/smilegallerycompany-droid'
+          url = os.environ['ACTIONS_ID_TOKEN_REQUEST_URL'] + '&audience=' + urllib.parse.quote(audience, safe='')
+          req = urllib.request.Request(url, headers={'Authorization': 'Bearer ' + os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
+          with urllib.request.urlopen(req, timeout=20) as response:
+              jwt = json.load(response)['value']
+          print('::add-mask::' + jwt)
+          segment = jwt.split('.')[1]
+          claims = json.loads(base64.urlsafe_b64decode(segment + '=' * (-len(segment) % 4)))
+          identity = {key: claims.get(key) for key in ('iss', 'aud', 'sub', 'repository', 'ref')}
+          print('OIDC_IDENTITY ' + json.dumps(identity))
+          assert identity['iss'] == 'https://token.actions.githubusercontent.com'
+          assert identity['aud'] == audience
+          assert identity['sub'] == 'repo:smilegallerycompany-droid/lemuria-park-next15:ref:refs/heads/main'
+          PYIDENTITY
       - name: Get short-lived Yandex IAM token
         id: auth
         uses: docker://ghcr.io/yc-actions/yc-iam-token-fed:1.0.0
