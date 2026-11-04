@@ -31,7 +31,7 @@ jobs:
           print('OIDC_IDENTITY ' + json.dumps(identity))
           assert identity['iss'] == 'https://token.actions.githubusercontent.com'
           assert identity['aud'] == audience
-          assert identity['sub'] == 'repo:smilegallerycompany-droid/lemuria-park-next15:ref:refs/heads/main'
+          assert identity['sub'] == 'repo:smilegallerycompany-droid@230834415/lemuria-park-next15@1311503609:ref:refs/heads/main'
           PYIDENTITY
       - name: Get short-lived Yandex IAM token
         id: auth
