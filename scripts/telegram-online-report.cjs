@@ -124,6 +124,7 @@ function start(env = process.env) {
     res.setHeader("Content-Type","application/json; charset=utf-8");
     if (req.method === "GET") { res.end(JSON.stringify({ok:true,worker:"telegram-online-report-v1"})); return; }
     if (req.method !== "POST" || req.url !== "/") { res.writeHead(404); res.end('{"ok":false}'); return; }
+    let stage="input";
     try {
       let body="";
       for await (const chunk of req) { body+=chunk; if(body.length>4096)throw new Error("BODY_TOO_LARGE"); }
@@ -131,19 +132,23 @@ function start(env = process.env) {
       if (!['preview','send'].includes(input.mode)) throw new Error("INVALID_MODE");
       const timeZone=env.REPORT_TIMEZONE || "Europe/Saratov";
       const date=input.date || reportDate(new Date(),timeZone);
+      stage="database";
       const row=await collect(prisma,date,timeZone);
       const text=formatReport(row,date,timeZone);
       if(input.mode==='preview') {res.end(JSON.stringify({ok:true,date,timeZone,row,text}));return;}
       if(!env.TELEGRAM_BOT_TOKEN) throw new Error("MISSING_TELEGRAM_BOT_TOKEN");
       const results=[];
       // Explicit allowlist only; /start never subscribes a new recipient automatically.
+      stage="telegram";
       for(const id of recipients(env.REPORT_CHAT_IDS)) results.push(await telegram(env.TELEGRAM_BOT_TOKEN,id,text));
       console.log(JSON.stringify({event:"DAILY_ONLINE_REPORT_SENT",date,timeZone,deliveries:results}));
       res.end(JSON.stringify({ok:true,date,deliveries:results}));
     } catch(error) {
       // Do not print request bodies, URLs, database errors, credentials or PII.
-      console.error(JSON.stringify({event:"DAILY_ONLINE_REPORT_FAILED",code:error.code || "REPORT_FAILED"}));
-      res.writeHead(500);res.end('{"ok":false,"error":"REPORT_FAILED"}');
+      const candidate=error.code || error.cause?.code || (typeof error.message==='string' && error.message.startsWith('TELEGRAM_SEND_FAILED_') ? error.message : 'REPORT_FAILED');
+      const code=/^[A-Z0-9_]+$/.test(String(candidate)) ? String(candidate) : 'REPORT_FAILED';
+      console.error(JSON.stringify({event:"DAILY_ONLINE_REPORT_FAILED",stage,code}));
+      res.writeHead(500);res.end(JSON.stringify({ok:false,error:"REPORT_FAILED",stage,code}));
     }
   });
   server.listen(Number(env.PORT || 8080),'0.0.0.0');
