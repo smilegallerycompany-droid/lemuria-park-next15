@@ -88,9 +88,9 @@ async function fixtureCheck(){
   const site=await tx.payment.create({data:{orderId:online.id,amount:500000,method:'CARD_ONLINE',status:'SUCCEEDED',succeededAt:when,provider:'YOOKASSA'}});
   await tx.refund.create({data:{orderId:offline.id,paymentId:cash.id,amount:20000,status:'COMPLETED',completedAt:when,createdAt:when}});
   await tx.refund.create({data:{orderId:online.id,paymentId:site.id,amount:30000,status:'COMPLETED',completedAt:when,createdAt:when}});
-  await tx.parkOperation.create({data:{locationId:session.locationId,date:day,kind:'FEED_SALE',amountKopecks:30000,quantity:1,method:'CASH',createdBy:owner.id,note:'Private rollback QA'}});
+  await tx.parkOperation.create({data:{id:'qa-feed-'+suffix,locationId:session.locationId,date:day,kind:'FEED_SALE',amountKopecks:30000,quantity:1,method:'CASH',createdBy:owner.id,note:'Private rollback QA'}});
   const expenseKinds=require('/app/.next/server/webpack-runtime.js')(3743).JD;assert.ok(Array.isArray(expenseKinds)&&expenseKinds.length);
-  await tx.parkOperation.create({data:{locationId:session.locationId,date:day,kind:expenseKinds[0],amountKopecks:5000,quantity:1,method:'CASH',createdBy:owner.id,note:'Private rollback QA expense'}});
+  await tx.parkOperation.create({data:{id:'qa-expense-'+suffix,locationId:session.locationId,date:day,kind:expenseKinds[0],amountKopecks:5000,quantity:1,method:'CASH',createdBy:owner.id,note:'Private rollback QA expense'}});
   const after=await finance(actor,params);
   const delta={tickets:after.revenue.tickets-before.revenue.tickets,feed:after.revenue.feed-before.revenue.feed,revenue:after.revenue.total-before.revenue.total,refunds:after.refunds.total-before.refunds.total,expenses:after.expenses.total-before.expenses.total,net:after.net-before.net};
   assert.deepEqual(delta,{tickets:100000,feed:30000,revenue:130000,refunds:20000,expenses:5000,net:105000});
