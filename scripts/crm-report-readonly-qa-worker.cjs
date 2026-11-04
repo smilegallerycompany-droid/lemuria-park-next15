@@ -66,7 +66,25 @@ async function check(){
  assert.equal(report.net,report.revenue.total-report.refunds.total-report.expenses.total);
  assert.ok(sums.offlinePayments<=sums.allPayments);
  assert.ok(sums.offlineRefunds<=sums.allRefunds);
- return {ok:true,database:identity.database,day,offlineScopeVerified:true,allPaymentsKopecks:sums.allPayments,offlinePaymentsKopecks:sums.offlinePayments,excludedOnlinePaymentsKopecks:sums.allPayments-sums.offlinePayments,excludedOnlineRefundsKopecks:sums.allRefunds-sums.offlineRefunds,revenue:report.revenue,refunds:report.refunds,expensesKopecks:report.expenses.total,netKopecks:report.net};
+ let adminScope;
+ if(env.QA_CHECK_ADMIN==='1'){
+  const assigned=await db.location.findUnique({where:{slug:'saratov'},select:{id:true}});assert.ok(assigned);
+  let admin={id:'private-readonly-admin-qa',role:'ADMIN',status:'ACTIVE',readOnly:false,locationIds:[assigned.id]};
+  if(env.QA_ACTOR_EMAIL){
+   const user=await db.user.findUnique({where:{email:env.QA_ACTOR_EMAIL},select:{id:true,role:true,status:true,readOnly:true,locations:{select:{locationId:true}}}});
+   assert.ok(user);assert.equal(user.role,'ADMIN');assert.equal(user.status,'ACTIVE');assert.equal(user.readOnly,false);
+   admin={...user,locationIds:user.locations.map(x=>x.locationId)};
+   assert.deepEqual(admin.locationIds,[assigned.id]);
+  }
+  const own=await finance(admin,{from:day,to:day,page:1,locationId:assigned.id});assert.ok(own.revenue);
+  const foreign=locations.find(x=>x.id!==assigned.id);assert.ok(foreign);
+  let denied=false;try{await finance(admin,{from:day,to:day,page:1,locationId:foreign.id});}catch(error){denied=error.code==='FORBIDDEN';}assert.ok(denied);
+  for(const role of ['CASHIER','ONLINE_MANAGER']){
+   let rejected=false;try{await finance({...admin,role},{from:day,to:day,page:1});}catch(error){rejected=error.code==='FORBIDDEN';}assert.ok(rejected);
+  }
+  adminScope={ownLocationAllowed:true,foreignLocationDenied:true,actualAccountChecked:!!env.QA_ACTOR_EMAIL,cashierAndOnlineManagerGlobalFinanceDenied:true};
+ }
+ return {ok:true,database:identity.database,day,offlineScopeVerified:true,allPaymentsKopecks:sums.allPayments,offlinePaymentsKopecks:sums.offlinePayments,excludedOnlinePaymentsKopecks:sums.allPayments-sums.offlinePayments,excludedOnlineRefundsKopecks:sums.allRefunds-sums.offlineRefunds,revenue:report.revenue,refunds:report.refunds,expensesKopecks:report.expenses.total,netKopecks:report.net,adminScope};
 }
 async function fixtureCheck(){
  assert.equal(env.QA_EXPECTED_DB,'lemuria_staging');assert.equal(env.QA_ALLOW_ROLLBACK_FIXTURES,'1');
