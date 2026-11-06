@@ -24,6 +24,10 @@ Published release: `crm-tickets-revenue-20261107-4ca654fa`.
 - A staging-only serializable fixture test exercised the compiled finance service: synthetic ticket sales 100000, add-on sales 30000, refund 20000 and expense 5000 kopecks produced net 105000. Synthetic online payment 500000 and refund 30000 were excluded. All fixtures rolled back; zero fixture orders remained.
 - Seven local tests passed: actual ticket timezone rendering, actual finance card separation, PDF contract, unchanged API filtering, refusal of unsafe deletions, archive-before-delete ordering, and stable archive hashing.
 - Production finance, ticket list and shifts were inspected in the authenticated browser. The production PDF downloaded successfully; its text and page rendering showed the three separate amounts.
+- The cashier screen now shows the new-shift form with active Saratov selected, instead of the stale paused-location error. No new shift was opened by the audit.
+- Public origin check at **01:27 Moscow, 7 November 2026**: site root HTTP 200 in 0.375s, CRM root HTTP 200 in 0.162s; TLS 1.3 validated on both. Both `/api/health/live` and `/api/health/ready` returned HTTP 200, readiness reported `database=ok`. `/about`, one stylesheet taken from the actual HTML, and public locations returned HTTP 200. No unexpected redirects or error-page content were observed.
+- The current open date was obtained from active location settings/next sessions, not an expired arbitrary date: **2026-11-07**, 21 sessions **10:30–20:30**, including 13 after 14:00. The browser showed all 21 time options and the Yandex map at Happy Mall. A local ticket selection and promo quote for `ВЫГОДА` changed 1100 to 990 roubles; no booking, reservation or payment was created.
+- Cloud API Gateway and production container were `ACTIVE`; PostgreSQL was `RUNNING / ALIVE`. The existing private audit worker was restored to its previous immutable image/configuration after maintenance; the active revision no longer has the test-shift deletion flag.
 
 ## Source and deployment
 
