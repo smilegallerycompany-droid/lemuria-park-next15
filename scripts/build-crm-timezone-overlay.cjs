@@ -3,7 +3,7 @@
 // Immutable-artifact patch: only overview session display, no business/DB changes.
 const fs = require("node:fs"), path = require("node:path"), crypto = require("node:crypto");
 const assert = require("node:assert/strict"), cp = require("node:child_process");
-const BASE_DIGEST = "sha256:c524919964093de59cfe2449ef9a6bfe48925b04eae1a0d811e9b37b0bac9589";
+const BASE_DIGEST = "sha256:40338679c4ad314a9a3f90cd17cd792edee63b822fb2caaa687b677116541bbd";
 
 function patchOverview(body) {
   assert.ok(body.includes("Смены сегодня") && body.includes("Ближайшие сеансы"), "Expected overview module");
@@ -18,10 +18,32 @@ function patchOverview(body) {
   return { body: body.replace(old, replacement), old, replacement };
 }
 
+function patchSessions(body) {
+  assert.ok(body.includes("Генерация сеансов") && body.includes("Обновить уже созданные сеансы"));
+  const calls = [...body.matchAll(/(\(0,[A-Za-z_$][\w$]*\.r6\))\(([A-Za-z_$][\w$]*)\.(startsAt|endsAt)\)/g)];
+  assert.equal(calls.length, 2, "Only the two session table cells must change");
+  assert.deepEqual(calls.map(m => m[3]).sort(), ["endsAt", "startsAt"]);
+  assert.equal(calls[0][2], calls[1][2]);
+  for (const m of calls) body = body.replace(m[0], `${m[1]}(${m[2]}.${m[3]},${m[2]}.location?.timezone??"Europe/Moscow")`);
+  return body;
+}
+
+function patchOverviewShift(body) {
+  assert.ok(body.includes("Смены сегодня") && body.includes("Ближайшие сеансы"));
+  const data = [...body.matchAll(/([A-Za-z_$][\w$]*)\.locations\?\.find\(loc=>loc\.id===/g)];
+  assert.equal(data.length, 1, "Previously verified overview patch required");
+  const calls = [...body.matchAll(/(\(0,[A-Za-z_$][\w$]*\.r6\))\(([A-Za-z_$][\w$]*)\.openedAt\)/g)];
+  assert.equal(calls.length, 1);
+  const m = calls[0], d = data[0][1], row = m[2];
+  return body.replace(m[0], `${m[1]}(${row}.openedAt,${d}.locations?.find(loc=>loc.id===${row}.locationId||loc.city===${row}.location||loc.name===${row}.location)?.timezone??${d}.timezone??"Europe/Moscow")`);
+}
+
 function build(root, commit) {
   assert.match(commit || "", /^[a-f0-9]{40}$/);
   const prior = JSON.parse(fs.readFileSync(path.join(root, "public/crm-release.json"), "utf8"));
-  assert.equal(prior.releaseId, "crm-admin-reports-20261104-10a09198", "Exact production base required");
+  assert.equal(prior.releaseId, "crm-localtime-20261106-3b95938b", "Exact production base required");
+  const overviewAsset = prior.files.filter(f => /^\.next\/static\/chunks\/app\/director\/page-[a-f0-9]+\.js$/.test(f.path));
+  assert.equal(overviewAsset.length, 1);
   const files = new Map(), originals = new Map();
   function walk(dir) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -36,14 +58,17 @@ function build(root, commit) {
   walk(path.join(root, ".next"));
   const counts = { client: 0, server: 0 };
   for (const [file, body] of files) {
-    if (!body.includes("Смены сегодня") || !body.includes("Ближайшие сеансы")) continue;
     if (file === ".next/server/app/director/page.js") {
-      files.set(file, patchOverview(body).body); counts.server++;
-    } else if (/^\.next\/static\/chunks\/app\/director\/page-[a-f0-9]+\.js$/.test(file)) {
-      files.set(file, patchOverview(body).body); counts.client++;
+      files.set(file, patchOverviewShift(body)); counts.server++;
+    } else if (file === overviewAsset[0].path) {
+      files.set(file, patchOverviewShift(body)); counts.client++;
+    } else if (file === ".next/server/app/director/sessions/page.js") {
+      files.set(file, patchSessions(body)); counts.server++;
+    } else if (/^\.next\/static\/chunks\/app\/director\/sessions\/page-[a-f0-9]+\.js$/.test(file)) {
+      files.set(file, patchSessions(body)); counts.client++;
     }
   }
-  assert.deepEqual(counts, { client: 1, server: 1 });
+  assert.deepEqual(counts, { client: 2, server: 2 });
   const hash = body => crypto.createHash("sha256").update(body).digest("hex");
   const renamed = [];
   for (let pass = 0; pass < 12; pass++) {
@@ -77,12 +102,12 @@ function build(root, commit) {
     releaseId: "crm-localtime-20261106-" + commit.slice(0, 8), sourceCommit: commit,
     baseImageDigest: BASE_DIGEST, builtAt: new Date().toISOString(), counts,
     renamedAssets: renamed, files: output,
-    databaseMigrations: false, scope: "Overview sessions use each location timezone; all business services preserved",
+    databaseMigrations: false, scope: "Session table and overview shifts use location timezone; business services preserved",
   };
   fs.writeFileSync(path.join(root, "public/crm-release.json"), JSON.stringify(manifest, null, 2) + "\n");
   output.push({ path: "public/crm-release.json" });
   fs.writeFileSync(path.join(root, "crm-timezone-overlay-files.json"), JSON.stringify(output, null, 2) + "\n");
   return { releaseId: manifest.releaseId, counts, files: output.length, syntaxChecks: "passed" };
 }
-module.exports = { patchOverview, build, BASE_DIGEST };
+module.exports = { patchOverview, patchSessions, patchOverviewShift, build, BASE_DIGEST };
 if (require.main === module) console.log(JSON.stringify(build(path.resolve(process.argv[2] || ""), process.argv[3])));

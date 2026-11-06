@@ -16,11 +16,11 @@ import tempfile
 from urllib.parse import urlparse
 import urllib.request
 
-BASE = 'sha256:c524919964093de59cfe2449ef9a6bfe48925b04eae1a0d811e9b37b0bac9589'
+BASE = 'sha256:40338679c4ad314a9a3f90cd17cd792edee63b822fb2caaa687b677116541bbd'
 REPOSITORY = 'cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app'
 # Cloud Shell home can be a shared FUSE mount that does not honor Unix modes.
 # Keep revision snapshots (which may contain secrets) on a private local mount.
-WORK = Path(tempfile.gettempdir()) / ('lemuria-crm-timezone-fix-20261106-' + str(os.getuid()))
+WORK = Path(tempfile.gettempdir()) / ('lemuria-crm-timezone-followup-20261106-' + str(os.getuid()))
 SCRIPTS = Path(__file__).resolve().parent
 IDS = {'production': 'bbaqa5r6njb9nrqhaohq', 'staging': 'bba8dkct9jn9885jcd6n'}
 ORIGINS = {
@@ -104,7 +104,7 @@ def build(commit):
         assert proc.wait() == 0, 'Image extraction failed'
         app = root / 'app'
         result = json.loads(run(['node', str(SCRIPTS / 'build-crm-timezone-overlay.cjs'), str(app), commit]))
-        assert result['counts'] == {'client': 1, 'server': 1}
+        assert result['counts'] == {'client': 2, 'server': 2}
         files = json.loads((app / 'crm-timezone-overlay-files.json').read_text())
         with tarfile.open(WORK / 'overlay.tar', 'w') as archive:
             for file in files:
@@ -174,6 +174,8 @@ def verify(target):
         assert hashlib.sha256(body).hexdigest() == item['sha256']
         if '/app/director/page-' in item['path']:
             assert b'locations?.find(loc=>loc.id===' in body
+        if '/app/director/sessions/page-' in item['path']:
+            assert b'.location?.timezone??"Europe/Moscow"' in body
     result = {'ok': True, 'target': target, 'digest': release['digest'], 'revision': current['id'],
               'database': 'ok', 'assetsVerified': len(assets), 'releaseId': release['releaseId']}
     save('staging-accepted.json' if target == 'staging' else 'production-verified.json', result)
