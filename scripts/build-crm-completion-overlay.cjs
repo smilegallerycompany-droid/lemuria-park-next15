@@ -29,10 +29,10 @@ function patchFinance(body){
  return body.replace('children:"Итого выручка"','children:"Общий кассовый итог"').replace('01 / Выручка','01 / Билетная выручка и допродажи');
 }
 function patchFinancePdf(body){
- const report=body.match(/rows:\[\["Билеты",\((\w+)\.revenue\.tickets\)\]/);assert.ok(report,'PDF report object');
+ const report=body.match(/rows:\[\["Билеты",(\w+)\((\w+)\.revenue\.tickets\)\]/);assert.ok(report,'PDF report object');
  const re=/\{text:`Итого выручка: \$\{(\w+)\((\w+)\.revenue\)\}`,emphasis:!0\}/g;
  const m=[...body.matchAll(re)];assert.equal(m.length,1,'Unique PDF total');
- const [,money,net]=m[0],d=report[1];
+ const [,money,net]=m[0],d=report[2];assert.equal(money,report[1]);
  return body.replace(re,'{text:`Выручка по билетам (до возвратов): ${'+money+'('+d+'.revenue.tickets)}`,emphasis:!0},{text:`Допродажи отдельно (до возвратов): ${'+money+'('+d+'.revenue.feed+'+d+'.revenue.balabas+'+d+'.revenue.photo)}`},{text:`Общий кассовый итог (после возвратов): ${'+money+'('+net+'.revenue)}`,emphasis:!0}')
   .replaceAll('Итого выручка','Общий кассовый итог').replace('01 / Выручка','01 / Билетная выручка и допродажи');
 }

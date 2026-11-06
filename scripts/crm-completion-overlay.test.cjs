@@ -1,6 +1,11 @@
 "use strict";
 const{test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const p=require('./build-crm-completion-overlay.cjs');
+test('PDF separates gross ticket/add-on values from the unchanged net cash total',()=>{
+ const s='title:"01 / Выручка",rows:[["Билеты",j(a.revenue.tickets)]],{text:`Итого выручка: ${j(b.revenue)}`,emphasis:!0}';
+ const b=p.patchFinancePdf(s);
+ assert.ok(b.includes('${j(a.revenue.tickets)}'));assert.ok(b.includes('${j(a.revenue.feed+a.revenue.balabas+a.revenue.photo)}'));assert.ok(b.includes('${j(b.revenue)}'));assert.throws(()=>p.patchFinancePdf(b));
+});
 test('ticket contract adds timezone without changing filtering or fields',()=>{
  const source='AUTH;where:scope;session:{select:{startsAt:!0,location:{select:{id:!0,name:!0}}}};filter:status';
  assert.equal(p.patchTicketApi(source),'AUTH;where:scope;session:{select:{startsAt:!0,location:{select:{id:!0,name:!0,timezone:!0}}}};filter:status');

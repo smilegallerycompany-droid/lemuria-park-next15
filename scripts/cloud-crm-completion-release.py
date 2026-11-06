@@ -82,7 +82,7 @@ def snapshot():
     print(json.dumps({'snapshot': True, 'productionRevision': prod['id'],
                       'baseDigest': BASE, 'stagingDatabase': 'lemuria_staging'}))
 
-def build(commit):
+def build(commit, reuse=False):
     assert len(commit) == 40 and all(c in '0123456789abcdef' for c in commit)
     assert active('production')['image']['imageDigest'] == BASE
     crane = str(Path.home() / 'lemuria-crm-report-fix-20261104/tools/crane')
@@ -93,15 +93,19 @@ def build(commit):
                               input=token, text=True, capture_output=True, env=env, timeout=30)
         assert auth.returncode == 0, 'Registry authentication failed'
         root = WORK / 'rootfs'
-        assert not root.exists(), 'Use the saved candidate; do not rebuild over it'
-        root.mkdir(mode=0o700)
-        proc = subprocess.Popen([crane, 'export', REPOSITORY + '@' + BASE, '-'], stdout=subprocess.PIPE, env=env)
-        with tarfile.open(fileobj=proc.stdout, mode='r|') as archive:
-            for item in archive:
-                name = item.name.lstrip('./')
-                if name.startswith('app/.next/') or name in ['app/package.json', 'app/release-manifest.json', 'app/public/crm-release.json']:
-                    archive.extract(item, path=root, filter='data')
-        assert proc.wait() == 0, 'Image extraction failed'
+        if reuse:
+            assert root.is_dir() and not (root/'app/crm-completion-overlay-files.json').exists()
+            assert not (WORK/'image.json').exists()
+        else:
+            assert not root.exists(), 'Use explicit build-extracted only after a pre-write patch assertion'
+            root.mkdir(mode=0o700)
+            proc = subprocess.Popen([crane, 'export', REPOSITORY + '@' + BASE, '-'], stdout=subprocess.PIPE, env=env)
+            with tarfile.open(fileobj=proc.stdout, mode='r|') as archive:
+                for item in archive:
+                    name = item.name.lstrip('./')
+                    if name.startswith('app/.next/') or name in ['app/package.json', 'app/release-manifest.json', 'app/public/crm-release.json']:
+                        archive.extract(item, path=root, filter='data')
+            assert proc.wait() == 0, 'Image extraction failed'
         app = root / 'app'
         result = json.loads(run(['node', str(SCRIPTS / 'build-crm-completion-overlay.cjs'), str(app), commit], timeout=150))
         assert result['counts'] == {'ticketApi': 1, 'ticketClient': 1, 'ticketServer': 2, 'financeClient': 1, 'financeServer': 1, 'financePdf': 1}
@@ -185,6 +189,7 @@ if __name__ == '__main__':
     action = sys.argv[1]
     if action == 'snapshot': snapshot()
     elif action == 'build': build(sys.argv[2])
+    elif action == 'build-extracted': build(sys.argv[2], True)
     elif action in ['deploy-staging', 'deploy-production']: deploy(action.removeprefix('deploy-'))
     elif action in ['verify-staging', 'verify-production']: verify(action.removeprefix('verify-'))
     elif action in ['rollback-staging', 'rollback-production']: deploy(action.removeprefix('rollback-'), True)
