@@ -18,7 +18,10 @@ import urllib.request
 
 BASE = 'sha256:c524919964093de59cfe2449ef9a6bfe48925b04eae1a0d811e9b37b0bac9589'
 REPOSITORY = 'cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app'
-WORK = Path.home() / 'lemuria-crm-timezone-fix-20261106'
+# Cloud Shell home can be a shared FUSE mount that does not honor Unix modes.
+# Keep revision snapshots (which may contain secrets) on a private local mount.
+WORK = Path(tempfile.gettempdir()) / ('lemuria-crm-timezone-fix-20261106-' + str(os.getuid()))
+SCRIPTS = Path(__file__).resolve().parent
 IDS = {'production': 'bbaqa5r6njb9nrqhaohq', 'staging': 'bba8dkct9jn9885jcd6n'}
 ORIGINS = {
     'production': 'https://crm.xn--80ajjjbhwgdz8k.xn--p1ai',
@@ -100,7 +103,7 @@ def build(commit):
                     archive.extract(item, path=root, filter='data')
         assert proc.wait() == 0, 'Image extraction failed'
         app = root / 'app'
-        result = json.loads(run(['node', str(WORK / 'build-crm-timezone-overlay.cjs'), str(app), commit]))
+        result = json.loads(run(['node', str(SCRIPTS / 'build-crm-timezone-overlay.cjs'), str(app), commit]))
         assert result['counts'] == {'client': 1, 'server': 1}
         files = json.loads((app / 'crm-timezone-overlay-files.json').read_text())
         with tarfile.open(WORK / 'overlay.tar', 'w') as archive:
