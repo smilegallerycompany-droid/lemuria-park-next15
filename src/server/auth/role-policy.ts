@@ -10,13 +10,17 @@ const RANK: Record<UserRole, number> = {
 
 export function canManageRole(actorRole: UserRole, targetRole: UserRole): boolean {
   if (actorRole === "OWNER") return true;
-  if (actorRole === "ADMIN") return targetRole === "ADMIN" || targetRole === "DIRECTOR" || targetRole === "CASHIER";
+  if (actorRole === "ADMIN")
+    return targetRole === "ADMIN" || targetRole === "DIRECTOR" || targetRole === "CASHIER";
   if (actorRole === "DIRECTOR") return targetRole === "CASHIER";
   return false;
 }
 
 export function assertCanAssignRole(actorRole: UserRole, nextRole: UserRole) {
-  if (actorRole === "DIRECTOR" && (nextRole === "ADMIN" || nextRole === "OWNER" || nextRole === "DIRECTOR")) {
+  if (
+    actorRole === "DIRECTOR" &&
+    (nextRole === "ADMIN" || nextRole === "OWNER" || nextRole === "DIRECTOR")
+  ) {
     throw new DomainError("FORBIDDEN", "Директор не может назначать эту роль");
   }
   if (actorRole === "ADMIN" && nextRole === "OWNER") {
@@ -34,13 +38,20 @@ export function assertCanModifyUser(params: {
   targetId: string;
   nextRole?: UserRole;
 }) {
+  if (!canManageRole(params.actorRole, params.targetRole)) {
+    throw new DomainError("FORBIDDEN", "Недостаточно прав для изменения этого сотрудника");
+  }
   if (params.targetRole === "OWNER" && params.actorRole !== "OWNER") {
     throw new DomainError("FORBIDDEN", "Нельзя изменять OWNER");
   }
   if (params.nextRole) {
     assertCanAssignRole(params.actorRole, params.nextRole);
   }
-  if (params.actorId === params.targetId && params.nextRole && RANK[params.nextRole] < RANK[params.actorRole]) {
+  if (
+    params.actorId === params.targetId &&
+    params.nextRole &&
+    RANK[params.nextRole] < RANK[params.actorRole]
+  ) {
     // demoting self is allowed only for non-last OWNER (checked separately)
   }
 }

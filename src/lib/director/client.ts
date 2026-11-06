@@ -1,4 +1,4 @@
-import type { ApiErrorBody, ApiSuccessBody } from "@/types/api";
+import { ApiClientError, requestWithMeta } from "@/lib/api/client";
 
 export class DirectorApiError extends Error {
   code: string;
@@ -18,14 +18,19 @@ export async function directorFetch<T>(path: string, init?: RequestInit): Promis
     headers.set("Content-Type", "application/json");
   }
 
-  const response = await fetch(path, { ...init, headers, credentials: "include" });
-  const payload = (await response.json()) as ApiSuccessBody<T> | ApiErrorBody;
-
-  if (!payload.ok) {
-    throw new DirectorApiError(payload.error.message, payload.error.code, payload.error.details);
+  try {
+    const { data } = await requestWithMeta<T>(
+      path,
+      { ...init, headers, credentials: "include" },
+      { signal: init?.signal ?? undefined },
+    );
+    return data;
+  } catch (error) {
+    if (error instanceof ApiClientError) {
+      throw new DirectorApiError(error.message, error.code, error.details);
+    }
+    throw error;
   }
-
-  return payload.data;
 }
 
 export function formatDateTime(iso: string, timeZone = "Europe/Moscow"): string {
@@ -47,9 +52,10 @@ export function downloadCsv(filename: string, rows: Array<Record<string, string 
   if (rows.length === 0) return;
   const keys = Object.keys(rows[0]!);
   const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
-  const csv = [keys.join(","), ...rows.map((row) => keys.map((k) => escape(row[k] ?? "")).join(","))].join(
-    "\n",
-  );
+  const csv = [
+    keys.join(","),
+    ...rows.map((row) => keys.map((k) => escape(row[k] ?? "")).join(",")),
+  ].join("\n");
   const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

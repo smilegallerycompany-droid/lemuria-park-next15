@@ -1,13 +1,21 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  assertCanAssignRole,
-  canManageRole,
-} from "@/server/auth/role-policy";
+import { assertCanAssignRole, canManageRole, assertCanModifyUser } from "@/server/auth/role-policy";
 import { DomainError } from "@/server/domain/errors";
 import { hasCoordinates, resolveRouteUrl } from "@/lib/maps/types";
 
 describe("role policy", () => {
+  it("enforces the managed-role matrix for every existing target, even without a role change", () => {
+    const roles = ["CASHIER", "DIRECTOR", "ADMIN", "OWNER"] as const;
+    for (const actorRole of roles)
+      for (const targetRole of roles) {
+        const action = () =>
+          assertCanModifyUser({ actorRole, targetRole, actorId: "actor", targetId: "target" });
+        if (canManageRole(actorRole, targetRole)) assert.doesNotThrow(action);
+        else
+          assert.throws(action, (e: unknown) => e instanceof DomainError && e.code === "FORBIDDEN");
+      }
+  });
   it("blocks DIRECTOR → ADMIN/OWNER and ADMIN → OWNER", () => {
     assert.equal(canManageRole("DIRECTOR", "CASHIER"), true);
     assert.equal(canManageRole("DIRECTOR", "ADMIN"), false);

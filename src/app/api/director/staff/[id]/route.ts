@@ -7,6 +7,8 @@ import { hashPassword } from "@/server/auth/password";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
 import { assertCanAssignRole } from "@/server/auth/role-policy";
+import { assertLocationAccess } from "@/server/auth/location-access";
+import { assertManagedStaffAccess } from "@/server/auth/staff-management";
 
 const patchSchema = z.object({
   confirm: z.literal(true).optional(),
@@ -43,10 +45,19 @@ export async function PATCH(req: Request, context: RouteContext) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
     const input = patchSchema.parse(json);
+    // Owner administration has its own last-owner protection in /api/admin/users.
+    if (before.role === "OWNER") {
+      throw new ApiError("FORBIDDEN", "Управляйте владельцем через раздел пользователей", 403);
+    }
+    assertManagedStaffAccess(actor, before, input.role);
+    for (const locationId of input.locationIds ?? []) assertLocationAccess(actor, locationId);
     const meta = requestMeta(req);
 
     const needsConfirm =
-      input.status === "DISABLED" || input.resetPassword === true || input.locationIds !== undefined;
+      input.status === "DISABLED" ||
+      input.resetPassword === true ||
+      input.locationIds !== undefined ||
+      input.role !== undefined;
     if (needsConfirm && input.confirm !== true) {
       throw new ApiError("VALIDATION_ERROR", "Подтвердите действие (confirm: true)", 400);
     }

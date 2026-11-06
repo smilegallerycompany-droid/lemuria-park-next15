@@ -23,6 +23,8 @@ export default function DirectorStaffPage() {
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [actorRole, setActorRole] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({
     email: "",
     name: "",
@@ -33,12 +35,14 @@ export default function DirectorStaffPage() {
   const [confirmByUser, setConfirmByUser] = useState<Record<string, boolean>>({});
 
   async function load() {
-    const [staffData, locationsData] = await Promise.all([
+    const [staffData, locationsData, actor] = await Promise.all([
       directorFetch<{ staff: StaffRow[] }>("/api/director/staff"),
       directorFetch<{ locations: LocationOption[] }>("/api/director/locations"),
+      directorFetch<{ role: string }>("/api/auth/me"),
     ]);
     setStaff(staffData.staff);
     setLocations(locationsData.locations);
+    setActorRole(actor.role);
   }
 
   useEffect(() => {
@@ -46,6 +50,8 @@ export default function DirectorStaffPage() {
   }, []);
 
   async function createStaffMember() {
+    if (creating) return;
+    setCreating(true);
     setError(null);
     try {
       await directorFetch("/api/director/staff", {
@@ -56,6 +62,8 @@ export default function DirectorStaffPage() {
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Не удалось создать");
+    } finally {
+      setCreating(false);
     }
   }
 
@@ -63,10 +71,13 @@ export default function DirectorStaffPage() {
     setError(null);
     setMessage(null);
     try {
-      const result = await directorFetch<{ temporaryPassword?: string }>(`/api/director/staff/${userId}`, {
-        method: "PATCH",
-        body: JSON.stringify(body),
-      });
+      const result = await directorFetch<{ temporaryPassword?: string }>(
+        `/api/director/staff/${userId}`,
+        {
+          method: "PATCH",
+          body: JSON.stringify(body),
+        },
+      );
       if (result.temporaryPassword) {
         setMessage(`Временный пароль: ${result.temporaryPassword}`);
       }
@@ -78,7 +89,10 @@ export default function DirectorStaffPage() {
 
   return (
     <>
-      <PageHeader title="Сотрудники" description="Кассиры и директора: доступы, локации, блокировка." />
+      <PageHeader
+        title="Сотрудники"
+        description="Кассиры и директора: доступы, локации, блокировка."
+      />
       {error ? <div className="director-alert error">{error}</div> : null}
       {message ? <div className="director-alert success">{message}</div> : null}
 
@@ -89,11 +103,17 @@ export default function DirectorStaffPage() {
         <div className="director-form-grid">
           <div className="director-field">
             <label>Эл. почта</label>
-            <input value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} />
+            <input
+              value={createForm.email}
+              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+            />
           </div>
           <div className="director-field">
             <label>Имя</label>
-            <input value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} />
+            <input
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+            />
           </div>
           <div className="director-field">
             <label>Пароль</label>
@@ -105,9 +125,14 @@ export default function DirectorStaffPage() {
           </div>
           <div className="director-field">
             <label>Роль</label>
-            <select value={createForm.role} onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}>
+            <select
+              value={createForm.role}
+              onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+            >
               <option value="CASHIER">Кассир</option>
-              <option value="ADMIN">Администратор</option>
+              {actorRole === "ADMIN" || actorRole === "OWNER" ? (
+                <option value="ADMIN">Администратор</option>
+              ) : null}
             </select>
           </div>
           <div className="director-field" style={{ gridColumn: "1 / -1" }}>
@@ -132,7 +157,12 @@ export default function DirectorStaffPage() {
           </div>
         </div>
         <div style={{ padding: "0 18px 18px" }}>
-          <button type="button" className="director-btn primary" onClick={createStaffMember}>
+          <button
+            type="button"
+            className="director-btn primary"
+            disabled={creating || !actorRole}
+            onClick={createStaffMember}
+          >
             Создать
           </button>
         </div>
@@ -166,7 +196,9 @@ export default function DirectorStaffPage() {
                       <ConfirmCheckbox
                         id={`confirm-${user.id}`}
                         checked={confirmed}
-                        onChange={(value) => setConfirmByUser((prev) => ({ ...prev, [user.id]: value }))}
+                        onChange={(value) =>
+                          setConfirmByUser((prev) => ({ ...prev, [user.id]: value }))
+                        }
                         label="Подтверждаю изменение доступа"
                       />
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
