@@ -1,0 +1,103 @@
+{
+  "checkedAtMoscow": "2026-11-07T00:26:07.695158+03:00",
+  "checks": [
+    {
+      "url": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/",
+      "finalUrl": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/",
+      "status": 200,
+      "tlsVerified": true,
+      "seconds": 6.89,
+      "tls": "TLSv1.3",
+      "bytes": 19705,
+      "title": [
+        "Вход сотрудников — Лемурия и Чирик Парк"
+      ],
+      "employeeLogin": true,
+      "applicationError": false
+    },
+    {
+      "url": "https://xn--80ajjjbhwgdz8k.xn--p1ai/api/health/live",
+      "finalUrl": "https://xn--80ajjjbhwgdz8k.xn--p1ai/api/health/live",
+      "status": 200,
+      "tlsVerified": true,
+      "seconds": 6.75,
+      "tls": "TLSv1.3",
+      "bytes": 108,
+      "health": {
+        "ok": true,
+        "status": "live",
+        "sha": "26ae10732d2a239b775ff0ae67b982f48aa2be68",
+        "revision": null,
+        "instance": null
+      }
+    },
+    {
+      "url": "https://xn--80ajjjbhwgdz8k.xn--p1ai/api/health/ready",
+      "finalUrl": "https://xn--80ajjjbhwgdz8k.xn--p1ai/api/health/ready",
+      "status": 200,
+      "tlsVerified": true,
+      "seconds": 4.86,
+      "tls": "TLSv1.3",
+      "bytes": 55,
+      "health": {
+        "ok": true,
+        "status": "ready",
+        "checks": {
+          "database": "ok"
+        }
+      }
+    },
+    {
+      "url": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/api/health/ready",
+      "finalUrl": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/api/health/ready",
+      "status": 200,
+      "tlsVerified": true,
+      "seconds": 4.1,
+      "tls": "TLSv1.3",
+      "bytes": 55,
+      "health": {
+        "ok": true,
+        "status": "ready",
+        "checks": {
+          "database": "ok"
+        }
+      }
+    },
+    {
+      "url": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/crm-release.json",
+      "finalUrl": "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai/crm-release.json",
+      "status": 200,
+      "tlsVerified": true,
+      "seconds": 5.96,
+      "tls": "TLSv1.3",
+      "bytes": 5929,
+      "release": {
+        "releaseId": "crm-localtime-20261106-26ae1073",
+        "sourceCommit": "26ae10732d2a239b775ff0ae67b982f48aa2be68",
+        "baseImageDigest": "sha256:40338679c4ad314a9a3f90cd17cd792edee63b822fb2caaa687b677116541bbd",
+        "counts": {
+          "client": 2,
+          "server": 2
+        },
+        "databaseMigrations": false
+      }
+    }
+  ],
+  "toolNetworkNote": "HTTP timing was measured through the ChatGPT network proxy. Its certificate metadata is not the origin certificate.",
+  "originTlsFromYandexCloud": [
+    {
+      "host": "xn--80ajjjbhwgdz8k.xn--p1ai",
+      "tls": "TLSv1.3",
+      "issuer": "Let’s Encrypt YR1",
+      "notAfter": "2026-12-07T11:07:47Z",
+      "hostnameAndChainVerified": true
+    },
+    {
+      "host": "crm.xn--80ajjjbhwgdz8k.xn--p1ai",
+      "tls": "TLSv1.3",
+      "issuer": "Let’s Encrypt R11",
+      "notAfter": "2027-01-06T08:43:22Z",
+      "hostnameAndChainVerified": true
+    }
+  ]
+}

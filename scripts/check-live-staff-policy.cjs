@@ -43,6 +43,7 @@ const prices=namedGuard('Изменять цены');
 const operations=namedGuard('Недостаточно прав для управления данными парка');
 const reports=namedGuard('Заполнять отчёт может');
 for(const role of ['OWNER','DIRECTOR']){prices({role,readOnly:false});checks++;}
+for(const role of ['OWNER','DIRECTOR'])deny(()=>prices({role,readOnly:true}));
 for(const role of ['ADMIN','CASHIER','ONLINE_MANAGER'])deny(()=>prices({role,readOnly:false}));
 for(const role of ['OWNER','DIRECTOR','ADMIN']){
  operations({role,readOnly:false});checks++;
@@ -53,5 +54,11 @@ for(const role of ['OWNER','DIRECTOR','ADMIN']){
 for(const role of ['CASHIER','ONLINE_MANAGER']){
  deny(()=>operations({role,readOnly:false}));
  deny(()=>reports({role,readOnly:false}));
+}
+for(const role of ['CASHIER','ADMIN','DIRECTOR','ONLINE_MANAGER']){
+ const unassigned={role,locationIds:[],readOnly:false};
+ assert.deepEqual(locationScope(unassigned),[]);checks++;
+ deny(()=>assertLocation(unassigned,'saratov'));
+ deny(()=>assertLocation(unassigned,'volgograd'));
 }
 console.log(JSON.stringify({ok:true,checks,administratorRestrictedToAssignedLocations:true,administratorCannotChangePrices:true,readonlyOwnerCannotWrite:true,ownerCanViewBothLocations:true,note:'Cashier report writes use a separate own-shift endpoint; no global finance grant tested here.'}));
