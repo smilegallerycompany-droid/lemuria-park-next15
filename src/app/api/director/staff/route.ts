@@ -6,6 +6,9 @@ import { requireDirector } from "@/server/auth/staff-session";
 import { hashPassword } from "@/server/auth/password";
 import { recordAuditLog } from "@/lib/audit";
 import { requestMeta } from "@/server/director/http";
+import { assertCanAssignRole } from "@/server/auth/role-policy";
+import { assertLocationAccess } from "@/server/auth/location-access";
+import { managedStaffFilter } from "@/server/auth/staff-management";
 
 const createSchema = z.object({
   email: z.string().email(),
@@ -17,9 +20,9 @@ const createSchema = z.object({
 
 export async function GET() {
   try {
-    await requireDirector();
+    const actor = await requireDirector();
     const staff = await prisma.user.findMany({
-      where: { role: { in: ["CASHIER", "ADMIN", "OWNER"] } },
+      where: managedStaffFilter(actor),
       orderBy: [{ role: "asc" }, { name: "asc" }],
       select: {
         id: true,
@@ -45,6 +48,8 @@ export async function POST(req: Request) {
       throw new ApiError("VALIDATION_ERROR", "Некорректный JSON", 400);
     });
     const input = createSchema.parse(json);
+    assertCanAssignRole(actor.role, input.role);
+    for (const locationId of input.locationIds) assertLocationAccess(actor, locationId);
     const meta = requestMeta(req);
 
     const passwordHash = await hashPassword(input.password);

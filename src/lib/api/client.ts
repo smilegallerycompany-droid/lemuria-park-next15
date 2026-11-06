@@ -30,21 +30,20 @@ export interface ResponseMeta {
   serverDate: Date | null;
 }
 
-async function requestWithMeta<T>(
+export async function requestWithMeta<T>(
   path: string,
   init: RequestInit,
   options?: RequestOptions,
 ): Promise<{ data: T; meta: ResponseMeta }> {
+  const headers = new Headers(init.headers);
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (options?.idempotencyKey) headers.set("Idempotency-Key", options.idempotencyKey);
   let res: Response;
   try {
     res = await fetch(path, {
       ...init,
       signal: options?.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...(options?.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
-        ...init.headers,
-      },
+      headers,
     });
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") {
@@ -68,8 +67,28 @@ async function requestWithMeta<T>(
     throw new ApiClientError("INVALID_RESPONSE", "Сервер вернул некорректный ответ", res.status);
   }
 
+  if (
+    !body ||
+    typeof body !== "object" ||
+    typeof body.ok !== "boolean" ||
+    (body.ok
+      ? !Object.hasOwn(body, "data")
+      : !body.error ||
+        typeof body.error.code !== "string" ||
+        typeof body.error.message !== "string")
+  ) {
+    throw new ApiClientError("INVALID_RESPONSE", "Сервер вернул некорректный ответ", res.status);
+  }
+
   if (!body.ok) {
     throw new ApiClientError(body.error.code, body.error.message, res.status, body.error.details);
+  }
+  if (!res.ok) {
+    throw new ApiClientError(
+      "HTTP_ERROR",
+      "Сервер временно недоступен. Повторите попытку",
+      res.status,
+    );
   }
 
   return { data: body.data, meta: { serverDate } };
