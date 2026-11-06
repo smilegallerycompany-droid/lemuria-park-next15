@@ -33,7 +33,7 @@ with tempfile.TemporaryDirectory(prefix='lemuria-sbom-auth-') as authdir:
     with tarfile.open(fileobj=proc.stdout, mode='r|') as archive:
         for item in archive:
             name = item.name.lstrip('./')
-            if not item.isfile() or '/node_modules/' not in name or not name.endswith('/package.json'):
+            if not item.isfile() or not name.startswith('app/node_modules/') or not name.endswith('/package.json'):
                 continue
             assert item.size < 2000000
             try:
@@ -57,9 +57,9 @@ request = urllib.request.Request('https://registry.npmjs.org/-/npm/v1/security/a
 with urllib.request.urlopen(request, timeout=45) as response:
     advisories = json.load(response)
 result = {'image': image, 'packageNames': len(inventory), 'packageManifests': len(paths),
-          'versions': inventory, 'advisories': advisories,
+          'versions': inventory, 'paths': paths, 'advisories': advisories,
           'scope': 'Known advisories from installed manifests; not an exploitability or vendored-code proof'}
-out = release_path.parent / 'runtime-dependencies.json'
+out = release_path.parent / 'runtime-app-dependencies.json'
 fd = os.open(out, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
 with os.fdopen(fd, 'w') as file:
     json.dump(result, file, indent=2)
