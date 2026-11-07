@@ -6,13 +6,13 @@ const ORIGIN='https://d5d9sorlbdsebnpfr97f.0ly8ed4d.apigw.yandexcloud.net';
 async function guard(){assert.equal(process.env.APP_ENV,'staging');const[r]=await db.$queryRawUnsafe('SELECT current_database() AS name');assert.equal(r.name,'lemuria_staging')}
 async function request(path,{cookie,body,key}={}){const r=await fetch(ORIGIN+path,{method:body?'POST':'GET',redirect:'manual',headers:{'Content-Type':'application/json',Origin:ORIGIN,...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(25000)});return{status:r.status,data:await r.json(),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}}
 async function test(){await guard();let user,shift,orderId,sessionId;const result=[];const suffix=crypto.randomUUID();try{
- const loc=await db.location.findFirst({where:{slug:'saratov',status:'ACTIVE'}});assert.ok(loc);
- const type=await db.ticketType.findFirst({where:{isActive:true,availableAtCashier:true,qualifiesAsAdultCompanion:true,isTwoParkBundle:false}});assert.ok(type);
+ const loc=await db.location.findFirst({where:{slug:'saratov',park:'LEMURIA',status:'ACTIVE'}});assert.ok(loc);
+ const type=await db.ticketType.findFirst({where:{code:'ADULT',isActive:true,availableAtCashier:true}});assert.ok(type);
  const extras=await db.cashierExtra.findMany({where:{code:{in:['FEED','PHOTO']},isActive:true}});assert.equal(extras.length,2);
  const password=crypto.randomBytes(32).toString('base64url');user=await db.user.create({data:{name:'Synthetic cashier extras QA',email:`qa-extras-${suffix}@example.invalid`,passwordHash:await require('/app/node_modules/bcryptjs').hash(password,12),role:'CASHIER',status:'ACTIVE',locations:{create:{locationId:loc.id}}}});
  const login=await request('/api/auth/login',{body:{email:user.email,password,portal:'cashier'}});assert.equal(login.status,200);assert.ok(login.cookie);
  shift=await db.cashierShift.create({data:{userId:user.id,locationId:loc.id,status:'OPEN',openingCashAmount:0,notes:'Synthetic staging cashier extras QA'}});
- const start=new Date(Date.now()+3600000);const session=await db.session.create({data:{locationId:loc.id,startsAt:start,endsAt:new Date(+start+1200000),capacity:15,status:'SCHEDULED'}});sessionId=session.id;
+ const start=new Date(Date.now()+3600000);const session=await db.session.create({data:{locationId:loc.id,park:loc.park,startsAt:start,endsAt:new Date(+start+1200000),capacity:15,status:'SCHEDULED'}});sessionId=session.id;
  const selection={sessionPublicId:session.publicId,items:[{ticketTypeCode:type.code,quantity:1}],extras:[{code:'FEED',quantity:2},{code:'PHOTO',quantity:1}]};
  const quote=await request('/api/cashier/quote',{cookie:login.cookie,body:selection});assert.equal(quote.status,200,quote.data?.error?.code);assert.ok(quote.data.data.fingerprint);result.push({test:'server_quote_with_feed_and_photo',ok:true});
  const key=crypto.randomUUID(),body={...selection,paymentMethod:'CASH',quoteFingerprint:quote.data.data.fingerprint,adultCompanionConfirmed:true};
