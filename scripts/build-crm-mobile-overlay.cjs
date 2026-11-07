@@ -32,7 +32,7 @@ function build(root,commit){
   if(f.endsWith('.css')&&s.includes('.cashier-home-aside{min-width:0}')){s=patchCss(s);counts.cashierCss++;}
   files.set(f,s);
  }
- assert.equal(counts.cashierClient,1);assert.ok(counts.cashierServer>=1&&counts.cashierServer<=2);assert.equal(counts.cashierCss,1);
+ assert.equal(counts.cashierClient,1);assert.ok(counts.cashierServer>=1&&counts.cashierServer<=2);assert.equal(counts.cashierCss,2);
  const hash=s=>crypto.createHash('sha256').update(s).digest('hex'),renamed=[];
  for(let pass=0;pass<12;pass++){
   const changes=[];for(const[f,s]of files){if(!f.startsWith('.next/static/')||originals.get(f)===s)continue;const m=f.match(/(?:-|\/)([a-f0-9]{16,32})\.(?:js|css)$/);if(!m)continue;const next=hash(s).slice(0,m[1].length);if(next!==m[1])changes.push({file:f,old:m[1],next,to:f.replace(m[1],next)});}
