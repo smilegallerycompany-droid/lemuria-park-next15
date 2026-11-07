@@ -7,11 +7,12 @@ spec=importlib.util.spec_from_file_location('release',S/'cloud-crm-completion-re
 r.WORK=Path('/tmp')/('lemuria-functional-qa-20261107-'+str(os.getuid()))
 def active(cid):
  rows=json.loads(r.run(['yc','serverless','container','revision','list','--container-id',cid,'--format','json-rest']));return next(x for x in rows if x['status']=='ACTIVE')
-def build(commit):
- assert not (r.WORK/'audit-before.json').exists()
+def build(commit,reuse=False):
+ assert reuse or not (r.WORK/'audit-before.json').exists()
  rows=json.loads(r.run(['yc','serverless','container','list','--format','json-rest']));cid=next(x['id'] for x in rows if x['name']=='lemuria-crm-readonly-audit')
  stage=active(r.IDS['staging']);assert r.database_name(stage)=='lemuria_staging';r.validate_config(stage,'staging')
- r.save('stage-before.json',stage);r.save('audit-before.json',active(cid));r.save('container.json',{'id':cid})
+ if reuse:assert r.read('stage-before.json')['id']==stage['id'];assert r.read('container.json')['id']==cid
+ else:r.save('stage-before.json',stage);r.save('audit-before.json',active(cid));r.save('container.json',{'id':cid})
  layer=r.WORK/'layer/app';layer.mkdir(parents=True);(layer/'staging-functional-qa-worker.cjs').write_text((S/'staging-functional-qa-worker.cjs').read_text());subprocess.run(['node','--check',str(layer/'staging-functional-qa-worker.cjs')],check=True)
  with tarfile.open(r.WORK/'layer.tar','w') as t:t.add(layer/'staging-functional-qa-worker.cjs',arcname='app/staging-functional-qa-worker.cjs')
  crane=str(Path.home()/'lemuria-crm-report-fix-20261104/tools/crane')
@@ -43,6 +44,7 @@ def call(action):
 if __name__=='__main__':
  a=sys.argv[1]
  if a=='build':build(sys.argv[2])
+ elif a=='rebuild':build(sys.argv[2],True)
  elif a=='deploy':deploy()
  elif a=='restore':deploy(True)
  elif a=='verify-restored':
