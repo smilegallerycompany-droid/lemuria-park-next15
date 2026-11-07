@@ -1,0 +1,12 @@
+'use strict';
+// IAM-private read-only incident diagnostics. Never sends mail or changes orders.
+const http=require('node:http');const {PrismaClient}=require('/app/node_modules/@prisma/client');const db=new PrismaClient({log:[]});
+const safe=e=>String(e||'').replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[address]').replace(/(?:Bearer|token|secret|password|key)[=: ]+[^\s,;]+/gi,'[credential]').slice(0,180);
+async function audit(){return db.$transaction(async tx=>{
+ await tx.$executeRawUnsafe('SET TRANSACTION READ ONLY');await tx.$executeRawUnsafe("SET LOCAL statement_timeout='20000ms'");const[r]=await tx.$queryRawUnsafe('SELECT current_database() AS database');if(r.database!=='lemuria')throw Error('WRONG_DATABASE');
+ const orders=await tx.order.findMany({where:{source:'ONLINE',status:'PAID'},orderBy:{createdAt:'desc'},take:40,select:{id:true,number:true,createdAt:true,customerEmail:true,items:{select:{quantity:true}},tickets:{select:{id:true,status:true}},deliveries:{orderBy:{createdAt:'desc'},select:{status:true,errorMessage:true,createdAt:true,toAddress:true}},payments:{select:{method:true,status:true}}}});
+ const totals=await tx.ticketDelivery.groupBy({by:['status'],_count:{_all:true}});
+ const logs=await tx.auditLog.findMany({where:{action:{in:['TICKET_EMAIL_SENT','TICKET_EMAIL_FAILED','TICKET_EMAIL_SKIPPED','TICKETS_ISSUED']}},orderBy:{createdAt:'desc'},take:40,select:{action:true,entityId:true,createdAt:true}});
+ return {ok:true,paidOnlineOrders:orders.map(o=>({id:o.id,number:o.number,createdAt:o.createdAt,expectedTickets:o.items.reduce((s,x)=>s+x.quantity,0),issuedTickets:o.tickets.length,ticketStatuses:o.tickets.map(x=>x.status),addressValid:/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(o.customerEmail),deliveries:o.deliveries.map(d=>({status:d.status,error:safe(d.errorMessage),createdAt:d.createdAt,addressMatches:d.toAddress===o.customerEmail})),paymentStatuses:o.payments.map(p=>({method:p.method,status:p.status}))})),deliveryTotals:totals,logs};
+ },{timeout:25000});}
+http.createServer(async(req,res)=>{res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');if(req.method!=='GET'||req.url!=='/audit'){res.writeHead(404);res.end('{}');return}try{res.end(JSON.stringify(await audit()))}catch(e){res.writeHead(500);res.end(JSON.stringify({ok:false,error:'READ_ONLY_DIAG_FAILED',code:e.code||null}))}}).listen(Number(process.env.PORT||8080),'0.0.0.0');
