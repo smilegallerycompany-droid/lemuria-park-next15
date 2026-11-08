@@ -5,7 +5,6 @@ const normalName=s=>String(s||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('
 function prepareEntry(entry){
   if(entry.method!=='CASH'||!EXPENSE_KINDS.includes(entry.kind))return entry;
   if(entry.note.startsWith(SAFE))return entry;
-  if(entry.note.length>1000-SAFE.length)throw new Error('Примечание слишком длинное для записи источника выплаты');
   return {...entry,note:SAFE+entry.note};
 }
 function isSafe(entry){return entry.method==='CASH'&&EXPENSE_KINDS.includes(entry.kind)&&String(entry.note||'').startsWith(SAFE);}

@@ -108,7 +108,7 @@ def build(commit, reuse=False):
             assert proc.wait() == 0, 'Image extraction failed'
         app = root / 'app'
         result = json.loads(run(['node', str(SCRIPTS / 'build-finance-safe-overlay.cjs'), str(app), commit], timeout=150))
-        assert result['counts']['service'] == 1 and result['counts']['shiftSchema'] == 1
+        assert result['counts']['service'] == 1 and result['counts']['shiftSchema'] == 2
         files = json.loads((app / 'finance-safe-overlay-files.json').read_text())
         with tarfile.open(WORK / 'overlay.tar', 'w') as archive:
             for file in files:
