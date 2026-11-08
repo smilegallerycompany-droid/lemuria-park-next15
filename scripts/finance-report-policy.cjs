@@ -17,7 +17,8 @@ function allocate(amount,weights){
 }
 function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,unknown:0},revenue}){
   const products=Object.fromEntries(['tickets','feed','photo','balabas'].map(k=>[k,{cash:0,card:0,total:0}]));
-  const nominal=new Map(),seen=new Set();let refundedExtras=0;
+  const nominal=new Map(),seen=new Set(),commissionBases=new Map();let refundedExtras=0;
+  const addBase=(shiftId,amount)=>{const key=shiftId||"unassigned";commissionBases.set(key,(commissionBases.get(key)||0)+amount);};
   for(const payment of payments){
     const method=payment.method==='CASH'?'cash':'card',order=payment.order;
     const lines=[...order.items.map(x=>({...x,product:'tickets'})),...order.extras.map(x=>({...x,product:x.code==='FEED'?'feed':x.code==='PHOTO'?'photo':'balabas'}))];
@@ -28,18 +29,19 @@ function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,un
         const key=JSON.stringify([line.ticketTypeName,line.unitPriceAmount]),row=nominal.get(key)||{name:line.ticketTypeName,nominal:line.unitPriceAmount,quantity:0,cash:0,card:0,total:0};
         const itemKey=order.id+':'+line.id;if(!seen.has(itemKey)){row.quantity+=line.quantity;seen.add(itemKey);}
         row[method]+=amounts[i];row.total+=amounts[i];nominal.set(key,row);
-      }else if(order.status==='REFUNDED'&&['feed','photo'].includes(line.product))refundedExtras+=amounts[i];
+      }else if(['feed','photo'].includes(line.product)){if(order.status==='REFUNDED')refundedExtras+=amounts[i];else addBase(order.shiftId,amounts[i]);}
     });
   }
   const ops=operations.filter(x=>!x.cancelledAt);
-  for(const op of ops){if(!['FEED_SALE','BALABAS_SALE'].includes(op.kind))continue;const p=products[op.kind==='FEED_SALE'?'feed':'balabas'];p[op.method==='CASH'?'cash':'card']+=op.amountKopecks;p.total+=op.amountKopecks;}
+  for(const op of ops){if(!['FEED_SALE','BALABAS_SALE'].includes(op.kind))continue;const p=products[op.kind==='FEED_SALE'?'feed':'balabas'];p[op.method==='CASH'?'cash':'card']+=op.amountKopecks;p.total+=op.amountKopecks;if(op.kind==='FEED_SALE')addBase(op.shiftId,op.amountKopecks);}
   // Payment-based amounts remain authoritative, and zero-data reports still render.
   const total={cash:revenue?.cash??Object.values(products).reduce((s,x)=>s+x.cash,0),card:revenue?.card??Object.values(products).reduce((s,x)=>s+x.card,0)};total.total=total.cash+total.card;
   const netRevenue=total.total-refunds.total;
   const groups={expenses:{rows:[],total:0},temporary:{rows:[],total:0},salary:{rows:[],total:0}};
-  for(const op of ops){const kind=op.kind;if(!EXPENSE_KINDS.includes(kind)||kind==='COMMISSION')continue;const group=groups[kind==='TEMP_STAFF'?'temporary':['SALARY','ADVANCE'].includes(kind)?'salary':'expenses'];group.rows.push(op);group.total+=op.amountKopecks;}
+  for(const op of ops){const kind=op.kind;if(!EXPENSE_KINDS.includes(kind)||kind==='COMMISSION')continue;const group=groups[kind==='TEMP_STAFF'?'temporary':['SALARY','ADVANCE'].includes(kind)?'salary':'expenses'];group.rows.push(op);group.total+=op.amountKopecks;if(op.kind==='FEED_SALE')addBase(op.shiftId,op.amountKopecks);}
   const base=Math.max(0,products.feed.total+products.photo.total-refundedExtras),people=new Map();
-  for(const op of ops.filter(x=>x.kind==='STAFF')){const key=normalName(op.person);if(key&&!people.has(key))people.set(key,{person:op.person.trim(),accrued:Math.round(base*5/100),paid:0});}
+  const attendance=new Set();
+  for(const op of ops.filter(x=>x.kind==='STAFF')){const key=normalName(op.person),scope=op.shiftId||'unassigned',attendanceKey=JSON.stringify([key,scope]);if(!key||attendance.has(attendanceKey))continue;attendance.add(attendanceKey);const row=people.get(key)||{person:op.person.trim(),accrued:0,paid:0};row.accrued+=Math.round((commissionBases.get(scope)||0)*5/100);people.set(key,row);}
   for(const op of ops.filter(x=>x.kind==='COMMISSION')){const key=normalName(op.person);const row=people.get(key)||{person:op.person.trim(),accrued:0,paid:0};row.paid+=op.amountKopecks;people.set(key,row);}
   const commissionRows=[...people.values()].map(x=>({...x,balance:x.accrued-x.paid}));
   const commissions={rate:5,base,payments:ops.filter(x=>x.kind==='COMMISSION'),rows:commissionRows,accrued:commissionRows.reduce((s,x)=>s+x.accrued,0),paid:commissionRows.reduce((s,x)=>s+x.paid,0)};
@@ -49,8 +51,8 @@ function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,un
 }
 async function extend(tx,{operationWhere,paymentWhere,revenue,refunds}){
   const [operations,payments]=await Promise.all([
-    tx.parkOperation.findMany({where:operationWhere,orderBy:[{date:'asc'},{createdAt:'asc'}],select:{id:true,date:true,kind:true,person:true,note:true,amountKopecks:true,quantity:true,method:true,createdAt:true,cancelledAt:true,location:{select:{name:true}},creator:{select:{name:true}},receipt:{select:{fileName:true}}}}),
-    tx.payment.findMany({where:paymentWhere,select:{amount:true,method:true,order:{select:{id:true,status:true,items:{select:{id:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
+    tx.parkOperation.findMany({where:operationWhere,orderBy:[{date:'asc'},{createdAt:'asc'}],select:{id:true,shiftId:true,date:true,kind:true,person:true,note:true,amountKopecks:true,quantity:true,method:true,createdAt:true,cancelledAt:true,location:{select:{name:true}},creator:{select:{name:true}},receipt:{select:{fileName:true}}}}),
+    tx.payment.findMany({where:paymentWhere,select:{amount:true,method:true,order:{select:{id:true,shiftId:true,status:true,items:{select:{id:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
   ]);
   return makeReport({operations,payments,revenue,refunds});
 }
@@ -73,7 +75,7 @@ function pdfBlocks(r){
   block('6. Расходы',r.expenses),{text:'Итого расходы: '+m(r.expenses.total)},
   {title:'7. Временные сотрудники',headers:['Сотрудник','Позиция'],rows:r.temporaryStaff.map(x=>[x.person,x.note])},block('Выплаты временным сотрудникам',r.temporary),{text:'Итого: '+m(r.temporary.total)},
   {title:'8. Зарплата штата',headers:['Сотрудник','Позиция'],rows:r.staff.map(x=>[x.person,x.note])},block('Зарплата и авансы',r.salary),{text:'Итого: '+m(r.salary.total)},
-  {title:'9. Процент штата',text:'5% каждому постоянному сотруднику от корма и фото. База: '+m(r.commissions.base),headers:['Кому','Начислено','Выдано','Остаток'],rows:r.commissions.rows.map(x=>[x.person,m(x.accrued),m(x.paid),m(x.balance)])},
+  {title:'9. Процент штата',text:'5% каждому постоянному сотруднику от корма и фото в его сменах. Общая база: '+m(r.commissions.base),headers:['Кому','Начислено','Выдано','Остаток'],rows:r.commissions.rows.map(x=>[x.person,m(x.accrued),m(x.paid),m(x.balance)])},
   {text:'Всего начислено: '+m(r.commissions.accrued)+'. Выдано: '+m(r.commissions.paid)},
   {title:'10. Общая валовая прибыль',text:m(r.grossProfit),emphasis:true},
   {text:'После возвратов, расходов, выплат временным сотрудникам, зарплаты и процентов штата. Выданные проценты учитываются один раз.'}

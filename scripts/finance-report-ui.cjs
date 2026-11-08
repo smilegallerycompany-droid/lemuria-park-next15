@@ -20,7 +20,7 @@ function render(api,data,options={}){
   section('7. Временные сотрудники',[staffTable(data.temporaryStaff),expenseRows(data.temporary),subtotal(data.temporary.total)]),
   section('8. Зарплата штата',[staffTable(data.staff),expenseRows(data.salary),subtotal(data.salary.total)]),
   section('9. Процент штата',[
-   h('p',{children:'Каждому постоянному сотруднику, указанному в отчёте: 5% от корма и фото. База за выбранный период: '+money(data.commissions.base)+'.'}),
+   h('p',{children:'Каждому постоянному сотруднику: 5% от корма и фото в сменах, где он указан в составе. Общая база за выбранный период: '+money(data.commissions.base)+'.'}),
    table(['Сотрудник','Начислено 5%','Выдано','Осталось выдать'],data.commissions.rows.map(x=>[x.person,money(x.accrued),money(x.paid),money(x.balance)])),
    table(['Всего начислено','Всего выдано','Остаток'],[[money(data.commissions.accrued),money(data.commissions.paid),money(data.commissions.accrued-data.commissions.paid)]]),
    !data.staff.length?h('p',{role:'status',children:'Добавьте постоянных сотрудников в состав смены, чтобы рассчитать 5% по каждому.'}):null,

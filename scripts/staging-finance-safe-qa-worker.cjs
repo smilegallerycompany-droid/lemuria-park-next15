@@ -6,8 +6,8 @@ const ORIGIN='https://d5d9sorlbdsebnpfr97f.0ly8ed4d.apigw.yandexcloud.net';
 async function request(path,{cookie,body,key,method}={}){const r=await fetch(ORIGIN+path,{method:method||(body?'POST':'GET'),redirect:'manual',headers:{'Content-Type':'application/json',Origin:ORIGIN,...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(35000)});trace.push({path:path.split('?')[0],status:r.status});return{status:r.status,data:await r.json(),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}}
 async function run(){trace=[];
  assert.equal(process.env.APP_ENV,'staging');const[r]=await db.$queryRawUnsafe('SELECT current_database() AS name');assert.equal(r.name,'lemuria_staging');
- const users=[],operations=[],results=[];let shift;const suffix=crypto.randomUUID();
- async function account(role,loc){const password=crypto.randomBytes(32).toString('base64url');const user=await db.user.create({data:{name:'Synthetic finance '+role,email:`qa-finance-${role}-${suffix}@example.invalid`,passwordHash:await require('/app/node_modules/bcryptjs').hash(password,12),role,status:'ACTIVE',locations:{create:{locationId:loc.id}}}});users.push(user);const login=await request('/api/auth/login',{body:{email:user.email,password,portal:role==='CASHIER'?'cashier':'director'}});assert.equal(login.status,200,login.data?.error?.code);return {user,cookie:login.cookie};}
+ const users=[],operations=[],results=[];let shift,fixtureSession;const suffix=crypto.randomUUID();
+ async function account(role,loc){const password=crypto.randomBytes(32).toString('base64url');const user=await db.user.create({data:{name:'Synthetic finance '+role,email:`qa-finance-${role.toLowerCase()}-${suffix}@example.invalid`,passwordHash:await require('/app/node_modules/bcryptjs').hash(password,12),role,status:'ACTIVE',locations:{create:{locationId:loc.id}}}});users.push(user);const login=await request('/api/auth/login',{body:{email:user.email,password,portal:role==='CASHIER'?'cashier':'director'}});assert.equal(login.status,200,login.data?.error?.code);return {user,cookie:login.cookie};}
  try{
   const loc=await db.location.findFirst({where:{slug:'saratov',park:'LEMURIA',status:'ACTIVE'}});assert.ok(loc);
   const cashier=await account('CASHIER',loc),director=await account('DIRECTOR',loc);
@@ -22,8 +22,8 @@ async function run(){trace=[];
   let current=await request('/api/cashier/shift',{cookie:cashier.cookie});assert.equal(current.status,200);const shiftData=current.data.data.shift||current.data.data;assert.equal(shiftData.currentCashBalance,0);results.push({test:'safe_salary_expense_temp_with_zero_drawer',ok:true});
   const retry=await request('/api/cashier/shift/entries',{cookie:cashier.cookie,body:salary});assert.equal(retry.status,201);assert.equal(await db.parkOperation.count({where:{id:salary.id}}),1);results.push({test:'safe_entry_idempotency',ok:true});
   const type=await db.ticketType.findFirst({where:{code:'ADULT',isActive:true,availableAtCashier:true}});assert.ok(type);
-  const next=new Date(Date.now()+86400000);while(next.getUTCDay()!==0)next.setUTCDate(next.getUTCDate()+1);next.setUTCHours(14,30,0,0);
-  const session=await db.session.create({data:{locationId:loc.id,park:loc.park,startsAt:next,endsAt:new Date(+next+1200000),capacity:15,status:'SCHEDULED'}});
+  const next=new Date(Date.now()+86400000);while(next.getUTCDay()!==0)next.setUTCDate(next.getUTCDate()+1);next.setUTCHours(14,30,crypto.randomInt(1,60),crypto.randomInt(1,1000));
+  const session=fixtureSession=await db.session.create({data:{locationId:loc.id,park:loc.park,startsAt:next,endsAt:new Date(+next+1200000),capacity:15,status:'SCHEDULED'}});
   const selection={sessionPublicId:session.publicId,items:[{ticketTypeCode:type.code,quantity:1}],extras:[{code:'FEED',quantity:2},{code:'PHOTO',quantity:1}]};
   const quote=await request('/api/cashier/quote',{cookie:cashier.cookie,body:selection});assert.equal(quote.status,200,quote.data?.error?.code);
   const sale=await request('/api/cashier/sales',{cookie:cashier.cookie,key:crypto.randomUUID(),body:{...selection,paymentMethod:'CASH',quoteFingerprint:quote.data.data.fingerprint,adultCompanionConfirmed:true}});assert.equal(sale.status,201,sale.data?.error?.code);
@@ -36,6 +36,7 @@ async function run(){trace=[];
   return{ok:true,allPassed:true,results,providerCharge:false,productionDataChanged:false};
  }finally{
   if(users.length){const ids=users.map(x=>x.id),orders=await db.order.findMany({where:{cashierId:{in:ids}},select:{id:true}});const oids=orders.map(x=>x.id);if(oids.length){await db.ticket.updateMany({where:{orderId:{in:oids}},data:{status:'CANCELLED'}});await db.order.updateMany({where:{id:{in:oids}},data:{status:'CANCELLED'}});}await db.parkOperation.updateMany({where:{createdBy:{in:ids},cancelledAt:null},data:{cancelledAt:new Date()}});await db.user.updateMany({where:{id:{in:ids}},data:{status:'DISABLED'}});await db.staffSession.deleteMany({where:{userId:{in:ids}}});}
+  if(fixtureSession)await db.session.update({where:{id:fixtureSession.id},data:{status:'CANCELLED'}});
   if(shift)await db.cashierShift.update({where:{id:shift.id},data:{status:'CLOSED',closedAt:new Date(),closingCashAmount:0,expectedCashAmount:0,cashDifferenceAmount:0}});
  }
 }
