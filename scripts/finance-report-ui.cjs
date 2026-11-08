@@ -7,6 +7,7 @@ function render(api,data,options={}){
  const rowAction=row=>options.entryActions?options.entryActions(row):null;
  const expenseRows=group=>table(['Кому / назначение','Источник','Сумма',''],group.rows.map(x=>[x.person||x.note||'Расход',x.method==='CARD'?'Безналичные':String(x.note||'').startsWith('[Сейф] ')?'Наличные из сейфа':'Наличные из кассы',money(x.amountKopecks),rowAction(x)]));
  const subtotal=amount=>h('p',{style:{fontWeight:800,fontSize:19},children:'Итого: '+money(amount)});
+ const detailRows=rows=>table(['Запись','Примечание','Количество','Сумма',''],rows.map(x=>[x.person||({INVITATION:'Пригласительные',FEED_RECEIPT:'Поступление корма',FEED_WRITE_OFF:'Списание корма',FEED_SALE:'Продажа корма',BALABAS_SALE:'Балабас'}[x.kind])||x.kind,x.note||'—',x.quantity||'—',money(x.amountKopecks),rowAction(x)]));
  const staffTable=rows=>table(['Сотрудник','Позиция',''],rows.map(x=>[x.person,x.note||'—',rowAction(x)]));
  return h('div',{'data-testid':'finance-business-report',children:[
   section('1. Билеты по номиналу',[
@@ -23,7 +24,8 @@ function render(api,data,options={}){
    table(['Сотрудник','Начислено 5%','Выдано','Осталось выдать'],data.commissions.rows.map(x=>[x.person,money(x.accrued),money(x.paid),money(x.balance)])),
    table(['Всего начислено','Всего выдано','Остаток'],[[money(data.commissions.accrued),money(data.commissions.paid),money(data.commissions.accrued-data.commissions.paid)]]),
    !data.staff.length?h('p',{role:'status',children:'Добавьте постоянных сотрудников в состав смены, чтобы рассчитать 5% по каждому.'}):null,
-   h('p',{children:'Фактическую выдачу добавляйте видом «Процент штата (5%)». Начисление не означает, что деньги уже выданы.'})]),
+   h('p',{children:'Фактическую выдачу добавляйте видом «Процент штата (5%)». Начисление не означает, что деньги уже выданы.'}),expenseRows({rows:data.commissions.payments||[]})]),
+  (data.manualSales?.length||data.additional?.length)?h('details',{style:{margin:'16px 0'},children:[h('summary',{children:'Дополнительные записи: ручные продажи, корм и пригласительные'}),detailRows([...(data.manualSales||[]),...(data.additional||[])])]}):null,
   section('10. Общая валовая прибыль',[h('strong',{style:{fontSize:28},children:money(data.grossProfit)}),h('p',{children:'Общая сумма после возвратов − расходы − выплаты временным сотрудникам − зарплата и авансы штата − процент штата. Выданные проценты учитываются один раз; выдача сверх начисления также включается в расходы.'})])
  ]});
 }

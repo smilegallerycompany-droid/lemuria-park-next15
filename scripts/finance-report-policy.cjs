@@ -42,10 +42,10 @@ function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,un
   for(const op of ops.filter(x=>x.kind==='STAFF')){const key=normalName(op.person);if(key&&!people.has(key))people.set(key,{person:op.person.trim(),accrued:Math.round(base*5/100),paid:0});}
   for(const op of ops.filter(x=>x.kind==='COMMISSION')){const key=normalName(op.person);const row=people.get(key)||{person:op.person.trim(),accrued:0,paid:0};row.paid+=op.amountKopecks;people.set(key,row);}
   const commissionRows=[...people.values()].map(x=>({...x,balance:x.accrued-x.paid}));
-  const commissions={rate:5,base,rows:commissionRows,accrued:commissionRows.reduce((s,x)=>s+x.accrued,0),paid:commissionRows.reduce((s,x)=>s+x.paid,0)};
+  const commissions={rate:5,base,payments:ops.filter(x=>x.kind==='COMMISSION'),rows:commissionRows,accrued:commissionRows.reduce((s,x)=>s+x.accrued,0),paid:commissionRows.reduce((s,x)=>s+x.paid,0)};
   commissions.recognized=commissionRows.reduce((s,x)=>s+Math.max(x.accrued,x.paid),0);
   const costs=groups.expenses.total+groups.temporary.total+groups.salary.total+commissions.recognized;
-  return {products,tickets:[...nominal.values()].sort((a,b)=>a.nominal-b.nominal||a.name.localeCompare(b.name,'ru')),total,refunds,netRevenue,...groups,commissions,costs,grossProfit:netRevenue-costs,staff:ops.filter(x=>x.kind==='STAFF'),temporaryStaff:ops.filter(x=>x.kind==='TEMP_STAFF_SHIFT')};
+  return {products,tickets:[...nominal.values()].sort((a,b)=>a.nominal-b.nominal||a.name.localeCompare(b.name,'ru')),total,refunds,netRevenue,...groups,commissions,costs,grossProfit:netRevenue-costs,staff:ops.filter(x=>x.kind==='STAFF'),temporaryStaff:ops.filter(x=>x.kind==='TEMP_STAFF_SHIFT'),manualSales:ops.filter(x=>['FEED_SALE','BALABAS_SALE'].includes(x.kind)),additional:ops.filter(x=>['INVITATION','FEED_RECEIPT','FEED_WRITE_OFF'].includes(x.kind))};
 }
 async function extend(tx,{operationWhere,paymentWhere,revenue,refunds}){
   const [operations,payments]=await Promise.all([
