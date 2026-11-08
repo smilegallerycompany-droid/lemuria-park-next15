@@ -1,9 +1,10 @@
 'use strict';
 const http=require('node:http'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {PrismaClient}=require('/app/node_modules/@prisma/client');const db=new PrismaClient({log:[]});
+let trace=[];
 const ORIGIN='https://d5d9sorlbdsebnpfr97f.0ly8ed4d.apigw.yandexcloud.net';
-async function request(path,{cookie,body,key,method}={}){const r=await fetch(ORIGIN+path,{method:method||(body?'POST':'GET'),redirect:'manual',headers:{'Content-Type':'application/json',Origin:ORIGIN,...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(35000)});return{status:r.status,data:await r.json(),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}}
-async function run(){
+async function request(path,{cookie,body,key,method}={}){const r=await fetch(ORIGIN+path,{method:method||(body?'POST':'GET'),redirect:'manual',headers:{'Content-Type':'application/json',Origin:ORIGIN,...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(35000)});trace.push({path:path.split('?')[0],status:r.status});return{status:r.status,data:await r.json(),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}}
+async function run(){trace=[];
  assert.equal(process.env.APP_ENV,'staging');const[r]=await db.$queryRawUnsafe('SELECT current_database() AS name');assert.equal(r.name,'lemuria_staging');
  const users=[],operations=[],results=[];let shift;const suffix=crypto.randomUUID();
  async function account(role,loc){const password=crypto.randomBytes(32).toString('base64url');const user=await db.user.create({data:{name:'Synthetic finance '+role,email:`qa-finance-${role}-${suffix}@example.invalid`,passwordHash:await require('/app/node_modules/bcryptjs').hash(password,12),role,status:'ACTIVE',locations:{create:{locationId:loc.id}}}});users.push(user);const login=await request('/api/auth/login',{body:{email:user.email,password,portal:role==='CASHIER'?'cashier':'director'}});assert.equal(login.status,200,login.data?.error?.code);return {user,cookie:login.cookie};}
@@ -38,4 +39,4 @@ async function run(){
   if(shift)await db.cashierShift.update({where:{id:shift.id},data:{status:'CLOSED',closedAt:new Date(),closingCashAmount:0,expectedCashAmount:0,cashDifferenceAmount:0}});
  }
 }
-http.createServer(async(req,res)=>{res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');if(req.method!=='POST'||req.url!=='/test'){res.writeHead(404);res.end('{}');return;}try{res.end(JSON.stringify(await run()))}catch(e){res.writeHead(500);res.end(JSON.stringify({ok:false,error:e.code||e.name,message:String(e.message).slice(0,180)}))}}).listen(Number(process.env.PORT||8080),'0.0.0.0');
+http.createServer(async(req,res)=>{res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');if(req.method!=='POST'||req.url!=='/test'){res.writeHead(404);res.end('{}');return;}try{res.end(JSON.stringify(await run()))}catch(e){res.writeHead(500);res.end(JSON.stringify({ok:false,error:e.code||e.name,message:String(e.message).slice(0,180),trace}))}}).listen(Number(process.env.PORT||8080),'0.0.0.0');
