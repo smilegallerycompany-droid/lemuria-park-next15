@@ -1,0 +1,41 @@
+'use strict';
+const http=require('node:http'),crypto=require('node:crypto'),assert=require('node:assert/strict');
+const {PrismaClient}=require('/app/node_modules/@prisma/client');const db=new PrismaClient({log:[]});
+const ORIGIN='https://d5d9sorlbdsebnpfr97f.0ly8ed4d.apigw.yandexcloud.net';
+async function request(path,{cookie,body,key,method}={}){const r=await fetch(ORIGIN+path,{method:method||(body?'POST':'GET'),redirect:'manual',headers:{'Content-Type':'application/json',Origin:ORIGIN,...(cookie?{Cookie:cookie}:{}),...(key?{'Idempotency-Key':key}:{})},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(35000)});return{status:r.status,data:await r.json(),cookie:r.headers.getSetCookie().map(x=>x.split(';')[0]).join('; ')}}
+async function run(){
+ assert.equal(process.env.APP_ENV,'staging');const[r]=await db.$queryRawUnsafe('SELECT current_database() AS name');assert.equal(r.name,'lemuria_staging');
+ const users=[],operations=[],results=[];let shift;const suffix=crypto.randomUUID();
+ async function account(role,loc){const password=crypto.randomBytes(32).toString('base64url');const user=await db.user.create({data:{name:'Synthetic finance '+role,email:`qa-finance-${role}-${suffix}@example.invalid`,passwordHash:await require('/app/node_modules/bcryptjs').hash(password,12),role,status:'ACTIVE',locations:{create:{locationId:loc.id}}}});users.push(user);const login=await request('/api/auth/login',{body:{email:user.email,password,portal:role==='CASHIER'?'cashier':'director'}});assert.equal(login.status,200,login.data?.error?.code);return {user,cookie:login.cookie};}
+ try{
+  const loc=await db.location.findFirst({where:{slug:'saratov',park:'LEMURIA',status:'ACTIVE'}});assert.ok(loc);
+  const cashier=await account('CASHIER',loc),director=await account('DIRECTOR',loc);
+  shift=await db.cashierShift.create({data:{userId:cashier.user.id,locationId:loc.id,status:'OPEN',openingCashAmount:0,notes:'Synthetic safe-funded report acceptance'}});
+  const names=['QA permanent A '+suffix,'QA permanent B '+suffix,'QA temporary '+suffix];
+  async function add(kind,amountKopecks,person='',note='QA fixture'){
+   const body={id:crypto.randomUUID(),shiftId:shift.id,kind,amountKopecks,quantity:0,method:'CASH',person,note};const response=await request('/api/cashier/shift/entries',{cookie:cashier.cookie,body});assert.equal(response.status,201,response.data?.error?.code||JSON.stringify(response.data));operations.push(body.id);return body;
+  }
+  await add('STAFF',0,names[0],'QA position');await add('STAFF',0,names[1],'QA position');await add('TEMP_STAFF_SHIFT',0,names[2],'QA temporary position');
+  const salary=await add('SALARY',100000,names[0]),expense=await add('EXPENSE',50000),temporary=await add('TEMP_STAFF',20000,names[2]);
+  for(const id of [salary.id,expense.id,temporary.id]){const row=await db.parkOperation.findUnique({where:{id}});assert.equal(row.method,'CASH');assert.ok(row.note.startsWith('[Сейф] '));assert.equal(await db.cashOperation.count({where:{parkOperationId:id}}),0);}
+  let current=await request('/api/cashier/shift',{cookie:cashier.cookie});assert.equal(current.status,200);const shiftData=current.data.data.shift||current.data.data;assert.equal(shiftData.currentCashBalance,0);results.push({test:'safe_salary_expense_temp_with_zero_drawer',ok:true});
+  const retry=await request('/api/cashier/shift/entries',{cookie:cashier.cookie,body:salary});assert.equal(retry.status,201);assert.equal(await db.parkOperation.count({where:{id:salary.id}}),1);results.push({test:'safe_entry_idempotency',ok:true});
+  const type=await db.ticketType.findFirst({where:{code:'ADULT',isActive:true,availableAtCashier:true}});assert.ok(type);
+  const next=new Date(Date.now()+86400000);while(next.getUTCDay()!==0)next.setUTCDate(next.getUTCDate()+1);next.setUTCHours(14,30,0,0);
+  const session=await db.session.create({data:{locationId:loc.id,park:loc.park,startsAt:next,endsAt:new Date(+next+1200000),capacity:15,status:'SCHEDULED'}});
+  const selection={sessionPublicId:session.publicId,items:[{ticketTypeCode:type.code,quantity:1}],extras:[{code:'FEED',quantity:2},{code:'PHOTO',quantity:1}]};
+  const quote=await request('/api/cashier/quote',{cookie:cashier.cookie,body:selection});assert.equal(quote.status,200,quote.data?.error?.code);
+  const sale=await request('/api/cashier/sales',{cookie:cashier.cookie,key:crypto.randomUUID(),body:{...selection,paymentMethod:'CASH',quoteFingerprint:quote.data.data.fingerprint,adultCompanionConfirmed:true}});assert.equal(sale.status,201,sale.data?.error?.code);
+  const order=await db.order.findUnique({where:{number:sale.data.data.number},include:{extras:true}});assert.ok(order);
+  const base=order.extras.filter(x=>['FEED','PHOTO'].includes(x.code)).reduce((s,x)=>s+x.subtotalAmount,0),percent=Math.round(base*0.05);await add('COMMISSION',percent,names[0]);
+  current=await request('/api/cashier/shift',{cookie:cashier.cookie});assert.equal(current.status,200);const live=current.data.data.shift||current.data.data;const report=live.businessReport;assert.ok(report,'businessReport returned');assert.equal(live.currentCashBalance,order.totalAmount);assert.equal(report.commissions.accrued,2*percent);assert.equal(report.commissions.paid,percent);assert.equal(report.salary.total,100000);assert.equal(report.temporary.total,20000);assert.equal(report.expenses.total,50000);assert.equal(report.grossProfit,order.totalAmount-170000-2*percent);assert.equal(report.tickets[0].quantity,1);results.push({test:'cashier_report_all_sections_and_five_percent_each',ok:true});
+  const date=new Intl.DateTimeFormat('en-CA',{timeZone:loc.timezone}).format(new Date());const finance=await request(`/api/director/finance?locationId=${encodeURIComponent(loc.id)}&from=${date}&to=${date}`,{cookie:director.cookie});assert.equal(finance.status,200,finance.data?.error?.code);const f=finance.data.data.businessReport;assert.ok(f);assert.ok(f.salary.rows.some(x=>x.id===salary.id));assert.ok(f.commissions.rows.some(x=>x.person===names[0]&&x.paid===percent));results.push({test:'director_period_report_valid_queries_and_scope',ok:true});
+  const pdf=await fetch(ORIGIN+`/api/director/finance/pdf?locationId=${encodeURIComponent(loc.id)}&from=${date}&to=${date}`,{headers:{Cookie:director.cookie},signal:AbortSignal.timeout(35000)});assert.equal(pdf.status,200);assert.match(pdf.headers.get('content-type'),/application\/pdf/);assert.ok((await pdf.arrayBuffer()).byteLength>1000);results.push({test:'finance_pdf_exports_new_sections',ok:true});
+  const cancelled=await request('/api/cashier/shift/entries',{cookie:cashier.cookie,method:'DELETE',body:{id:expense.id,shiftId:shift.id}});assert.equal(cancelled.status,200,cancelled.data?.error?.code);assert.equal(await db.cashOperation.count({where:{parkOperationId:expense.id}}),0);results.push({test:'cancel_safe_expense_does_not_add_fictitious_drawer_cash',ok:true});
+  return{ok:true,allPassed:true,results,providerCharge:false,productionDataChanged:false};
+ }finally{
+  if(users.length){const ids=users.map(x=>x.id),orders=await db.order.findMany({where:{cashierId:{in:ids}},select:{id:true}});const oids=orders.map(x=>x.id);if(oids.length){await db.ticket.updateMany({where:{orderId:{in:oids}},data:{status:'CANCELLED'}});await db.order.updateMany({where:{id:{in:oids}},data:{status:'CANCELLED'}});}await db.parkOperation.updateMany({where:{createdBy:{in:ids},cancelledAt:null},data:{cancelledAt:new Date()}});await db.user.updateMany({where:{id:{in:ids}},data:{status:'DISABLED'}});await db.staffSession.deleteMany({where:{userId:{in:ids}}});}
+  if(shift)await db.cashierShift.update({where:{id:shift.id},data:{status:'CLOSED',closedAt:new Date(),closingCashAmount:0,expectedCashAmount:0,cashDifferenceAmount:0}});
+ }
+}
+http.createServer(async(req,res)=>{res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');if(req.method!=='POST'||req.url!=='/test'){res.writeHead(404);res.end('{}');return;}try{res.end(JSON.stringify(await run()))}catch(e){res.writeHead(500);res.end(JSON.stringify({ok:false,error:e.code||e.name,message:String(e.message).slice(0,180)}))}}).listen(Number(process.env.PORT||8080),'0.0.0.0');
