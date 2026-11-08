@@ -51,7 +51,7 @@ function build(root,commit){
   s=s.replaceAll('SALARY:"Зарплата",ADVANCE:', 'SALARY:"Зарплата",COMMISSION:"Процент штата (5%)",ADVANCE:').replaceAll('"SALARY","ADVANCE"','"SALARY","COMMISSION","ADVANCE"');
   if(uiNeeded)s=ui+';\n'+s;files.set(f,s);
  }
- for(const k of ['service','shiftSchema','shiftSummary','financePdf'])assert.equal(counts[k],1,k);assert.ok(counts.financeViews>=1&&counts.shiftViews>=1&&counts.entryForms>=1,JSON.stringify(counts));
+ for(const k of ['service','shiftSummary','financePdf'])assert.equal(counts[k],1,k);assert.equal(counts.shiftSchema,2,'both entry and shift schemas');assert.ok(counts.financeViews>=1&&counts.shiftViews>=1&&counts.entryForms>=1,JSON.stringify(counts));
  files.set('finance-report-policy.cjs',fs.readFileSync(path.join(__dirname,'finance-report-policy.cjs'),'utf8'));
  const hash=s=>crypto.createHash('sha256').update(s).digest('hex'),renamed=[];
  for(let pass=0;pass<14;pass++){const changes=[];for(const[f,s]of files){if(!f.startsWith('.next/static/')||originals.get(f)===s)continue;const m=f.match(/(?:-|\/)([a-f0-9]{16,32})\.(?:js|css)$/);if(!m)continue;const next=hash(s).slice(0,m[1].length);if(next!==m[1])changes.push({file:f,old:m[1],next,to:f.replace(m[1],next)});}if(!changes.length)break;assert.ok(pass<13);for(const c of changes){const s=files.get(c.file);files.delete(c.file);files.set(c.to,s);renamed.push(c);}for(const[f,s]of files){let b=s;for(const c of changes)b=b.replaceAll(c.old,c.next);files.set(f,b);}}
