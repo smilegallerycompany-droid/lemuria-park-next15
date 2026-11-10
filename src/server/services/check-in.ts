@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db/prisma";
 import { recordAuditLog } from "@/lib/audit";
 import { formatDateInTimezone } from "@/lib/datetime";
 import { getErrorReporter } from "@/server/monitoring/error-reporter";
+import { checkInInvitation } from "./invitation-tickets";
 
 export type CheckInResultCode =
   | "SUCCESS"
@@ -42,6 +43,8 @@ export async function checkInTicket(params: {
   }
 
   try {
+    const invitation = await checkInInvitation(prisma, params);
+    if (invitation) return invitation;
     const ticket = await prisma.ticket.findUnique({
       where: { qrToken: token },
       include: {
