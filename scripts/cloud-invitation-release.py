@@ -91,7 +91,8 @@ if __name__=='__main__':
  elif a.startswith('rollback-'):deploy(a[9:],True)
  elif a.startswith('verify-'):verify(a[7:])
  elif a.startswith('worker-'):worker(a[7:])
- elif a in ['stage','issue']:call(a)
+ elif a=='stage':call(a)
+ elif a=='issue':raise SystemExit('Use private request-data registration; active QR values must never enter source.')
  elif a=='check-restored':
   assert active(r.read('worker-id.json')['id'])['image']['imageDigest']==r.read('worker-before.json')['image']['imageDigest'];print('{"restored":true}')
  else:raise SystemExit('Unknown action')
