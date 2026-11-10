@@ -16,11 +16,11 @@ import tempfile
 from urllib.parse import urlparse
 import urllib.request
 
-BASE = 'sha256:9bfcda03f02e25e560256bfa8bdc7870ae43afedc724fca2983cd092a95a3e8b'
+BASE = 'sha256:da2521116177791e7f1b143dea68057ea51cdb2f6e3f54e3447af8d34d00475e'
 REPOSITORY = 'cr.yandex/crprmg5vv1ubl0u4fpad/lemuria-app'
 # Cloud Shell home can be a shared FUSE mount that does not honor Unix modes.
 # Keep revision snapshots (which may contain secrets) on a private local mount.
-WORK = Path(tempfile.gettempdir()) / ('lemuria-cookie-release-20261110-' + str(os.getuid()))
+WORK = Path(tempfile.gettempdir()) / ('lemuria-cookie-release-v2-20261110-' + str(os.getuid()))
 SCRIPTS = Path(__file__).resolve().parent
 IDS = {'production': 'bbaqa5r6njb9nrqhaohq', 'staging': 'bba8dkct9jn9885jcd6n'}
 ORIGINS = {

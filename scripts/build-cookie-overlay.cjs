@@ -8,10 +8,9 @@ const files=new Map(),originals=new Map();function walk(dir){for(const e of fs.r
 const manifest=JSON.parse(files.get('.next/app-build-manifest.json'));
 const main=manifest.pages['/layout'].filter(p=>/\/main-app-[a-f0-9]+\.js$/.test(p));assert.equal(main.length,1);
 const mf='.next/'+main[0],old=files.get(mf),marker='\n;(()=>{try{document.documentElement.dataset.lemuriaRelease=';
-const ix=old.indexOf(marker);assert.ok(ix>0);assert.equal(old.indexOf(marker,ix+1),-1);assert.ok(old.slice(ix).includes('window.__lemuriaMetrika113976341'));assert.ok(old.endsWith('Public analytics could not initialize")}})();\n'));
-const script=fs.readFileSync(path.join(__dirname,'../public/cookie-consent.js'),'utf8');
-files.set(mf,old.slice(0,ix)+'\n;'+script+'\n');
-let policyCount=0,mapCount=0;
+assert.ok(old.includes('lemuria-cookie-choice-v1'),'Expected existing cookie release');
+assert.ok(!old.includes('window.__lemuriaMetrika113976341'),'Unconditional analytics must be removed');
+let policyCount=0,mapCount=0,serverMapCount=0;
 for(const[f,original]of files){
  let s=original;
  if(f.endsWith('.js')&&s.includes('Сайт может использовать технически необходимые cookie')){
@@ -19,11 +18,12 @@ for(const[f,original]of files){
   assert.equal(s.split(before).length-1,1);s=s.replace(before,policyCookieText);policyCount++;
  }
  if(f.endsWith('.js')&&s.includes('location-map-embed-footer')){
-  s=s.replace(/"iframe",\{src:(\w+),title:"Карта: "/g,(_,name)=>{mapCount++;return '"iframe",{srcDoc:('+mapDocument.toString()+')('+name+'),title:"Карта: "';});
+  s=s.replace(/"iframe",\{src:(\w+),title:("Карта: "|`Карта: )/g,(_,name,label)=>{mapCount++;if(f.startsWith(".next/server/"))serverMapCount++;return '"iframe",{srcDoc:('+mapDocument.toString()+')('+name+'),title:'+label;});
  }
  if(s!==original)files.set(f,s);
 }
-assert.equal(policyCount,1);assert.ok(mapCount>=2,'Patch both server and client map renderers');
+assert.equal(policyCount,0);assert.ok(serverMapCount>=1,'Patch the server map renderer as well as the client');
+for(const[f,s]of files){if(f.endsWith('.js'))assert.ok(!/"iframe",\{src:\w+,title:(?:"Карта: "|`Карта: )/.test(s),'Ungated map remains: '+f);}
 // No other executed client or server entry may contain an unconditional analytics loader.
 for(const[f,s]of files){if(f!==mf&&f.endsWith('.js')&&s.includes('mc.yandex.ru/metrika/tag.js')){
  // Old hashed chunks remain in the base but must be unreferenced; active entry is replaced above.
@@ -35,5 +35,5 @@ for(let pass=0;pass<14;pass++){
 }
 for(const name of ['cookie-consent.js','cookies.html'])files.set('public/'+name,fs.readFileSync(path.join(__dirname,'../public',name),'utf8'));
 const output=[];for(const[f,s]of files){if(originals.get(f)===s)continue;const dest=path.join(root,f);fs.mkdirSync(path.dirname(dest),{recursive:true});fs.writeFileSync(dest,s);if(/\.(js|cjs)$/.test(f))cp.execFileSync(process.execPath,['--check',dest]);if(f.endsWith('.json'))JSON.parse(s);output.push({path:f,sha256:hash(s),bytes:Buffer.byteLength(s)});}
-const result={releaseId:'cookie-consent-20261110-'+commit.slice(0,8),sourceCommit:commit,baseImageDigest:'sha256:9bfcda03f02e25e560256bfa8bdc7870ae43afedc724fca2983cd092a95a3e8b',previousRelease:release.releaseId,files:output,databaseMigrations:false,scope:'Cookie consent, opt-in analytics, on-demand map, policy supplement; preserves CRM and orders'};
-fs.writeFileSync(path.join(root,'public/privacy-release.json'),JSON.stringify(result));output.push({path:'public/privacy-release.json'});fs.writeFileSync(path.join(root,'cookie-overlay-files.json'),JSON.stringify(output));console.log(JSON.stringify({releaseId:result.releaseId,cookieBundle:1,policyCount,mapCount,files:output.length}));
+const result={releaseId:'cookie-consent-20261110-'+commit.slice(0,8),sourceCommit:commit,baseImageDigest:'sha256:da2521116177791e7f1b143dea68057ea51cdb2f6e3f54e3447af8d34d00475e',previousRelease:release.releaseId,files:output,databaseMigrations:false,scope:'Cookie consent, opt-in analytics, on-demand map, policy supplement; preserves CRM and orders'};
+fs.writeFileSync(path.join(root,'public/privacy-release.json'),JSON.stringify(result));output.push({path:'public/privacy-release.json'});fs.writeFileSync(path.join(root,'cookie-overlay-files.json'),JSON.stringify(output));console.log(JSON.stringify({releaseId:result.releaseId,cookieBundle:1,policyCount,mapCount,serverMapCount,files:output.length}));
