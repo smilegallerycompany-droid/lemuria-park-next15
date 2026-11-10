@@ -1,5 +1,15 @@
 import { prisma } from "@/lib/db/prisma";
 import { formatDateInTimezone } from "@/lib/datetime";
+import type { Session } from "@prisma/client";
+
+// The same local-time break policy is used by public and CRM sales.
+const { nearestSessions } = require("../../../scripts/session-break-policy.cjs") as {
+  nearestSessions: (
+    fetchPage: (skip: number, take: number) => Promise<Session[]>,
+    location: { slug: string; timezone: string },
+    limit?: number,
+  ) => Promise<Session[]>;
+};
 
 export type PublicLocationPayload = {
   sectionTitle: string;
@@ -51,15 +61,16 @@ export async function getPublicLocationsPayload(): Promise<PublicLocationPayload
           ? `${openDays.map((d) => DAY_RU[d.dayOfWeek] ?? d.dayOfWeek).join(", ")} · ${openDays[0]!.opensAt}–${openDays[0]!.closesAt}`
           : null;
 
-      const sessions = await prisma.session.findMany({
+      const sessions = await nearestSessions((skip, take) => prisma.session.findMany({
         where: {
           locationId: loc.id,
           status: { in: ["SCHEDULED", "OPEN"] },
           startsAt: { gte: now },
         },
-        orderBy: { startsAt: "asc" },
-        take: 6,
-      });
+        orderBy: [{ startsAt: "asc" }, { id: "asc" }],
+        skip,
+        take,
+      }), loc);
 
       const soldBySession =
         sessions.length === 0

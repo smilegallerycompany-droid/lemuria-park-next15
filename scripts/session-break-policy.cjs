@@ -15,4 +15,13 @@ async function filterCandidates(db,params,rows){
  if(location?.slug!=='saratov')return rows;
  return rows.filter(s=>!isBreak(s,location));
 }
-module.exports={NOTICE,isBreak,filterCandidates};
+// Fetch another page when a break occupies a slot in the preview. Read-only.
+async function nearestSessions(fetchPage, location, limit=6){
+ const result=[];
+ for(let skip=0;;skip+=limit){
+  const rows=await fetchPage(skip,limit);
+  for(const row of rows)if(!isBreak(row,location)){result.push(row);if(result.length===limit)return result;}
+  if(rows.length<limit)return result;
+ }
+}
+module.exports={NOTICE,isBreak,filterCandidates,nearestSessions};
