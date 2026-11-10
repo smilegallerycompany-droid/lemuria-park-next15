@@ -15,7 +15,7 @@ function allocate(amount,weights){
   let left=amount-rows.reduce((s,x)=>s+x.value,0);for(const row of [...rows].sort((a,b)=>b.fraction-a.fraction||a.i-b.i)){if(left--<=0)break;row.value++;}
   return rows.map(x=>x.value);
 }
-function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,unknown:0},revenue}){
+function makeLiveReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,unknown:0},revenue}){
   const products=Object.fromEntries(['tickets','feed','photo','balabas'].map(k=>[k,{cash:0,card:0,total:0}]));
   const nominal=new Map(),seen=new Set(),commissionBases=new Map();let refundedExtras=0;
   const addBase=(shiftId,amount)=>{const key=shiftId||"unassigned";commissionBases.set(key,(commissionBases.get(key)||0)+amount);};
@@ -49,10 +49,11 @@ function makeReport({payments=[],operations=[],refunds={total:0,cash:0,card:0,un
   const costs=groups.expenses.total+groups.temporary.total+groups.salary.total+commissions.recognized;
   return {products,tickets:[...nominal.values()].sort((a,b)=>a.nominal-b.nominal||a.name.localeCompare(b.name,'ru')),total,refunds,netRevenue,...groups,commissions,costs,grossProfit:netRevenue-costs,staff:ops.filter(x=>x.kind==='STAFF'),temporaryStaff:ops.filter(x=>x.kind==='TEMP_STAFF_SHIFT'),manualSales:ops.filter(x=>['FEED_SALE','BALABAS_SALE'].includes(x.kind)),additional:ops.filter(x=>['INVITATION','FEED_RECEIPT','FEED_WRITE_OFF'].includes(x.kind))};
 }
+function makeReport(input){return require('./paper-daily-policy.cjs').makePaperReport(input,makeLiveReport);}
 async function extend(tx,{operationWhere,paymentWhere,revenue,refunds}){
   const [operations,payments]=await Promise.all([
-    tx.parkOperation.findMany({where:operationWhere,orderBy:[{date:'asc'},{createdAt:'asc'}],select:{id:true,shiftId:true,date:true,kind:true,person:true,note:true,amountKopecks:true,quantity:true,method:true,createdAt:true,cancelledAt:true,location:{select:{name:true}},creator:{select:{name:true}},receipt:{select:{fileName:true}}}}),
-    tx.payment.findMany({where:paymentWhere,select:{amount:true,method:true,order:{select:{id:true,shiftId:true,status:true,items:{select:{id:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
+    tx.parkOperation.findMany({where:operationWhere,orderBy:[{date:'asc'},{createdAt:'asc'}],select:{id:true,locationId:true,shiftId:true,date:true,kind:true,person:true,note:true,amountKopecks:true,quantity:true,method:true,createdAt:true,cancelledAt:true,location:{select:{name:true}},creator:{select:{name:true}},receipt:{select:{fileName:true}}}}),
+    tx.payment.findMany({where:paymentWhere,select:{id:true,createdAt:true,amount:true,method:true,order:{select:{id:true,locationId:true,createdAt:true,shiftId:true,status:true,items:{select:{id:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
   ]);
   return makeReport({operations,payments,revenue,refunds});
 }
@@ -63,10 +64,11 @@ async function forShift(tx,summary){
   return extend(tx,{operationWhere:{shiftId:shift.id,cancelledAt:null},paymentWhere:{status:'SUCCEEDED',order:{shiftId:shift.id,source:'CASHIER'}},revenue:{cash:shift.cashSalesAmount+summary.reportTotals.cashSales,card:shift.cardSalesAmount+summary.reportTotals.cardSales},refunds});
 }
 function pdfBlocks(r){
- const m=x=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format((x||0)/100)+' ₽';
+ const m=x=>x===null?'Не указано':new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format((x||0)/100)+' ₽';
  const amounts=product=>[m(product.cash),m(product.card),m(product.total)];
  const block=(title,group)=>({title,headers:['Кому / назначение','Источник','Сумма'],rows:group.rows.map(x=>[x.person||x.note||'Расход',x.method==='CARD'?'Безналичные':isSafe(x)?'Наличные из сейфа':'Наличные из кассы',m(x.amountKopecks)])});
  return [
+  ...(r.paperDays?.length?[{text:'Исторические отчёты: '+r.paperDays.map(x=>x.date).join(', ')+'. Номиналы и нал/безнал по категориям не указаны на бумаге. Общий нал/безнал сохранён.'}]:[]),
   {title:'1. Билеты по номиналу',headers:['Билет','Номинал','Кол-во','Наличные','Безналичные','Итого'],rows:r.tickets.map(x=>[x.name,m(x.nominal),String(x.quantity),m(x.cash),m(x.card),m(x.total)])},
   {text:'Билеты: '+amounts(r.products.tickets).join(' / ')},
   ...[['2. Корм','feed'],['3. Фото','photo'],['4. Балабас','balabas']].map(([title,key])=>({title,headers:['Наличные','Безналичные','Итого'],rows:[amounts(r.products[key])]})),
@@ -75,7 +77,7 @@ function pdfBlocks(r){
   block('6. Расходы',r.expenses),{text:'Итого расходы: '+m(r.expenses.total)},
   {title:'7. Временные сотрудники',headers:['Сотрудник','Позиция'],rows:r.temporaryStaff.map(x=>[x.person,x.note])},block('Выплаты временным сотрудникам',r.temporary),{text:'Итого: '+m(r.temporary.total)},
   {title:'8. Зарплата штата',headers:['Сотрудник','Позиция'],rows:r.staff.map(x=>[x.person,x.note])},block('Зарплата и авансы',r.salary),{text:'Итого: '+m(r.salary.total)},
-  {title:'9. Процент штата',text:'5% каждому постоянному сотруднику от корма и фото в его сменах. Общая база: '+m(r.commissions.base),headers:['Кому','Начислено','Выдано','Остаток'],rows:r.commissions.rows.map(x=>[x.person,m(x.accrued),m(x.paid),m(x.balance)])},
+  {title:'9. Процент штата',text:'5% каждому постоянному сотруднику от корма и фото за дни, включённые в отчёт. Общая база: '+m(r.commissions.base),headers:['Кому','Начислено','Выдано','Остаток'],rows:r.commissions.rows.map(x=>[x.person,m(x.accrued),m(x.paid),m(x.balance)])},
   {text:'Всего начислено: '+m(r.commissions.accrued)+'. Выдано: '+m(r.commissions.paid)},
   {title:'10. Общая валовая прибыль',text:m(r.grossProfit),emphasis:true},
   {text:'После возвратов, расходов, выплат временным сотрудникам, зарплаты и процентов штата. Выданные проценты учитываются один раз.'}
