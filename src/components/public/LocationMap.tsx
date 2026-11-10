@@ -17,6 +17,7 @@ export function LocationMap(props: LocationMapProps) {
   const mapId = useId().replace(/:/g, "");
   const containerRef = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
+  const [mapEnabled, setMapEnabled] = useState(false);
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY ?? "";
   const widgetUrl = trustedYandexMapWidgetUrl(props.embedUrl);
   const ready = hasCoordinates(props);
@@ -24,7 +25,7 @@ export function LocationMap(props: LocationMapProps) {
   const height = props.height ?? 420;
 
   useEffect(() => {
-    if (!ready || !apiKey || failed) return;
+    if (!mapEnabled || !ready || !apiKey || failed) return;
     let cancelled = false;
     let map: {
       addChild?: (child: unknown) => void;
@@ -76,7 +77,16 @@ export function LocationMap(props: LocationMapProps) {
         /* ignore */
       }
     };
-  }, [apiKey, failed, props.address, props.latitude, props.longitude, props.title, props.zoom, ready, route]);
+  }, [mapEnabled, apiKey, failed, props.address, props.latitude, props.longitude, props.title, props.zoom, ready, route]);
+
+  if (!mapEnabled) {
+    return <div className="location-map-fallback" style={{ minHeight: height }}>
+      <div className="location-map-fallback-inner">
+        <strong>Карта проезда</strong><p>Яндекс получит технические данные браузера и может использовать cookie.</p>
+        <button type="button" className="button button-orange" onClick={() => setMapEnabled(true)}>Показать карту</button>
+      </div>
+    </div>;
+  }
 
   if (!ready || !apiKey || failed) {
     if (widgetUrl) {

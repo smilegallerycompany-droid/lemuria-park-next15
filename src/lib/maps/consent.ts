@@ -1,0 +1,4 @@
+export function mapConsentDocument(url: string){
+ const escaped=String(url).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'} as Record<string, string>)[c]);
+ return '<!doctype html><html lang="ru"><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;min-height:95vh;display:grid;place-items:center;background:#f3f7ec;color:#2d4526;font:16px/1.5 Arial}main{max-width:410px;padding:30px;text-align:center}a{display:inline-block;background:#355e31;color:white;text-decoration:none;padding:12px 22px;border-radius:12px;font-weight:bold}small{display:block;margin-top:16px;color:#52664b}</style><main><h2>Карта проезда</h2><p>Карта загрузится после вашего нажатия.</p><a href="'+escaped+'">Показать карту</a><small>Яндекс получит технические данные вашего браузера и может использовать cookie. Подробнее — в политике сайта.</small></main></html>';
+}

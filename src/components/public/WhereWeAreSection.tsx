@@ -1,4 +1,5 @@
 "use client";
+import { mapConsentDocument } from "@/lib/maps/consent";
 
 import { useEffect, useMemo, useState } from "react";
 import { MapPin, Phone, Clock3, Navigation } from "lucide-react";
@@ -159,7 +160,7 @@ export function WhereWeAreSection({
           ) : embeddedMapUrl ? (
             <iframe
               title={`Яндекс Карта: ${title}`}
-              src={embeddedMapUrl}
+              srcDoc={mapConsentDocument(embeddedMapUrl)}
               className="location-map-canvas"
               style={{ width: "100%", height: 420, border: 0 }}
               loading="lazy"
