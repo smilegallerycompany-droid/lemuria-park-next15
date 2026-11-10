@@ -172,7 +172,11 @@ def verify(target):
     assert manifest['releaseId'] == release['releaseId']
     assert manifest['baseImageDigest'] == BASE
     assets = [f for f in manifest['files'] if f['path'].startswith('.next/static/') and f['path'].endswith(('.js', '.css'))]
-    assert assets
+    assert assets or release['build'].get('serverMapCount', 0) > 0
+    public_assets = [f for f in manifest['files'] if f['path'] in ['public/cookie-consent.js', 'public/cookies.html']]
+    assert len(public_assets) == 2
+    for item in public_assets:
+        assert hashlib.sha256(get('/' + item['path'][len('public/'):])).hexdigest() == item['sha256']
     for item in assets:
         body = get('/_next/' + item['path'][len('.next/'):])
         assert hashlib.sha256(body).hexdigest() == item['sha256']
