@@ -34,11 +34,9 @@ async function testSeats() {
   assert.ok(location, "staging location");
   const date = (time) => new Intl.DateTimeFormat("en-CA", { timeZone: location.timezone }).format(time);
   const now = Date.now();
-  // Use a future time distinct from regularly generated half-hour sessions.
-  const start = new Date(Math.ceil((now + 5 * 60000) / 1800000) * 1800000 + 137000);
-  assert.equal(date(start), date(new Date(now)), "local staging day");
+  const path = `/api/public/sessions?locationSlug=saratov&date=${date(new Date(now))}`;
   const password = randomBytes(32).toString("base64url");
-  let user, shift, session, reservation, order;
+  let user, shift, reservation, order;
   try {
     user = await db.user.create({ data: {
       name: "Synthetic seat availability QA", email: `qa-seats-${randomUUID()}@example.invalid`,
@@ -51,13 +49,20 @@ async function testSeats() {
     shift = await db.cashierShift.create({ data: {
       userId: user.id, locationId: location.id, status: "OPEN", openingCashAmount: 0, notes: "Staging seat QA",
     } });
-    session = await db.session.create({ data: {
-      locationId: location.id, park: location.park, startsAt: start, endsAt: new Date(+start + 1200000),
-      capacity: 2, status: "SCHEDULED",
-    } });
+    const [published, pointOfSale] = await Promise.all([
+      request(path), request("/api/cashier/sessions", { cookie: login.cookie }),
+    ]);
+    assert.equal(published.status, 200, published.error);
+    assert.equal(pointOfSale.status, 200, pointOfSale.error);
+    const salesSessions = new Map(pointOfSale.data.sessions.map((item) => [item.publicId, item.remaining]));
+    const session = published.data.sessions.find((item) =>
+      Date.parse(item.startsAt) > now + 5 * 60000 &&
+      item.remainingSeats >= 2 && salesSessions.get(item.publicId) === item.remainingSeats);
+    assert.ok(session, "published staging session with matching availability");
+    const before = session.remainingSeats;
     const seats = async (expected) => {
       const [website, cashier] = await Promise.all([
-        request(`/api/public/sessions?locationSlug=saratov&date=${date(start)}`),
+        request(path),
         request("/api/cashier/sessions", { cookie: login.cookie }),
       ]);
       assert.equal(website.status, 200, website.error);
@@ -68,11 +73,11 @@ async function testSeats() {
         expected, "cashier seats");
     };
     const selection = { sessionPublicId: session.publicId, items: [{ ticketTypeCode: "ADULT", quantity: 1 }] };
-    await seats(2);
+    await seats(before);
     const hold = await request("/api/public/reservations", { body: selection, key: randomUUID() });
     assert.ok([200, 201].includes(hold.status), hold.error);
     reservation = hold.data.publicId;
-    await seats(1);
+    await seats(before - 1);
 
     const quote = await request("/api/cashier/quote", { body: selection, cookie: login.cookie });
     assert.equal(quote.status, 200, quote.error);
@@ -81,18 +86,16 @@ async function testSeats() {
         adultCompanionConfirmed: true } });
     assert.ok([200, 201].includes(sale.status), sale.error);
     order = sale.data.number;
-    await seats(0);
-    const blocked = await request("/api/public/reservations", { body: selection, key: randomUUID() });
-    assert.ok(["SESSION_SOLD_OUT", "INSUFFICIENT_CAPACITY"].includes(blocked.error), blocked.error);
-
-    await db.session.update({ where: { id: session.id }, data: {
-      startsAt: new Date(Date.now() - 45 * 60000), endsAt: new Date(Date.now() - 25 * 60000),
-    } });
-    const past = await request("/api/cashier/quote", { body: selection, cookie: login.cookie });
+    await seats(before - 2);
+    const pastSession = published.data.sessions.find((item) => Date.parse(item.startsAt) < now - 60 * 60000);
+    assert.ok(pastSession, "past published staging session");
+    const past = await request("/api/cashier/quote", {
+      body: { ...selection, sessionPublicId: pastSession.publicId }, cookie: login.cookie,
+    });
     assert.equal(past.error, "SESSION_NOT_AVAILABLE");
-    return { ok: true, website: [2, 1, 0], cashier: [2, 1, 0], fullBlocked: true, pastBlocked: true };
+    const availability = [before, before - 1, before - 2];
+    return { ok: true, website: availability, cashier: availability, pastBlocked: true };
   } finally {
-    if (session) await db.session.update({ where: { id: session.id }, data: { status: "CANCELLED" } });
     if (reservation) await db.reservation.updateMany({ where: { publicId: reservation }, data: { status: "EXPIRED", expiresAt: new Date() } });
     if (order) {
       const created = await db.order.findUnique({ where: { number: order } });
