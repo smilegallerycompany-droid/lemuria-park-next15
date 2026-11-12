@@ -66,6 +66,8 @@ export function QrScanner() {
   const [secureOk, setSecureOk] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const cameraRequest = useRef(0);
+  const [readyStream, setReadyStream] = useState<MediaStream | null>(null);
   const submittingRef = useRef(false);
   const lastTokenRef = useRef("");
   const lastAtRef = useRef(0);
@@ -74,6 +76,8 @@ export function QrScanner() {
   const prefs = useRef(loadPrefs());
 
   const stopCamera = useCallback(() => {
+    cameraRequest.current++;
+    setReadyStream(null);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
@@ -189,6 +193,7 @@ export function QrScanner() {
         return;
       }
       stopCamera();
+      const request = cameraRequest.current;
       setPhase("camera");
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -199,16 +204,17 @@ export function QrScanner() {
           },
           audio: false,
         });
-        streamRef.current = stream;
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          await video.play();
+        if (request !== cameraRequest.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
         }
+        streamRef.current = stream;
+        setReadyStream(stream);
         const track = stream.getVideoTracks()[0];
         const caps = track?.getCapabilities?.() as { torch?: boolean } | undefined;
         setTorchSupported(Boolean(caps?.torch));
       } catch (err) {
+        if (request !== cameraRequest.current) return;
         const name = err instanceof DOMException ? err.name : "";
         if (name === "NotAllowedError" || name === "PermissionDeniedError") {
           setError("Доступ к камере запрещён. Разрешите доступ или введите код вручную.");
@@ -227,7 +233,9 @@ export function QrScanner() {
   );
 
   useEffect(() => {
-    if (phase !== "camera") return;
+    const video = videoRef.current;
+    if (phase !== "camera" || !readyStream || !video) return;
+    video.srcObject = readyStream;
     let cancelled = false;
     let raf = 0;
     let zxingControls: { stop: () => void } | null = null;
@@ -248,15 +256,16 @@ export function QrScanner() {
         try {
           const codes = await detector.detect(video);
           const value = codes[0]?.rawValue?.trim();
-          if (value) {
+          if (value && !cancelled && streamRef.current === readyStream) {
             await submitToken(value);
-            return;
           }
         } catch {
           /* continue */
         }
       }
-      raf = requestAnimationFrame(() => void loopNative(detector));
+      if (!cancelled && streamRef.current === readyStream) {
+        raf = requestAnimationFrame(() => void loopNative(detector));
+      }
     }
 
     async function startFallback() {
@@ -264,11 +273,13 @@ export function QrScanner() {
         const { BrowserMultiFormatReader } = await import("@zxing/browser");
         const reader = new BrowserMultiFormatReader();
         const video = videoRef.current;
-        if (!video || !streamRef.current) return;
-        zxingControls = await reader.decodeFromStream(streamRef.current, video, (res) => {
+        if (!video || cancelled || streamRef.current !== readyStream) return;
+        const controls = await reader.decodeFromVideoElement(video, (res) => {
           const text = res?.getText()?.trim();
-          if (text) void submitToken(text);
+          if (text && !cancelled && streamRef.current === readyStream) void submitToken(text);
         });
+        if (cancelled || streamRef.current !== readyStream) controls.stop();
+        else zxingControls = controls;
       } catch {
         if (!cancelled) {
           setError("Не удалось запустить распознавание QR. Используйте ручной ввод.");
@@ -276,19 +287,35 @@ export function QrScanner() {
       }
     }
 
-    if (DetectorCtor) {
-      const detector = new DetectorCtor({ formats: ["qr_code"] });
-      raf = requestAnimationFrame(() => void loopNative(detector));
-    } else {
+    async function startRecognition() {
+      try {
+        await video?.play();
+      } catch {
+        if (!cancelled && streamRef.current === readyStream) {
+          setError("Не удалось запустить видео. Используйте ручной ввод.");
+        }
+        return;
+      }
+      if (cancelled || streamRef.current !== readyStream) return;
+      try {
+        const detector = DetectorCtor && new DetectorCtor({ formats: ["qr_code"] });
+        if (detector) {
+          raf = requestAnimationFrame(() => void loopNative(detector));
+          return;
+        }
+      } catch {
+        // Some browsers expose BarcodeDetector without support for QR.
+      }
       void startFallback();
     }
+    void startRecognition();
 
     return () => {
       cancelled = true;
       cancelAnimationFrame(raf);
       zxingControls?.stop();
     };
-  }, [phase, submitToken]);
+  }, [phase, readyStream, submitToken]);
 
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0];
