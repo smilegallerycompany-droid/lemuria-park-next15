@@ -135,11 +135,11 @@ export function QrScanner() {
         return;
       }
       submittingRef.current = true;
+      lastTokenRef.current = trimmed;
+      lastAtRef.current = Date.now();
       setError(null);
       try {
         const response = await cashierCheckIn(trimmed);
-        lastTokenRef.current = trimmed;
-        lastAtRef.current = Date.now();
         setResult(response);
         setPhase("result");
         stopCamera();

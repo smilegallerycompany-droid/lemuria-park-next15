@@ -11,7 +11,7 @@ assert.ok(fixture, "Set SCANNER_BASE_ASSET to the pinned production scanner chun
 const chunk = patchScanner(fs.readFileSync(fixture, "utf8"));
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
-function harness() {
+function harness(checkInFails = false) {
   let cursor = 0;
   let mediaReady;
   let videoReady;
@@ -73,6 +73,7 @@ function harness() {
     15610: { T7: async (code) => {
       assert.equal(code, "synthetic-qr");
       checkIns++;
+      if (checkInFails) throw new Error("check-in is temporarily unavailable");
       return { result: "SUCCESS", message: "fixture" };
     } },
     64895: { BrowserMultiFormatReader: class {
@@ -136,4 +137,20 @@ test("closing before permission resolves stops the late stream", async () => {
   await settle();
   h.render();
   assert.deepEqual(h.counts(), [0, 1, 0]);
+});
+
+test("the same visible code does not flood the API after a failed check-in", async () => {
+  const h = harness(true);
+  assert.ok(h.click(h.render(), "Включить камеру"));
+  h.render();
+  h.allow();
+  await settle();
+  h.render();
+  h.play();
+  await settle();
+  h.decode();
+  await settle();
+  h.decode();
+  await settle();
+  assert.deepEqual(h.counts(), [1, 0, 1]);
 });

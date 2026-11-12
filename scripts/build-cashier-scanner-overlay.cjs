@@ -25,6 +25,8 @@ function patchScanner(source) {
   source = replaceOnce(source, 'S.current=e;let t=j.current;t&&(t.srcObject=e,await t.play());',
     'if(request!==cameraRequest.current){e.getTracks().forEach(track=>track.stop());return}S.current=e;setReadyStream(e);');
   source = replaceOnce(source, 'catch(n){let e=n instanceof DOMException', 'catch(n){if(request!==cameraRequest.current)return;let e=n instanceof DOMException');
+  source = replaceOnce(source, 'C.current=!0,u(null);try{let e=await (0,s.T7)(n);T.current=n,D.current=Date.now(),h(e)',
+    'C.current=!0,T.current=n,D.current=Date.now(),u(null);try{let e=await (0,s.T7)(n);h(e)');
   const start = 'if("camera"!==e)return;let t=!1,r=0,a=null,i=globalThis.BarcodeDetector;';
   const end = '},[e,O]),"result"===e&&d)';
   const before = source.indexOf(start), after = source.indexOf(end);
