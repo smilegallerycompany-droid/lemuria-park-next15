@@ -24,3 +24,32 @@ test('period commission follows each employee shifts, without paying other shift
  const r=makeReport({payments:[a,b],operations});assert.equal(r.commissions.base,100000);assert.equal(r.commissions.accrued,5000);assert.equal(r.commissions.rows.find(x=>x.person==='Иван').accrued,2500);
  const both=makeReport({payments:[a,b],operations:[...operations,{...op('STAFF',0,'Иван'),shiftId:'b'}]});assert.equal(both.commissions.rows.find(x=>x.person==='Иван').accrued,5000);
 });
+
+test('Saratov changes commission at local midnight and keeps actual payments', () => {
+ const before = {...payment(), createdAt:new Date('2026-11-10T19:59:00Z')};
+ before.order = {...before.order, id:'before', shiftId:'old', location:{slug:'saratov'}};
+ const after = {...payment(), createdAt:new Date('2026-11-10T20:00:00Z')};
+ after.order = {...after.order, id:'after', shiftId:'new', location:{slug:'saratov'}};
+ const datedOp = (kind, amount, person, date, shiftId, slug='saratov') => ({
+  ...op(kind,amount,person), date, shiftId, location:{slug},
+ });
+ const operations = [
+  datedOp('STAFF',0,'Даша','2026-11-10','old'),
+  datedOp('COMMISSION',2500,'Даша','2026-11-10','old'),
+  datedOp('STAFF',0,'Даша','2026-11-11','new'),
+  datedOp('FEED_SALE',20000,'','2026-11-11','new'),
+  datedOp('COMMISSION',2500,'Паша','2026-11-11','new'),
+ ];
+ const report = makeReport({payments:[before,after],operations});
+ assert.deepEqual(report.commissions.rows.map(row => [row.person,row.feedAccrued,row.photoAccrued,row.accrued,row.paid]), [
+  ['Даша',0,0,2500,2500],
+  ['Дима',2500,1000,3500,0],
+  ['Неклюдов Павел',2500,1000,3500,2500],
+  ['Аня',2500,0,2500,0],
+ ]);
+ assert.equal(report.commissions.recognized,12000);
+ const otherLocation = {...after,order:{...after.order,location:{slug:'volgograd'}}};
+ const otherReport = makeReport({payments:[otherLocation],operations:[datedOp('STAFF',0,'Даша','2026-11-11','new','volgograd')]});
+ assert.equal(otherReport.commissions.hasSaratovCommission,false);
+ assert.equal(otherReport.commissions.accrued,2500);
+});

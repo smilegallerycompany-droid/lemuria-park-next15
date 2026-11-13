@@ -1,5 +1,6 @@
 'use strict';
 const assert=require('node:assert/strict');
+const {usesSaratovCommission,personKey,commissionRow,accrueSaratovCommission}=require('./finance-report-policy.cjs');
 const normal=s=>String(s||'').trim().replace(/\s+/g,' ').toLocaleLowerCase('ru');
 const key=(location,date)=>String(location||'')+'|'+date;
 const localDay=(value,zone)=>value?new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value)):null;
@@ -10,7 +11,7 @@ function readPaper(op){
  assert.equal(p.cash+p.card,Object.values(p.products).reduce((a,b)=>a+b,0));assert.equal(op.amountKopecks,p.cash+p.card);
  assert.ok(Array.isArray(p.commissionPeople));assert.equal(new Set(p.commissionPeople.map(normal)).size,p.commissionPeople.length);
  assert.ok(p.commissionPeople.every(x=>typeof x==='string'&&x.trim()));
- return {...p,locationId:op.locationId,operationId:op.id};
+ return {...p,locationId:op.locationId,locationSlug:op.location?.slug,operationId:op.id};
 }
 function makePaperReport(input,live){
  const ops=(input.operations||[]).filter(x=>!x.cancelledAt),papers=ops.filter(x=>x.kind==='PAPER_DAILY').map(readPaper);
@@ -22,8 +23,10 @@ function makePaperReport(input,live){
  // Paper statements replace revenue for their location/day. They never create
  // orders, tickets, provider payments or fabricated nominal denominations.
  const clean=ops.filter(x=>!(isCoveredOp(x)&&['STAFF','FEED_SALE','BALABAS_SALE'].includes(x.kind)));
- const r=live({...input,payments,operations:clean,revenue:undefined});
- const people=new Map(r.commissions.rows.map(x=>[normal(x.person),{...x}]));
+ const includeSaratovCommission = papers.some(p => usesSaratovCommission(p.locationSlug,p.date));
+ const r=live({...input,payments,operations:clean,revenue:undefined,includeSaratovCommission});
+ const keyForPerson = r.commissions.hasSaratovCommission ? personKey : normal;
+ const people=new Map(r.commissions.rows.map(x=>[keyForPerson(x.person),{...x}]));
  for(const p of papers){
   r.total.cash+=p.cash;r.total.card+=p.card;r.total.total+=p.cash+p.card;
   for(const product of ['tickets','feed','photo','balabas']){
@@ -33,7 +36,8 @@ function makePaperReport(input,live){
   }
   r.tickets.push({name:'Бумажный отчёт '+p.date.split('-').reverse().join('.'),nominal:null,quantity:p.ticketQuantity,cash:null,card:null,total:p.products.tickets});
   const base=p.products.feed+p.products.photo;r.commissions.base+=base;
-  for(const person of p.commissionPeople){const k=normal(person),row=people.get(k)||{person,accrued:0,paid:0};row.accrued+=Math.round(base*5/100);people.set(k,row);}
+  if (usesSaratovCommission(p.locationSlug,p.date)) accrueSaratovCommission(people,p.products.feed,p.products.photo);
+  else for (const person of p.commissionPeople) commissionRow(people,person,r.commissions.hasSaratovCommission).accrued += Math.round(base*0.05);
  }
  r.netRevenue=r.total.total-r.refunds.total;
  r.commissions.rows=[...people.values()].map(x=>({...x,balance:x.accrued-x.paid}));

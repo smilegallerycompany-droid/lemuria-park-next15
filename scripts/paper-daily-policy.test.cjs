@@ -8,3 +8,19 @@ test('multiple days sum once and commission follows each day',()=>{const r=p.mak
 test('covered live sales and manual feed are not counted twice',()=>{const payment={id:'p',createdAt:new Date('2026-11-07T10:00:00Z'),amount:100000,method:'CARD',order:{id:'o',locationId:'loc',shiftId:'s',status:'PAID',items:[{id:'i',ticketTypeName:'Adult',unitPriceAmount:100000,subtotalAmount:100000,quantity:1}],extras:[]}};const r=p.makeReport({payments:[payment],operations:[paper(),op('feed','FEED_SALE',60000)],revenue:{cash:999999,card:999999}});assert.equal(r.total.total,210000);assert.equal(r.paperRevenueOverlapCount,1);});
 test('cancelled paper falls back to existing live report',()=>{assert.equal(p.makeReport({operations:[{...paper(),cancelledAt:new Date()}]}).total.total,0);});
 test('invalid or duplicate paper sources fail rather than misstate totals',()=>{assert.throws(()=>p.makeReport({operations:[paper(),{...paper(),id:'other'}]}));assert.throws(()=>p.makeReport({operations:[{...paper(),amountKopecks:1}]}));});
+
+test('a mixed period preserves historical paper payments and applies the new Saratov rules to later revenue', () => {
+ const saratov = row => ({...row,location:{slug:'saratov'}});
+ const report = p.makeReport({operations:[
+  saratov(paper()),
+  saratov(paper('2026-11-11')),
+  saratov(op('ca','COMMISSION',5000,'A')),
+  saratov(op('cb','COMMISSION',5000,'B')),
+ ]});
+ assert.equal(report.commissions.paid,10000);
+ assert.equal(report.commissions.recognized,23000);
+ assert.deepEqual(report.commissions.rows.map(x=>[x.person,x.accrued,x.paid]),[
+  ['A',5000,5000],['B',5000,5000],['Дима',5000,0],['Неклюдов Павел',5000,0],['Аня',3000,0],
+ ]);
+ assert.equal(report.grossProfit,397000);
+});

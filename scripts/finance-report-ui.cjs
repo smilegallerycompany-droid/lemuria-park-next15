@@ -21,10 +21,10 @@ function render(api,data,options={}){
   section('7. Временные сотрудники',[staffTable(data.temporaryStaff),expenseRows(data.temporary),subtotal(data.temporary.total)]),
   section('8. Зарплата штата',[staffTable(data.staff),expenseRows(data.salary),subtotal(data.salary.total)]),
   section('9. Процент штата',[
-   h('p',{children:'Каждому постоянному сотруднику: 5% от корма и фото. Для бумажных отчётов получатели взяты из раздела «Процент штата». Общая база за выбранный период: '+money(data.commissions.base)+'.'}),
-   table(['Сотрудник','Начислено 5%','Выдано','Осталось выдать'],data.commissions.rows.map(x=>[x.person,money(x.accrued),money(x.paid),money(x.balance)])),
+   h('p',{children:data.commissions.rule ?? ('Каждому постоянному сотруднику: 5% от корма и фото. Для бумажных отчётов получатели взяты из раздела «Процент штата». Общая база за выбранный период: '+money(data.commissions.base)+'.')}),
+   table(['Сотрудник',...(data.commissions.hasSaratovCommission?['Корм с 11.11','Фото с 11.11']:[]),'Начислено','Выдано','Осталось выдать'],data.commissions.rows.map(x=>[x.person,...(data.commissions.hasSaratovCommission?[money(x.feedAccrued),money(x.photoAccrued)]:[]),money(x.accrued),money(x.paid),money(x.balance)])),
    table(['Всего начислено','Всего выдано','Остаток'],[[money(data.commissions.accrued),money(data.commissions.paid),money(data.commissions.accrued-data.commissions.paid)]]),
-   !data.staff.length&&!data.paperDays?.length?h('p',{role:'status',children:'Добавьте постоянных сотрудников в состав смены, чтобы рассчитать 5% по каждому.'}):null,
+   !data.commissions.hasSaratovCommission&&!data.staff.length&&!data.paperDays?.length?h('p',{role:'status',children:'Добавьте постоянных сотрудников в состав смены, чтобы рассчитать 5% по каждому.'}):null,
    h('p',{children:'Фактическую выдачу добавляйте видом «Процент штата (5%)». Начисление не означает, что деньги уже выданы.'}),expenseRows({rows:data.commissions.payments||[]})]),
   (data.manualSales?.length||data.additional?.length)?h('details',{style:{margin:'16px 0'},children:[h('summary',{children:'Дополнительные записи: ручные продажи, корм и пригласительные'}),detailRows([...(data.manualSales||[]),...(data.additional||[])])]}):null,
   section('10. Общая валовая прибыль',[h('strong',{style:{fontSize:28},children:money(data.grossProfit)}),h('p',{children:'Общая сумма после возвратов − расходы − выплаты временным сотрудникам − зарплата и авансы штата − процент штата. Выданные проценты учитываются один раз; выдача сверх начисления также включается в расходы.'})])
