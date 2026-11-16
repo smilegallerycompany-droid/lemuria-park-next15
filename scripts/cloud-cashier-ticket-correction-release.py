@@ -150,7 +150,7 @@ def run_staging_test(commit):
         except urllib.error.HTTPError as error:
             result = json.loads(error.read())
         print(json.dumps(result), flush=True)
-        assert result["ok"] and result["ticketCount"] == 2 and result["reconciled"], result
+        assert result["ok"] and result["ticketCount"] == 3 and result["reconciled"], result
         release.save("staging-accepted.json", {**checked, **result})
     finally:
         release.run(["yc", "serverless", "container", "delete", "--id", cid], timeout=90)

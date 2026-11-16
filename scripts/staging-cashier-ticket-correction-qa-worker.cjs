@@ -45,9 +45,9 @@ async function run() {
     date.setUTCHours(14, 30, randomInt(1, 60), randomInt(1, 1000));
     session = await db.session.create({ data: {
       locationId: location.id, park: location.park, startsAt: date, endsAt: new Date(+date + 20 * 60_000),
-      capacity: 2, status: "SCHEDULED",
+      capacity: 3, status: "SCHEDULED",
     } });
-    const selection = { sessionPublicId: session.publicId, items: [{ ticketTypeCode: "CHILD", quantity: 2 }] };
+    const selection = { sessionPublicId: session.publicId, items: [{ ticketTypeCode: "CHILD", quantity: 2 }, { ticketTypeCode: "ADULT", quantity: 1 }] };
     const quote = await request("/api/cashier/quote", { cookie, body: selection });
     const sale = await request("/api/cashier/sales", { cookie, key: randomUUID(), expected: 201,
       body: { ...selection, paymentMethod: "CASH", quoteFingerprint: quote.data.fingerprint, adultCompanionConfirmed: true } });
@@ -55,7 +55,9 @@ async function run() {
     const path = "/api/cashier/orders/" + order.number;
     const detail = (await request(path, { cookie })).data.order;
     assert.ok(detail.tickets.every((ticket) => ticket.canCorrect));
-    const ticket = order.tickets[0];
+    const childType = await db.ticketType.findUniqueOrThrow({ where: { code: "CHILD" } });
+    const ticket = order.tickets.find((row) => row.ticketTypeId === childType.id);
+    assert.ok(ticket);
     const body = { action: "preview", ticketId: ticket.publicId };
     const { data: preview } = await request(path, { cookie, body });
     assert.notEqual(preview.before, preview.after);
@@ -71,15 +73,15 @@ async function run() {
     });
     assert.equal(result.totalAmount, order.totalAmount + preview.delta);
     assert.equal(result.payments[0].amount, result.totalAmount);
-    assert.deepEqual(result.items.map((item) => item.quantity), [1, 1]);
+    assert.deepEqual(result.items.map((item) => item.quantity).sort(), [1, 2]);
     assert.equal(result.tickets.find((row) => row.id === ticket.id).ticketType.code, "ADULT");
     assert.equal(result.tickets.find((row) => row.id === ticket.id).qrToken, ticket.qrToken);
-    assert.equal(result.tickets.length, 2);
+    assert.equal(result.tickets.length, 3);
     const { data } = await request("/api/cashier/shift", { cookie });
     assert.equal(data.shift.currentCashBalance, result.totalAmount);
     assert.equal(data.shift.businessReport.products.tickets.total, result.totalAmount);
     assert.equal(await db.auditLog.count({ where: { action: "CASHIER_TICKET_CORRECTED", entityId: order.id } }), 1);
-    return { ok: true, ticketCount: 2, reconciled: true };
+    return { ok: true, ticketCount: 3, reconciled: true };
   } finally {
     if (user) {
       await db.staffSession.updateMany({ where: { userId: user.id }, data: { revokedAt: new Date() } });
