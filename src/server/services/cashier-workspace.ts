@@ -9,6 +9,12 @@ import { DomainError } from "@/server/domain/errors";
 import { isSessionSellableAtCashier } from "@/server/domain/session.domain";
 import { computeAvailability } from "@/server/domain/availability.domain";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
+import {
+  isSaratovBreak,
+  isSaratovBreakDate,
+  SARATOV_BREAK_TIMES,
+} from "@/server/domain/saratov-breaks";
+import { getCancelledBreakSessionIds } from "@/server/services/cashier-breaks";
 import { locationRepository } from "@/server/repositories/location.repository";
 import { sessionRepository } from "@/server/repositories/session.repository";
 import { reservationRepository } from "@/server/repositories/reservation.repository";
@@ -47,10 +53,21 @@ export async function listCashierSessionsForToday(locationId?: string) {
     take: DOMAIN_CONFIG.maxSessionsPerQuery,
   });
 
-  const sessions = candidates.filter(
+  const todaySessions = candidates.filter(
     (session) =>
       isSessionSellableAtCashier(session, now) &&
       formatDateInTimezone(session.startsAt, location.timezone) === date,
+  );
+
+  const breakSessions = todaySessions.filter((session) =>
+    isSaratovBreak(session.startsAt, location),
+  );
+  const cancelled = await getCancelledBreakSessionIds(
+    prisma,
+    breakSessions.map((session) => session.id),
+  );
+  const sessions = todaySessions.filter(
+    (session) => !isSaratovBreak(session.startsAt, location) || cancelled.has(session.id),
   );
 
   const sessionIds = sessions.map((session) => session.id);
@@ -87,6 +104,24 @@ export async function listCashierSessionsForToday(locationId?: string) {
       timezone: location.timezone,
     },
     date,
+    breaks: isSaratovBreakDate(location.slug, date)
+      ? SARATOV_BREAK_TIMES.map((time) => {
+          const session = breakSessions.find(
+            (row) => formatTimeInTimezone(row.startsAt, location.timezone) === time,
+          );
+          const midnight = startOfLocalDateInTimezone(date, location.timezone);
+          const endsAt =
+            session?.endsAt ??
+            new Date(
+              +midnight + (Number(time.slice(0, 2)) * 60 + location.visitDurationMinutes) * 60_000,
+            );
+          return {
+            time,
+            endsAt: endsAt.toISOString(),
+            cancelled: Boolean(session && cancelled.has(session.id)),
+          };
+        })
+      : [],
     ticketTypes: ticketTypes.map((ticketType) => {
       const dayType = resolveDayType(now, location.timezone);
       // Prices for "today" — used in the sale panel as a hint; final price is
@@ -154,9 +189,7 @@ export async function listCashierOrders(
   }
 
   const locationIds =
-    scope?.locationIds === null || scope?.locationIds === undefined
-      ? undefined
-      : scope.locationIds;
+    scope?.locationIds === null || scope?.locationIds === undefined ? undefined : scope.locationIds;
 
   const orders = await orderRepository.listForCashier(prisma, {
     status,

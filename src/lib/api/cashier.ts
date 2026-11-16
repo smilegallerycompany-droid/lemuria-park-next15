@@ -1,4 +1,4 @@
-import { apiGet, apiPost, type RequestOptions } from "@/lib/api/client";
+import { apiGet, apiPatch, apiPost, type RequestOptions } from "@/lib/api/client";
 
 export interface CashierUser {
   id: string;
@@ -23,6 +23,7 @@ export interface CashierSessionsResponse {
   date: string;
   ticketTypes: Array<{ code: string; name: string; unitPrice: number | null }>;
   sessions: CashierSessionCard[];
+  breaks?: Array<{ time: "13:00" | "17:00"; endsAt: string; cancelled: boolean }>;
 }
 
 export interface CashierOrderRow {
@@ -51,6 +52,14 @@ export function getCashierMe(options?: RequestOptions) {
 
 export function getCashierSessions(options?: RequestOptions) {
   return apiGet<CashierSessionsResponse>("/api/cashier/sessions", options);
+}
+
+export function setCashierBreak(input: {
+  date: string;
+  time: "13:00" | "17:00";
+  cancelled: boolean;
+}) {
+  return apiPatch<{ cancelled: boolean }>("/api/cashier/sessions/breaks", input);
 }
 
 export function getCashierOrders(

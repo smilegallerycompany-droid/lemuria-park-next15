@@ -1,3 +1,4 @@
+import { isSaratovBreak } from "@/server/domain/saratov-breaks";
 import { prisma } from "@/lib/db/prisma";
 import { formatDateInTimezone } from "@/lib/datetime";
 
@@ -51,16 +52,19 @@ export async function getPublicLocationsPayload(): Promise<PublicLocationPayload
           ? `${openDays.map((d) => DAY_RU[d.dayOfWeek] ?? d.dayOfWeek).join(", ")} · ${openDays[0]!.opensAt}–${openDays[0]!.closesAt}`
           : null;
 
-      const sessions = await prisma.session.findMany({
+      const candidates = await prisma.session.findMany({
         where: {
           locationId: loc.id,
           status: { in: ["SCHEDULED", "OPEN"] },
           startsAt: { gte: now },
         },
         orderBy: { startsAt: "asc" },
-        take: 6,
+        take: loc.slug === "saratov" ? 24 : 6,
       });
 
+      const sessions = candidates
+        .filter((session) => !isSaratovBreak(session.startsAt, loc))
+        .slice(0, 6);
       const soldBySession =
         sessions.length === 0
           ? []

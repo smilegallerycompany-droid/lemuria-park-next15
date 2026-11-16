@@ -1,3 +1,5 @@
+import { prisma } from "@/lib/db/prisma";
+import { getOpenShiftForCashier } from "@/server/services/cashier-shifts";
 import { apiSuccess, handleApiError } from "@/lib/api/response";
 import { requireCashier } from "@/server/auth/cashier-session";
 import { assertLocationAccess, locationIdsForActor } from "@/server/auth/location-access";
@@ -12,8 +14,12 @@ export async function GET(req: Request) {
       assertLocationAccess(user, requested);
     }
     const scope = locationIdsForActor(user);
-    const locationId = requested ?? (scope && scope.length === 1 ? scope[0] : undefined);
-    if (scope && !requested && scope.length === 0) {
+
+    const shift = requested ? null : await getOpenShiftForCashier(prisma, user.id);
+    const locationId =
+      requested ?? shift?.locationId ?? (scope && scope.length === 1 ? scope[0] : undefined);
+    if (locationId) assertLocationAccess(user, locationId);
+    if (!locationId && scope) {
       return apiSuccess({
         location: { city: "", venue: "", timezone: "Europe/Moscow" },
         date: "",

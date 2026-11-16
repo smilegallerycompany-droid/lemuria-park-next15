@@ -1,3 +1,4 @@
+import { isSaratovBreak } from "@/server/domain/saratov-breaks";
 import type { Session } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { formatDateInTimezone, formatTimeInTimezone, todayInTimezone } from "@/lib/datetime";
@@ -71,7 +72,9 @@ export async function listPublicSessions(query: SessionsQuery): Promise<PublicSe
   });
 
   const sessions = candidates.filter(
-    (session) => formatDateInTimezone(session.startsAt, location.timezone) === targetDate,
+    (session) =>
+      formatDateInTimezone(session.startsAt, location.timezone) === targetDate &&
+      !isSaratovBreak(session.startsAt, location),
   );
 
   if (sessions.length === 0) {

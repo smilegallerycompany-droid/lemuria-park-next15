@@ -1,3 +1,4 @@
+import { isSaratovBreak } from "@/server/domain/saratov-breaks";
 import { Prisma, type Reservation, type ReservationItem } from "@prisma/client";
 import { prisma, type DbClient } from "@/lib/db/prisma";
 import { recordAuditLog } from "@/lib/audit";
@@ -100,6 +101,9 @@ async function createReservationInTransaction(
 
   const session = await sessionRepository.findByPublicId(tx, input.sessionPublicId);
   assertSessionBookable(session, now);
+  if (isSaratovBreak(session.startsAt, session.location)) {
+    throw new DomainError("SESSION_NOT_AVAILABLE", "На это время запланирован перерыв");
+  }
 
   // Explicit row lock on the Session, scoped by its own id (which is itself
   // scoped to a single locationId) — belt-and-suspenders on top of the

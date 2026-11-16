@@ -4,7 +4,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { DomainError } from "@/server/domain/errors";
 import { assertCapacity } from "@/server/domain/availability.domain";
-import { assertSessionSellableAtCashier } from "@/server/domain/session.domain";
+import { isSessionSellableAtCashier } from "@/server/domain/session.domain";
 import {
   assertIdempotencyPayloadMatches,
   hashIdempotencyPayload,
@@ -15,6 +15,8 @@ import { sessionRepository } from "@/server/repositories/session.repository";
 import { orderRepository } from "@/server/repositories/order.repository";
 import { expireStaleReservations } from "@/server/services/reservation-cleanup";
 import { expireStalePaymentOrders } from "@/server/services/order-cleanup";
+import { isSaratovBreak } from "@/server/domain/saratov-breaks";
+import { getCancelledBreakSessionIds } from "@/server/services/cashier-breaks";
 import { getSessionAvailability } from "@/server/services/availability";
 import { findTicketTypeByCode, resolveTicketPrice } from "@/server/services/pricing";
 import { issueTicketsForOrder } from "@/server/services/tickets";
@@ -77,8 +79,14 @@ async function createCashierSaleInTransaction(
   await Promise.all([expireStaleReservations(tx, now), expireStalePaymentOrders(tx, now)]);
 
   const session = await sessionRepository.findByPublicId(tx, input.sessionPublicId);
-  assertSessionSellableAtCashier(session, new Date());
+  if (!session) throw new DomainError("SESSION_NOT_FOUND", "Сеанс не найден");
   await sessionRepository.lockForUpdate(tx, session.id);
+  if (
+    isSaratovBreak(session.startsAt, session.location) &&
+    !(await getCancelledBreakSessionIds(tx, [session.id])).has(session.id)
+  ) {
+    throw new DomainError("SESSION_NOT_AVAILABLE", "На это время запланирован перерыв");
+  }
 
   const shift = await requireOpenShift(tx, cashierId, session.locationId);
 
@@ -115,7 +123,9 @@ async function createCashierSaleInTransaction(
   );
 
   const totalAmount = computeOrderTotal(lineItems);
-  assertSessionSellableAtCashier(session, new Date());
+  if (!isSessionSellableAtCashier(session, new Date())) {
+    throw new DomainError("SESSION_NOT_AVAILABLE", "Сеанс закрыт или уже закончился");
+  }
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,

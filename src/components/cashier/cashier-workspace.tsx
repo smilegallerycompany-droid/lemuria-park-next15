@@ -26,6 +26,7 @@ import {
   getCashierMe,
   getCashierOrders,
   getCashierSessions,
+  setCashierBreak,
   type CashierCheckInResult,
   type CashierOrderRow,
   type CashierSessionCard,
@@ -74,6 +75,8 @@ export function CashierWorkspace() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
+  const [breakError, setBreakError] = useState<string | null>(null);
+  const [updatingBreak, setUpdatingBreak] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
   const timezone = sessionsData?.location.timezone ?? "Europe/Moscow";
@@ -112,6 +115,20 @@ export function CashierWorkspace() {
       setLoadingSessions(false);
     }
   }, []);
+
+  async function toggleBreak(slot: NonNullable<CashierSessionsResponse["breaks"]>[number]) {
+    if (!sessionsData || updatingBreak) return;
+    setUpdatingBreak(true);
+    setBreakError(null);
+    try {
+      await setCashierBreak({ date: sessionsData.date, time: slot.time, cancelled: !slot.cancelled });
+      await refreshSessions();
+    } catch (err) {
+      setBreakError(err instanceof ApiClientError ? err.message : "Не удалось изменить перерыв");
+    } finally {
+      setUpdatingBreak(false);
+    }
+  }
 
   const refreshOrders = useCallback(async () => {
     try {
@@ -230,6 +247,29 @@ export function CashierWorkspace() {
             Обновить
           </Button>
         </div>
+
+        {sessionsData?.breaks && sessionsData.breaks.length > 0 ? (
+          <div className="no-print flex flex-wrap gap-2" aria-label="Перерывы на сегодня">
+            {sessionsData.breaks.map((slot) => (
+              <Button
+                key={slot.time}
+                variant="outline"
+                size="sm"
+                disabled={
+                  updatingBreak || loadingSessions || selling || Date.parse(slot.endsAt) <= now
+                }
+                onClick={() => void toggleBreak(slot)}
+              >
+                {slot.cancelled ? "Вернуть перерыв" : "Отменить перерыв"} в {slot.time}
+              </Button>
+            ))}
+            {breakError ? (
+              <p role="alert" className="w-full text-sm text-destructive">
+                {breakError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
 
         {loadingSessions && !sessionsData ? (
           <div className="cashier-home-sessions">
