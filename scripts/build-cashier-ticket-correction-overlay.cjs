@@ -19,7 +19,7 @@ function replaceOnce(body, before, after) {
 }
 
 function patchView(body) {
-  const inject = 'async function T(){if(x)try{await (0,n.$P)("/api/cashier/orders/"';
+  const inject = 'function o(){var e,t;let[r,o]=(0,s.useState)("today")';
   body = replaceOnce(body, inject, TicketCorrection.toString() + ";" + inject);
   const anchor = 'id:"cashier-order-print",children:[';
   const component = '(0,a.jsx)(TicketCorrection,{React:s,jsx:a,order:x,refresh:e=>Promise.all([S(e),E()]),money:t=>new Intl.NumberFormat("ru-RU",{style:"currency",currency:"RUB"}).format(t/100)},x.number),';
@@ -28,14 +28,12 @@ function patchView(body) {
 
 function patchRoute(body) {
   body = replaceOnce(body, 'c.d(d,{GET:()=>A})', 'c.d(d,{GET:()=>A,POST:()=>A})');
-  body = replaceOnce(body, '{number:c}=await b.params,d=await w.z.order.findUnique',
-    '{number:g}=await b.params;if(a0.method==="POST"){(0,c(35991).t)(a0);const j=await a0.json().catch(()=>{throw new v.hD("VALIDATION_ERROR","Некорректный JSON",400)});' +
+  body = replaceOnce(body, 'async function A(a,b){try{let a=await (0,x.Xf)(),{number:c}=await b.params,d=await w.z.order.findUnique',
+    'async function A(request,b){try{let a=await (0,x.Xf)(),{number:g}=await b.params;' +
+    'if(request.method==="POST"){(0,c(35991).t)(request);const j=await request.json().catch(()=>{throw new v.hD("VALIDATION_ERROR","Некорректный JSON",400)});' +
     'return(0,v.kU)(await ' + correction + '.exchange(w.z,{actor:a,number:g,body:j},{ApiError:v.hD,canAccess:y.Ax,resolvePrice:c(92633).y,assertScope:c(88120).Q,lockActor:c(77114).aF,lockShift:c(77114).VN}));}' +
-    'let c=g,d=await w.z.order.findUnique');
-  body = replaceOnce(body, 'async function A(a,b){try{let a=await (0,x.Xf)()', 'async function A(a0,b){const runtimeRequire=c;try{let a=await (0,x.Xf)()');
-  // The route names the order number "c" inside the try block.
-  body = body.replaceAll('c(35991).t', 'runtimeRequire(35991).t').replaceAll('c(92633).y', 'runtimeRequire(92633).y')
-    .replaceAll('c(88120).Q', 'runtimeRequire(88120).Q').replaceAll('c(77114).', 'runtimeRequire(77114).');
+    'let d=await w.z.order.findUnique');
+  body = replaceOnce(body, 'order.findUnique({where:{number:c}', 'order.findUnique({where:{number:g}');
   body = replaceOnce(body, 'items:!0,extras:!0,session:{include:{location:!0}}', 'items:!0,extras:!0,shift:!0,refunds:{select:{id:!0},take:1},session:{include:{location:!0}}');
   body = replaceOnce(body, 'ticketTypeName:a.ticketType.name', 'ticketTypeName:a.ticketType.name,canCorrect:!1');
   // The GET handler's map variable shadows its authenticated cashier.
