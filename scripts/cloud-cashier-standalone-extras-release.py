@@ -11,6 +11,7 @@ import sys
 import tarfile
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 SCRIPTS = Path(__file__).resolve().parent
@@ -94,39 +95,65 @@ def verify(target):
 
 
 def run_staging_test(commit):
-    stage = release.read("staging-http.json")
-    assert release.active("staging")["image"]["imageDigest"] == stage["digest"]
-    spec = importlib.util.spec_from_file_location("qa", SCRIPTS / "cloud-staging-finance-qa.py")
-    qa = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(qa)
-    qa.r.WORK = release.WORK
-    qa.WORKER = "staging-standalone-extras-qa-worker.cjs"
-    qa.IMAGE_PREFIX = "staging-standalone-extras-qa"
-    qa.FOLDERS = ("b1gpfp37hftb0vfqsdl6", "b1g6627fmdlm7ms0eah1")
-    qa.build(commit, (release.WORK / "audit-before.json").exists())
-    before = release.read("audit-before.json")
-    worker = release.read("container.json")["id"]
-    digest = release.read("qa-image.json")["digest"]
-    assert qa.active(worker)["image"]["imageDigest"] == before["image"]["imageDigest"]
-
-    def wait_until(expected):
-        for _ in range(24):
-            if qa.active(worker)["image"]["imageDigest"] == expected:
-                return
-            time.sleep(4)
-        raise RuntimeError("QA worker did not reach expected revision")
-
-    qa.deploy()
+    checked = release.read("staging-http.json")
+    stage = release.active("staging")
+    assert stage["image"]["imageDigest"] == checked["digest"]
+    assert release.database_name(stage) == "lemuria_staging"
+    staging_folder = "b1gpfp37hftb0vfqsdl6"
+    worker = "staging-standalone-extras-qa-worker.cjs"
+    layer = release.WORK / "qa-layer.tar"
+    with tarfile.open(layer, "w") as archive:
+        archive.add(SCRIPTS / worker, "app/" + worker)
+    crane = str(Path.home() / "lemuria-crm-report-fix-20261104/tools/crane")
+    tag = release.REPOSITORY + ":staging-standalone-extras-qa-" + commit[:8]
+    token = release.run(["yc", "iam", "create-token"])
+    with tempfile.TemporaryDirectory(prefix="lemuria-qa-registry-") as auth:
+        env = dict(os.environ, DOCKER_CONFIG=auth)
+        subprocess.run([crane, "auth", "login", "cr.yandex", "-u", "iam", "--password-stdin"],
+                       input=token, text=True, capture_output=True, check=True, env=env, timeout=30)
+        release.run([crane, "append", "-b", release.REPOSITORY + "@" + checked["digest"],
+                     "-f", str(layer), "-t", tag], env=env, timeout=180)
+        digest = release.run([crane, "digest", tag], env=env)
+    assert re.fullmatch(r"sha256:[a-f0-9]{64}", digest)
+    created = json.loads(release.run(["yc", "serverless", "container", "create", "--folder-id", staging_folder,
+        "--name", "lemuria-product-qa-" + commit[:8], "--format", "json-rest"]))
+    cid = created["id"]
     try:
-        wait_until(digest)
-        qa.call("test")
-        result = release.read("test-result.json")
+        image = dict(image=release.REPOSITORY + "@" + digest, sourceCommit=commit,
+                     releaseId="temporary-cashier-product-qa")
+        payload = release.payload(stage, "staging", image)
+        payload.update(containerId=cid, executionTimeout="120s", concurrency="1")
+        payload.pop("provisionPolicy", None)
+        payload.pop("asyncInvocationConfig", None)
+        payload["imageSpec"].update(command={"command": ["node"]}, args={"args": ["/app/" + worker]})
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+        request = urllib.request.Request(
+            "https://serverless-containers.api.cloud.yandex.net/containers/v1/revisions:deploy",
+            method="POST", headers=headers, data=json.dumps(payload).encode(),
+        )
+        with urllib.request.urlopen(request, timeout=60) as response:
+            operation = json.load(response)
+        print(json.dumps({"testing": True, "operation": operation["id"]}), flush=True)
+        for _ in range(24):
+            revisions = json.loads(release.run(["yc", "serverless", "container", "revision", "list",
+                "--container-id", cid, "--format", "json-rest"]))
+            if any(row["status"] == "ACTIVE" and row["image"]["imageDigest"] == digest for row in revisions):
+                break
+            time.sleep(4)
+        else:
+            raise RuntimeError("Temporary QA container is not ready")
+        invoke = urllib.request.Request("https://" + cid + ".containers.yandexcloud.net/test",
+            method="POST", data=b"{}", headers=headers)
+        try:
+            with urllib.request.urlopen(invoke, timeout=115) as response:
+                result = json.load(response)
+        except urllib.error.HTTPError as error:
+            result = json.loads(error.read())
+        print(json.dumps(result), flush=True)
         assert result["ok"] and result["reportCorrect"] and result["orderCount"] == 0, result
     finally:
-        if qa.active(worker)["image"]["imageDigest"] == digest:
-            qa.deploy(restore=True)
-            wait_until(before["image"]["imageDigest"])
-    release.save("staging-accepted.json", {**stage, "checkoutTest": result})
+        release.run(["yc", "serverless", "container", "delete", "--id", cid], timeout=90)
+    release.save("staging-accepted.json", {**checked, "checkoutTest": result})
 
 
 if __name__ == "__main__":
