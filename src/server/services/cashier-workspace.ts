@@ -6,7 +6,7 @@ import {
   todayInTimezone,
 } from "@/lib/datetime";
 import { DomainError } from "@/server/domain/errors";
-import { isSessionBookable } from "@/server/domain/session.domain";
+import { isSessionSellableAtCashier } from "@/server/domain/session.domain";
 import { computeAvailability } from "@/server/domain/availability.domain";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { locationRepository } from "@/server/repositories/location.repository";
@@ -41,14 +41,15 @@ export async function listCashierSessionsForToday(locationId?: string) {
   const candidates = await sessionRepository.listCandidates(prisma, {
     locationId: location.id,
     statuses: ["SCHEDULED", "OPEN"],
-    from: now,
+    from: startOfLocalDateInTimezone(date, location.timezone),
+    endingAfter: now,
     to: rangeEnd,
     take: DOMAIN_CONFIG.maxSessionsPerQuery,
   });
 
   const sessions = candidates.filter(
     (session) =>
-      isSessionBookable(session, now) &&
+      isSessionSellableAtCashier(session, now) &&
       formatDateInTimezone(session.startsAt, location.timezone) === date,
   );
 
@@ -103,7 +104,7 @@ export async function listCashierSessionsForToday(locationId?: string) {
       };
     }),
     sessions: sessions
-      .filter((session) => isSessionBookable(session, responseTime))
+      .filter((session) => isSessionSellableAtCashier(session, responseTime))
       .map((session) => {
         const availability = computeAvailability({
           sessionId: session.id,
@@ -115,6 +116,7 @@ export async function listCashierSessionsForToday(locationId?: string) {
           publicId: session.publicId,
           localTime: formatTimeInTimezone(session.startsAt, location.timezone),
           startsAt: session.startsAt.toISOString(),
+          endsAt: session.endsAt.toISOString(),
           capacity: availability.capacity,
           sold: availability.booked,
           remaining: availability.available,

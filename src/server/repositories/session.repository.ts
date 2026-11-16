@@ -18,13 +18,21 @@ export const sessionRepository = {
 
   listCandidates(
     db: DbClient,
-    params: { locationId: string; statuses: SessionStatus[]; from: Date; to: Date; take: number },
+    params: {
+      locationId: string;
+      statuses: SessionStatus[];
+      from: Date;
+      to: Date;
+      take: number;
+      endingAfter?: Date;
+    },
   ) {
     return db.session.findMany({
       where: {
         locationId: params.locationId,
         status: { in: params.statuses },
         startsAt: { gte: params.from, lte: params.to },
+        endsAt: params.endingAfter === undefined ? undefined : { gt: params.endingAfter },
       },
       orderBy: { startsAt: "asc" },
       take: params.take,

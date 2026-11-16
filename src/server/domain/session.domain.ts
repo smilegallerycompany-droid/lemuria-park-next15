@@ -7,14 +7,15 @@ import { DomainError } from "@/server/domain/errors";
  * decisions or throws a `DomainError`.
  */
 
+function hasBookableStatus(status: Session["status"]): boolean {
+  return status === "SCHEDULED" || status === "OPEN";
+}
+
 export function isSessionBookable(
   session: Pick<Session, "status" | "startsAt">,
   now: Date,
 ): boolean {
-  if (session.status !== "SCHEDULED" && session.status !== "OPEN") {
-    return false;
-  }
-  return session.startsAt.getTime() > now.getTime();
+  return hasBookableStatus(session.status) && session.startsAt.getTime() > now.getTime();
 }
 
 /**
@@ -31,5 +32,24 @@ export function assertSessionBookable<T extends Pick<Session, "status" | "starts
   }
   if (!isSessionBookable(session, now)) {
     throw new DomainError("SESSION_NOT_AVAILABLE", "Сеанс недоступен для бронирования");
+  }
+}
+
+export function isSessionSellableAtCashier(
+  session: Pick<Session, "status" | "endsAt">,
+  now: Date,
+): boolean {
+  return hasBookableStatus(session.status) && session.endsAt.getTime() > now.getTime();
+}
+
+export function assertSessionSellableAtCashier<T extends Pick<Session, "status" | "endsAt">>(
+  session: T | null,
+  now: Date,
+): asserts session is T {
+  if (!session) {
+    throw new DomainError("SESSION_NOT_FOUND", "Сеанс не найден");
+  }
+  if (!isSessionSellableAtCashier(session, now)) {
+    throw new DomainError("SESSION_NOT_AVAILABLE", "Продажи на сеанс закрыты");
   }
 }

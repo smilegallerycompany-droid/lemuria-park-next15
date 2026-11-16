@@ -4,7 +4,7 @@ import { recordAuditLog } from "@/lib/audit";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { DomainError } from "@/server/domain/errors";
 import { assertCapacity } from "@/server/domain/availability.domain";
-import { assertSessionBookable } from "@/server/domain/session.domain";
+import { assertSessionSellableAtCashier } from "@/server/domain/session.domain";
 import {
   assertIdempotencyPayloadMatches,
   hashIdempotencyPayload,
@@ -77,7 +77,7 @@ async function createCashierSaleInTransaction(
   await Promise.all([expireStaleReservations(tx, now), expireStalePaymentOrders(tx, now)]);
 
   const session = await sessionRepository.findByPublicId(tx, input.sessionPublicId);
-  assertSessionBookable(session, new Date());
+  assertSessionSellableAtCashier(session, new Date());
   await sessionRepository.lockForUpdate(tx, session.id);
 
   const shift = await requireOpenShift(tx, cashierId, session.locationId);
@@ -115,7 +115,7 @@ async function createCashierSaleInTransaction(
   );
 
   const totalAmount = computeOrderTotal(lineItems);
-  assertSessionBookable(session, new Date());
+  assertSessionSellableAtCashier(session, new Date());
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,

@@ -79,8 +79,8 @@ export function CashierWorkspace() {
   const timezone = sessionsData?.location.timezone ?? "Europe/Moscow";
   const now = useCurrentTime();
   const clock = formatClock(timezone, now);
-  const upcomingSessions =
-    sessionsData?.sessions.filter((session) => Date.parse(session.startsAt) > now) ?? [];
+  const availableSessions =
+    sessionsData?.sessions.filter((session) => Date.parse(session.endsAt) > now) ?? [];
 
   useEffect(() => {
     getCashierMe()
@@ -101,7 +101,7 @@ export function CashierWorkspace() {
         return (
           current ??
           data.sessions.find(
-            (session) => !session.soldOut && Date.parse(session.startsAt) > loadedAt,
+            (session) => !session.soldOut && Date.parse(session.endsAt) > loadedAt,
           )?.publicId ??
           null
         );
@@ -131,7 +131,7 @@ export function CashierWorkspace() {
   }, [user, refreshSessions, refreshOrders]);
 
   const selectedSession: CashierSessionCard | null =
-    upcomingSessions.find((session) => session.publicId === selectedSessionId) ?? null;
+    availableSessions.find((session) => session.publicId === selectedSessionId) ?? null;
 
   const totalQuantity = useMemo(() => selectedTicketCount(quantities), [quantities]);
 
@@ -154,8 +154,8 @@ export function CashierWorkspace() {
 
   const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
     if (!selectedSession || !canSell) return;
-    if (Date.parse(selectedSession.startsAt) <= Date.now()) {
-      setError("Сеанс уже начался. Выберите другое время.");
+    if (Date.parse(selectedSession.endsAt) <= Date.now()) {
+      setError("Сеанс уже закончился. Выберите другое время.");
       return;
     }
     setSelling(true);
@@ -239,10 +239,10 @@ export function CashierWorkspace() {
           </div>
         ) : (
           <div className="cashier-home-sessions">
-            {sessionsData && upcomingSessions.length === 0 ? (
-              <div className="cashier-empty">На сегодня больше нет предстоящих сеансов.</div>
+            {sessionsData && availableSessions.length === 0 ? (
+              <div className="cashier-empty">На сегодня больше нет сеансов для продажи.</div>
             ) : null}
-            {upcomingSessions.map((session) => {
+            {availableSessions.map((session) => {
               const active = session.publicId === selectedSessionId;
               return (
                 <motion.button
@@ -507,7 +507,7 @@ export function CashierWorkspace() {
                 </>
               ) : (
                 <p className="mt-4 text-sm text-muted-foreground">
-                  {selectedSessionId && upcomingSessions.length > 0
+                  {selectedSessionId && availableSessions.length > 0
                     ? "Продажи на выбранный сеанс закрыты. Выберите другое время."
                     : "Выберите сеанс слева."}
                 </p>

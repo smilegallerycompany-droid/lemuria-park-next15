@@ -11,6 +11,7 @@ export interface CashierSessionCard {
   publicId: string;
   localTime: string;
   startsAt: string;
+  endsAt: string;
   capacity: number;
   sold: number;
   remaining: number;

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { assertSessionBookable, isSessionBookable } from "@/server/domain/session.domain";
+import {
+  assertSessionBookable,
+  assertSessionSellableAtCashier,
+  isSessionBookable,
+  isSessionSellableAtCashier,
+} from "@/server/domain/session.domain";
 import { DomainError } from "@/server/domain/errors";
 
 const NOW = new Date("2026-07-25T10:00:00.000Z");
@@ -48,5 +53,29 @@ test("assertSessionBookable does not throw for a bookable session", () => {
       { status: "SCHEDULED", startsAt: new Date("2026-07-25T11:00:00.000Z") },
       NOW,
     ),
+  );
+});
+
+test("a started session accepts cashier sales until its scheduled end", () => {
+  const session = {
+    status: "SCHEDULED" as const,
+    startsAt: new Date("2026-11-16T07:30:00.000Z"),
+    endsAt: new Date("2026-11-16T07:50:00.000Z"),
+  };
+  const twoMinutesAfterStart = new Date("2026-11-16T07:32:00.000Z");
+  const lastMillisecond = new Date("2026-11-16T07:49:59.999Z");
+
+  assert.doesNotThrow(() => assertSessionSellableAtCashier(session, session.startsAt));
+  assert.doesNotThrow(() => assertSessionSellableAtCashier(session, twoMinutesAfterStart));
+  assert.equal(isSessionBookable(session, twoMinutesAfterStart), false);
+  assert.equal(isSessionSellableAtCashier(session, lastMillisecond), true);
+  assert.equal(isSessionSellableAtCashier(session, session.endsAt), false);
+  assert.throws(
+    () => assertSessionSellableAtCashier(session, session.endsAt),
+    (error: unknown) => error instanceof DomainError && error.code === "SESSION_NOT_AVAILABLE",
+  );
+  assert.equal(
+    isSessionSellableAtCashier({ ...session, status: "CANCELLED" }, twoMinutesAfterStart),
+    false,
   );
 });
