@@ -4,8 +4,10 @@ const NOTE = "Продажа без билета";
 const PRODUCTS = { FEED_SALE: "FEED", PHOTO_SALE: "PHOTO" };
 
 function parseEntry(body, parse) {
-  if (body?.kind !== "PHOTO_SALE" || body.note !== NOTE) return parse(body);
-  return { ...parse({ ...body, kind: "FEED_SALE" }), kind: "PHOTO_SALE" };
+  if (body?.note !== NOTE || !Object.hasOwn(PRODUCTS, body.kind)) return parse(body);
+  // Use the existing manual-sale schema for the common entry fields. The
+  // real product is restored before checking price or writing any records.
+  return { ...parse({ ...body, kind: "BALABAS_SALE" }), kind: body.kind };
 }
 
 async function checkPrice(tx, entry, DomainError) {
