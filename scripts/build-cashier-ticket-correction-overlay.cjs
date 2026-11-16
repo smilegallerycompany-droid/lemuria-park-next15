@@ -43,7 +43,7 @@ function patchRoute(body, shiftEntries) {
   const eligibility = 'canCorrectOrder=' + correction + '.eligibleOrder(d,a,!0);';
   body = replaceOnce(body, 'return(0,v.kU)({order:', 'const ' + eligibility + 'return(0,v.kU)({order:');
   body = replaceOnce(body, 'canCorrect:!1', 'canCorrect:canCorrectOrder&&a.sessionId===d.sessionId&&["ADULT","CHILD"].includes(a.ticketType.code)&&["VALID","USED"].includes(a.status)');
-  return replaceOnce(body, 'b.X(0,[3897,2995,6802,1692,7028,6199]', 'b.X(0,[3897,2995,6802,1692,7028,6199,8555,7114,692]');
+  return replaceOnce(body, 'b.X(0,[3897,2995,6802,1692,7028,6199]', 'b.X(0,[3897,2995,6802,1692,7028,6199,670,8555,7114,692]');
 }
 
 function build(root, commit) {
