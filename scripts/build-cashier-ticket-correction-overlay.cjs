@@ -34,7 +34,7 @@ function patchRoute(body, shiftEntries) {
   body = replaceOnce(body, 'async function A(a,b){try{let a=await (0,x.Xf)(),{number:c}=await b.params,d=await w.z.order.findUnique',
     'async function A(request,b){try{let a=await (0,x.Xf)(),{number:g}=await b.params;' +
     'if(request.method==="POST"){(0,c(35991).t)(request);const j=await request.json().catch(()=>{throw new v.hD("VALIDATION_ERROR","Некорректный JSON",400)});' +
-    'return(0,v.kU)(await ' + correction + '.exchange(w.z,{actor:a,number:g,body:j},{ApiError:v.hD,canAccess:y.Ax,resolvePrice:c(92633).y,assertScope:c(88120).Q,lockActor:c(77114).aF,lockShift:c(77114).VN}));}' +
+    'return(0,v.kU)(await ' + correction + '.exchange(w.z,{actor:a,number:g,body:j},{ApiError:v.hD,canAccess:y.Ax,resolvePrice:c(92633).y,assertScope:c(88120).Q,lockActor:c(77114).aF,lockShift:c(77114).vN}));}' +
     'let d=await w.z.order.findUnique');
   body = replaceOnce(body, 'order.findUnique({where:{number:c}', 'order.findUnique({where:{number:g}');
   body = replaceOnce(body, 'items:!0,extras:!0,session:{include:{location:!0}}', 'items:!0,extras:!0,shift:!0,refunds:{select:{id:!0},take:1},session:{include:{location:!0}}');
@@ -78,7 +78,9 @@ function build(root, commit) {
   }
   assert.ok(changed.has(".next/app-build-manifest.json"));
   const route = ".next/server/app/api/cashier/orders/[number]/route.js";
-  changed.set(route, patchRoute(files.get(route), files.get(".next/server/app/api/cashier/shift/entries/route.js")));
+  const entries = ".next/server/app/api/cashier/shift/entries/route.js";
+  changed.set(route, patchRoute(files.get(route), files.get(entries)));
+  changed.set(entries, replaceOnce(files.get(entries), "lockShift:G.VN", "lockShift:G.vN"));
   changed.set("cashier-ticket-correction.cjs", fs.readFileSync(path.join(__dirname, "cashier-ticket-correction.cjs"), "utf8"));
   const output = [];
   for (const [relative, body] of changed) {
