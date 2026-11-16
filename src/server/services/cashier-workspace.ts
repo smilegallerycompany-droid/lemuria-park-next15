@@ -6,6 +6,7 @@ import {
   todayInTimezone,
 } from "@/lib/datetime";
 import { DomainError } from "@/server/domain/errors";
+import { isSessionBookable } from "@/server/domain/session.domain";
 import { computeAvailability } from "@/server/domain/availability.domain";
 import { DOMAIN_CONFIG } from "@/server/domain/config";
 import { locationRepository } from "@/server/repositories/location.repository";
@@ -35,19 +36,20 @@ export async function listCashierSessionsForToday(locationId?: string) {
 
   const date = todayInTimezone(location.timezone, now);
   const anchor = new Date(`${date}T00:00:00Z`);
-  const rangeStart = new Date(anchor.getTime() - 24 * 60 * 60 * 1000);
   const rangeEnd = new Date(anchor.getTime() + 2 * 24 * 60 * 60 * 1000);
 
   const candidates = await sessionRepository.listCandidates(prisma, {
     locationId: location.id,
     statuses: ["SCHEDULED", "OPEN"],
-    from: rangeStart,
+    from: now,
     to: rangeEnd,
     take: DOMAIN_CONFIG.maxSessionsPerQuery,
   });
 
   const sessions = candidates.filter(
-    (session) => formatDateInTimezone(session.startsAt, location.timezone) === date,
+    (session) =>
+      isSessionBookable(session, now) &&
+      formatDateInTimezone(session.startsAt, location.timezone) === date,
   );
 
   const sessionIds = sessions.map((session) => session.id);
@@ -76,6 +78,7 @@ export async function listCashierSessionsForToday(locationId?: string) {
     orderedBySession.set(order.sessionId, (orderedBySession.get(order.sessionId) ?? 0) + qty);
   }
 
+  const responseTime = new Date();
   return {
     location: {
       city: location.city,
@@ -99,23 +102,25 @@ export async function listCashierSessionsForToday(locationId?: string) {
         unitPrice: rule ? buildResolvedPrice(ticketType, rule).unitPriceAmount : null,
       };
     }),
-    sessions: sessions.map((session) => {
-      const availability = computeAvailability({
-        sessionId: session.id,
-        capacity: session.capacity,
-        reservedQuantity: reservedBySession.get(session.id) ?? 0,
-        orderedQuantity: orderedBySession.get(session.id) ?? 0,
-      });
-      return {
-        publicId: session.publicId,
-        localTime: formatTimeInTimezone(session.startsAt, location.timezone),
-        startsAt: session.startsAt.toISOString(),
-        capacity: availability.capacity,
-        sold: availability.booked,
-        remaining: availability.available,
-        soldOut: availability.available <= 0,
-      };
-    }),
+    sessions: sessions
+      .filter((session) => isSessionBookable(session, responseTime))
+      .map((session) => {
+        const availability = computeAvailability({
+          sessionId: session.id,
+          capacity: session.capacity,
+          reservedQuantity: reservedBySession.get(session.id) ?? 0,
+          orderedQuantity: orderedBySession.get(session.id) ?? 0,
+        });
+        return {
+          publicId: session.publicId,
+          localTime: formatTimeInTimezone(session.startsAt, location.timezone),
+          startsAt: session.startsAt.toISOString(),
+          capacity: availability.capacity,
+          sold: availability.booked,
+          remaining: availability.available,
+          soldOut: availability.available <= 0,
+        };
+      }),
   };
 }
 

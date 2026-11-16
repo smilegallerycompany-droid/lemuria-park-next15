@@ -7,6 +7,7 @@ type InvitationParams = {
   allowedLocationIds?: string[];
 };
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Use the same policy as the maintenance workers.
 const policy = require("./invitation-policy.cjs") as {
   checkInInvitation(db: PrismaClient, params: InvitationParams): Promise<CheckInResponse | null>;
 };

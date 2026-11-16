@@ -4,8 +4,8 @@ import {
   extractCronSecret,
   isGatewayProxied,
   isYandexTimerCleanupEvent,
-  secretsEqual,
 } from "@/lib/config/cron-auth";
+import { secretsEqual } from "@/lib/config/cron-secrets";
 import { handleApiError } from "@/lib/api/response";
 import { runScheduledCleanup } from "@/server/services/scheduled-cleanup";
 

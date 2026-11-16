@@ -1,19 +1,3 @@
-import { timingSafeEqual } from "crypto";
-
-/**
- * Compare bearer/header secrets without leaking length via early return on
- * the equality path. Dummy compare when lengths differ still runs HMAC-size work.
- */
-export function secretsEqual(provided: string, expected: string): boolean {
-  const a = Buffer.from(provided);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) {
-    timingSafeEqual(b, b);
-    return false;
-  }
-  return timingSafeEqual(a, b);
-}
-
 export function extractCronSecret(headers: Headers): string | null {
   const bearer = headers.get("authorization");
   if (bearer?.toLowerCase().startsWith("bearer ")) {

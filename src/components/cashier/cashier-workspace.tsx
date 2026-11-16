@@ -34,6 +34,7 @@ import {
 } from "@/lib/api/cashier";
 import { OpenShiftForm } from "@/components/cashier/OpenShiftForm";
 import { useCashierShift } from "@/components/cashier/CashierShiftProvider";
+import { useCurrentTime } from "@/components/cashier/use-current-time";
 import {
   canSubmitTicketSelection,
   lineTotalKopecks,
@@ -43,12 +44,7 @@ import {
 
 type Filter = "today" | "all" | "paid" | "cancelled";
 
-function useClock(timezone: string) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
+function formatClock(timezone: string, now: number) {
   return {
     date: new Intl.DateTimeFormat("ru-RU", {
       weekday: "long",
@@ -81,7 +77,10 @@ export function CashierWorkspace() {
   const [loadingSessions, setLoadingSessions] = useState(false);
 
   const timezone = sessionsData?.location.timezone ?? "Europe/Moscow";
-  const clock = useClock(timezone);
+  const now = useCurrentTime();
+  const clock = formatClock(timezone, now);
+  const upcomingSessions =
+    sessionsData?.sessions.filter((session) => Date.parse(session.startsAt) > now) ?? [];
 
   useEffect(() => {
     getCashierMe()
@@ -98,10 +97,14 @@ export function CashierWorkspace() {
       const data = await getCashierSessions();
       setSessionsData(data);
       setSelectedSessionId((current) => {
-        if (current && data.sessions.some((session) => session.publicId === current)) {
-          return current;
-        }
-        return data.sessions.find((session) => !session.soldOut)?.publicId ?? null;
+        const loadedAt = Date.now();
+        return (
+          current ??
+          data.sessions.find(
+            (session) => !session.soldOut && Date.parse(session.startsAt) > loadedAt,
+          )?.publicId ??
+          null
+        );
       });
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Не удалось загрузить сеансы");
@@ -128,7 +131,7 @@ export function CashierWorkspace() {
   }, [user, refreshSessions, refreshOrders]);
 
   const selectedSession: CashierSessionCard | null =
-    sessionsData?.sessions.find((session) => session.publicId === selectedSessionId) ?? null;
+    upcomingSessions.find((session) => session.publicId === selectedSessionId) ?? null;
 
   const totalQuantity = useMemo(() => selectedTicketCount(quantities), [quantities]);
 
@@ -151,6 +154,10 @@ export function CashierWorkspace() {
 
   const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
     if (!selectedSession || !canSell) return;
+    if (Date.parse(selectedSession.startsAt) <= Date.now()) {
+      setError("Сеанс уже начался. Выберите другое время.");
+      return;
+    }
     setSelling(true);
     setError(null);
     setStatusMessage(null);
@@ -232,7 +239,10 @@ export function CashierWorkspace() {
           </div>
         ) : (
           <div className="cashier-home-sessions">
-            {sessionsData?.sessions.map((session) => {
+            {sessionsData && upcomingSessions.length === 0 ? (
+              <div className="cashier-empty">На сегодня больше нет предстоящих сеансов.</div>
+            ) : null}
+            {upcomingSessions.map((session) => {
               const active = session.publicId === selectedSessionId;
               return (
                 <motion.button
@@ -496,7 +506,11 @@ export function CashierWorkspace() {
                   </div>
                 </>
               ) : (
-                <p className="mt-4 text-sm text-muted-foreground">Выберите сеанс слева.</p>
+                <p className="mt-4 text-sm text-muted-foreground">
+                  {selectedSessionId && upcomingSessions.length > 0
+                    ? "Продажи на выбранный сеанс закрыты. Выберите другое время."
+                    : "Выберите сеанс слева."}
+                </p>
               )}
 
               {statusMessage && (

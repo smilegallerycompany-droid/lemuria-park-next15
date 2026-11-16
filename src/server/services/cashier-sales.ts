@@ -77,7 +77,7 @@ async function createCashierSaleInTransaction(
   await Promise.all([expireStaleReservations(tx, now), expireStalePaymentOrders(tx, now)]);
 
   const session = await sessionRepository.findByPublicId(tx, input.sessionPublicId);
-  assertSessionBookable(session, now);
+  assertSessionBookable(session, new Date());
   await sessionRepository.lockForUpdate(tx, session.id);
 
   const shift = await requireOpenShift(tx, cashierId, session.locationId);
@@ -115,6 +115,7 @@ async function createCashierSaleInTransaction(
   );
 
   const totalAmount = computeOrderTotal(lineItems);
+  assertSessionBookable(session, new Date());
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,

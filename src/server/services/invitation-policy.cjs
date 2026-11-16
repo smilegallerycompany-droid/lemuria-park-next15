@@ -2,6 +2,7 @@
 
 // Small invitation batches use the existing append-only audit event store.
 // No orders, payments, sessions or ticket inventory are created by invitations.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- Shared with CommonJS maintenance workers.
 const {createHash, randomBytes} = require('node:crypto');
 const TYPE = 'InvitationTicket';
 const PREFIX = 'LPINV1-';

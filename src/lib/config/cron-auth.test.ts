@@ -5,8 +5,8 @@ import {
   extractCronSecret,
   isPrivateTimerRootPost,
   isYandexTimerCleanupEvent,
-  secretsEqual,
 } from "@/lib/config/cron-auth";
+import { secretsEqual } from "@/lib/config/cron-secrets";
 
 test("secretsEqual accepts matching secrets and rejects mismatches", () => {
   assert.equal(secretsEqual("same-secret-value", "same-secret-value"), true);
