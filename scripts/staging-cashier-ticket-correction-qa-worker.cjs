@@ -41,6 +41,7 @@ async function run() {
       userId: user.id, locationId: location.id, status: "OPEN", openingCashAmount: 0,
     } });
     const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    while (date.getUTCDay() !== 0) date.setUTCDate(date.getUTCDate() + 1);
     date.setUTCHours(14, 30, randomInt(1, 60), randomInt(1, 1000));
     session = await db.session.create({ data: {
       locationId: location.id, park: location.park, startsAt: date, endsAt: new Date(+date + 20 * 60_000),
