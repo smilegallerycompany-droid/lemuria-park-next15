@@ -26,7 +26,10 @@ function patchView(body) {
   return replaceOnce(body, anchor, anchor + component);
 }
 
-function patchRoute(body) {
+function patchRoute(body, shiftEntries) {
+  const sameOrigin = shiftEntries.match(/(?:[,{])(35991:[\s\S]*?)(?=,\d+:)/)?.[1];
+  assert.ok(sameOrigin?.includes("sec-fetch-site"), "Expected the cashier same-origin middleware");
+  body = replaceOnce(body, "a.modules={", "a.modules={" + sameOrigin + ",");
   body = replaceOnce(body, 'c.d(d,{GET:()=>A})', 'c.d(d,{GET:()=>A,POST:()=>A})');
   body = replaceOnce(body, 'async function A(a,b){try{let a=await (0,x.Xf)(),{number:c}=await b.params,d=await w.z.order.findUnique',
     'async function A(request,b){try{let a=await (0,x.Xf)(),{number:g}=await b.params;' +
@@ -75,7 +78,7 @@ function build(root, commit) {
   }
   assert.ok(changed.has(".next/app-build-manifest.json"));
   const route = ".next/server/app/api/cashier/orders/[number]/route.js";
-  changed.set(route, patchRoute(files.get(route)));
+  changed.set(route, patchRoute(files.get(route), files.get(".next/server/app/api/cashier/shift/entries/route.js")));
   changed.set("cashier-ticket-correction.cjs", fs.readFileSync(path.join(__dirname, "cashier-ticket-correction.cjs"), "utf8"));
   const output = [];
   for (const [relative, body] of changed) {
