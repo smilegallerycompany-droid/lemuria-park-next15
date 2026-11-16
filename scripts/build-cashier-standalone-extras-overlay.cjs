@@ -100,7 +100,7 @@ function build(root, commit) {
     const renames = new Map();
     for (const [file, body] of files) {
       if (!file.startsWith(".next/static/") || originals.get(file) === body) continue;
-      const old = file.match(/-([a-f0-9]{16})\.(?:js|css)$/)?.[1];
+      const old = file.match(/[.-]([a-f0-9]{16,32})\.(?:js|css)$/)?.[1];
       assert.ok(old, "Unexpected static filename: " + file);
       const next = hash(body).slice(0, old.length);
       if (old === next) continue;
