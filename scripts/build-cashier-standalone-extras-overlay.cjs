@@ -20,7 +20,9 @@ function once(body, search, value) {
 function patchEntryRoute(body) {
   body = once(body, "let c=D.sw.parse(b);", "let c=" + POLICY + ".parseEntry(b,value=>D.sw.parse(value));");
   body = once(body, "let g=(0,D.uC)(c);", "await " + POLICY + ".checkPrice(b,c,E.J);let g=(0,D.uC)(c);");
-  return once(body, "D.oZ[c.kind]", '("PHOTO_SALE"===c.kind?"Продажа фото":D.oZ[c.kind])');
+  const label = body.match(/parkOperationId:h\.id,comment:`\$\{([A-Z]\.oZ\[c\.kind\])\}/)?.[1];
+  assert.ok(label, "Missing cash operation label");
+  return once(body, label, '("PHOTO_SALE"===c.kind?"Продажа фото":' + label + ')');
 }
 
 function patchWorkspace(body) {
