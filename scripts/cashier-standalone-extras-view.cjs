@@ -15,6 +15,11 @@ function StandaloneExtras({ React, jsx, products, shiftId, refreshShift }) {
   const current = list.find((product) => product.code === code);
   const units = Number(quantity);
   const valid = Boolean(current && Number.isInteger(units) && units > 0 && units <= 100);
+  const quantityLocked = Boolean(pending) || busy;
+  const stepStyle = { width: "100%", minHeight: 48, padding: 0, fontSize: 23, lineHeight: 1 };
+  function changeQuantity(delta) {
+    setQuantity((previous) => String(Math.min(100, Math.max(1, (Number(previous) || 0) + delta))));
+  }
   const storageKey = "lemuria-extras-sale:" + shiftId;
   const currency = new Intl.NumberFormat("ru-RU", {
     style: "currency", currency: "RUB", maximumFractionDigits: 2,
@@ -101,12 +106,53 @@ function StandaloneExtras({ React, jsx, products, shiftId, refreshShift }) {
       (current || pending) ? jsx.jsxs("form", {
         onSubmit: submit, style: { display: "grid", gap: 10, marginTop: 12 },
         children: [
-          jsx.jsxs("label", {
-            children: ["Количество ", h("input", {
-              type: "number", min: 1, max: 100, inputMode: "numeric", required: true,
-              value: quantity, onChange: (event) => setQuantity(event.target.value),
-              disabled: Boolean(pending), className: "border rounded-lg px-2 py-1",
-            })],
+          jsx.jsxs("div", {
+            style: { display: "grid", gap: 6, maxWidth: 232 },
+            children: [
+              h("label", {
+                htmlFor: "standalone-extras-quantity",
+                style: { color: "#294334", fontWeight: 650 },
+                children: "Количество",
+              }),
+              jsx.jsxs("div", {
+                style: { display: "grid", gridTemplateColumns: "48px minmax(48px, 1fr) 48px", gap: 8 },
+                children: [
+                  h("button", {
+                    type: "button",
+                    "aria-label": "Уменьшить количество",
+                    disabled: quantityLocked || units <= 1,
+                    onClick: () => changeQuantity(-1),
+                    className: "cashier-btn cashier-btn-ghost",
+                    style: stepStyle,
+                    children: "−",
+                  }),
+                  h("input", {
+                    id: "standalone-extras-quantity", type: "text", inputMode: "numeric",
+                    maxLength: 3, required: true, autoComplete: "off",
+                    value: quantity, disabled: quantityLocked,
+                    onChange: (event) => {
+                      const digits = event.target.value.replace(/[^0-9]/g, "");
+                      setQuantity(digits === "" ? "" : String(Math.min(100, Number(digits))));
+                    },
+                    onBlur: () => { if (units < 1) setQuantity("1"); },
+                    style: {
+                      width: "100%", minWidth: 0, minHeight: 48, textAlign: "center",
+                      color: "#203b2b", background: "#fff", border: "1px solid #a9bda7",
+                      borderRadius: 10, fontSize: 22, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+                    },
+                  }),
+                  h("button", {
+                    type: "button",
+                    "aria-label": "Увеличить количество",
+                    disabled: quantityLocked || units >= 100,
+                    onClick: () => changeQuantity(1),
+                    className: "cashier-btn cashier-btn-primary",
+                    style: stepStyle,
+                    children: "+",
+                  }),
+                ],
+              }),
+            ],
           }),
           jsx.jsxs("label", {
             children: ["Оплата ", jsx.jsxs("select", {
