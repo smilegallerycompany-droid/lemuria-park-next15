@@ -241,7 +241,7 @@ export default function HomePage() {
             <span className="visit-num">03</span>
             <Users className="visit-icon" size={22} aria-hidden />
             <h3>Небольшие группы</h3>
-            <p>До 15 гостей на сеанс. Всем комфортно смотреть программу и фотографировать.</p>
+            <p>До 15 гостей на сеанс. Всем комфортно смотреть программу.</p>
           </article>
           <article className="visit-card">
             <span className="visit-num">04</span>
