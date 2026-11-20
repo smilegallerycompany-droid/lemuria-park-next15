@@ -40,14 +40,21 @@ body = once(body, '_||fetch("/api/public/content")', '(!_||_._refreshHome)&&fetc
 old_hash = re.search(r'-([a-f0-9]{16})\.js$',old_name)[1]
 new_hash = hashlib.sha256(body.encode()).hexdigest()[:16]
 changes[old_name.replace(old_hash,new_hash)] = body.encode()
+active_sheet = '.next/static/css/aac3dbc30195215e.css'
+styles = (root/active_sheet).read_text()
+assert '/hero-lemur.png' in styles
+styles = styles.replace('/hero-lemur.png', '/hero-lemur.webp').replace('/gallery-1.png', '/gallery-1.webp')
+old_css = Path(active_sheet).stem
+new_css = hashlib.sha256(styles.encode()).hexdigest()[:16]
+changes[active_sheet.replace(old_css, new_css)] = styles.encode()
 for p in (root/'.next').rglob('*'):
     if not p.is_file() or p.suffix not in {'.json','.js','.html','.rsc','.meta','.txt'}: continue
     name = str(p.relative_to(root))
-    if name == old_name: continue
+    if name in (old_name, active_sheet): continue
     data = changes.get(name,p.read_bytes())
-    if old_hash.encode() in data:
+    if old_hash.encode() in data or old_css.encode() in data:
         assert not name.startswith('.next/static/'), name
-        changes[name] = data.replace(old_hash.encode(),new_hash.encode())
+        changes[name] = data.replace(old_hash.encode(),new_hash.encode()).replace(old_css.encode(),new_css.encode())
 assert '.next/app-build-manifest.json' in changes
 with tarfile.open(target,'w') as tar:
     for name,data in changes.items():
