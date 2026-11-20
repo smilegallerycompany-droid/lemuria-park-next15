@@ -1,6 +1,5 @@
 "use strict";
-// Limit the time a public page can spend waiting for CMS and schedule queries.
-const seed = require("./home-public-seed.json");
+
 let pending;
 let cached;
 let freshUntil = 0;
@@ -14,9 +13,5 @@ exports.read = function read(load) {
       return result;
     }).finally(() => { pending = undefined; });
   }
-  return new Promise(resolve => {
-    const timer = setTimeout(() => resolve(seed), 120);
-    pending.then(value => { clearTimeout(timer); resolve(value); },
-      () => { clearTimeout(timer); resolve(seed); });
-  });
+  return pending;
 };
