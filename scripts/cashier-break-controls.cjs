@@ -58,6 +58,19 @@ async function filterCandidates(db, params, rows, now = new Date()) {
   });
 }
 
+async function listForCashier(db, params, now = new Date()) {
+  const rows = await db.session.findMany({
+    where: {
+      locationId: params.locationId, park: params.park ?? "LEMURIA",
+      status: { in: params.statuses }, startsAt: { gte: params.from, lt: params.toExclusive },
+      endsAt: { gt: now },
+    },
+    orderBy: { startsAt: "asc" },
+    take: params.take,
+  });
+  return filterCandidates(db, params, rows, now);
+}
+
 async function findForCashier(db, publicId, now = new Date()) {
   const session = await db.session.findUnique({ where: { publicId }, include: { location: true } });
   if (!isBreak(session)) return session;
@@ -148,4 +161,4 @@ async function setOverride(db, actorId, input, { ErrorType, lockActor, lockShift
   });
 }
 
-module.exports = { filterCandidates, findForCashier, forShift, setOverride };
+module.exports = { listForCashier, filterCandidates, findForCashier, forShift, setOverride };
