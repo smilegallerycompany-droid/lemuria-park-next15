@@ -1,6 +1,6 @@
 "use strict";
 
-function CashierBreakControls({ React, jsx, controls, shiftId, refresh }) {
+function CashierBreakControls({ React, jsx, controls, shiftId, refresh, sessions, selectSession, canSell }) {
   const [pending, setPending] = React.useState(null);
   const [message, setMessage] = React.useState("");
   const saving = React.useRef(false);
@@ -55,6 +55,13 @@ function CashierBreakControls({ React, jsx, controls, shiftId, refresh }) {
                   : slot.unavailableReason,
               }),
             ] }),
+            slot.open && sessions?.some((session) => session.localTime === slot.time && canSell(session))
+              ? h("button", {
+                type: "button", className: "cashier-btn cashier-btn-primary",
+                disabled: pending !== null,
+                onClick: () => selectSession(sessions.find((session) => session.localTime === slot.time)),
+                children: "Выбрать " + slot.time,
+              }) : null,
             slot.canToggle ? h("button", {
               type: "button",
               className: "cashier-btn cashier-btn-ghost",

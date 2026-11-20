@@ -68,6 +68,8 @@ test("opens each current-day cashier session independently and restores the brea
   const result = await toggle(db, "actor");
   assert.deepEqual(result.slots.map((slot) => slot.open), [true, false]);
   assert.equal(records.size, 1);
+  const query = { locationId: location.id, statuses: ["OPEN", "SCHEDULED"] };
+  assert.deepEqual(await policy.listForCashier(db, query, now), [rows[0], rows[1]]);
   assert.deepEqual(await policy.filterCandidates(db, { locationId: location.id }, rows, now), [rows[0], rows[1]]);
   assert.deepEqual(await standard.filterCandidates(db, { locationId: location.id }, rows), [rows[0]]);
   assert.equal(standard.isBreak(rows[1]), true);
@@ -78,6 +80,7 @@ test("opens each current-day cashier session independently and restores the brea
   assert.deepEqual((await toggle(db, "actor", { open: false })).slots.map((slot) => slot.open), [false, true]);
   assert.equal(await policy.findForCashier(db, rows[1].publicId, now), null);
   assert.equal(await policy.findForCashier(db, rows[3].publicId, now), rows[3]);
+  assert.deepEqual(await policy.listForCashier(db, query, now), [rows[0], rows[3]]);
 });
 
 test("rejects a changed local date, inactive shift, out-of-scope user and completed session", async (t) => {
