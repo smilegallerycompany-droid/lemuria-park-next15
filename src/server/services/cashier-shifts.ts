@@ -174,34 +174,30 @@ export async function recordSaleOnShift(
     shiftId: string;
     orderId: string;
     userId: string;
-    paymentMethod: PaymentMethod;
-    amount: number;
+    payments: Array<{ method: PaymentMethod; amount: number }>;
     ticketsCount: number;
   },
 ) {
-  const salesField =
-    params.paymentMethod === "CASH"
-      ? "cashSalesAmount"
-      : params.paymentMethod === "CARD_TERMINAL"
-        ? "cardSalesAmount"
-        : "onlineSalesAmount";
-
+  const amountFor = (method: PaymentMethod) => params.payments.find(part => part.method === method)?.amount ?? 0;
+  const cash = amountFor("CASH");
   await db.cashierShift.update({
     where: { id: params.shiftId },
     data: {
-      [salesField]: { increment: params.amount },
+      cashSalesAmount: { increment: cash },
+      cardSalesAmount: { increment: amountFor("CARD_TERMINAL") },
+      onlineSalesAmount: { increment: amountFor("CARD_ONLINE") },
       ordersCount: { increment: 1 },
       ticketsCount: { increment: params.ticketsCount },
     },
   });
 
-  if (params.paymentMethod === "CASH") {
+  if (cash > 0) {
     await db.cashOperation.create({
       data: {
         shiftId: params.shiftId,
         userId: params.userId,
         type: "SALE",
-        amount: params.amount,
+        amount: cash,
         orderId: params.orderId,
         comment: "Продажа наличными",
       },
@@ -242,9 +238,10 @@ export async function computeShiftCashSummary(shiftId: string) {
     .reduce((s, o) => s + o.amount, 0);
 
   const cashRefunds = shift.orders.reduce((sum, order) => {
-    const cashPaid = order.payments.some((p) => p.method === "CASH" && p.status === "SUCCEEDED");
-    if (!cashPaid) return sum;
-    return sum + order.refunds.reduce((r, ref) => r + ref.amount, 0);
+    const cash = order.payments.find(p => p.method === "CASH");
+    if (!cash) return sum;
+    return sum + order.refunds.filter(ref => ref.paymentId === cash.id ||
+      (!ref.paymentId && order.payments.length === 1)).reduce((total, ref) => total + ref.amount, 0);
   }, 0);
 
   const ledger = {

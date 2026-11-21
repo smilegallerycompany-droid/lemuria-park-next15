@@ -27,7 +27,7 @@ export interface CreateCashierOrderRecordInput {
   customerPhone: string;
   customerEmail: string;
   totalAmount: number;
-  paymentMethod: PaymentMethod;
+  payments: Array<{ method: PaymentMethod; amount: number; ticketTypeIds: string[] }>;
   idempotencyKey?: string;
   idempotencyPayloadHash?: string;
   items: OrderLineItemInput[];
@@ -143,13 +143,14 @@ export const orderRepository = {
           })),
         },
         payments: {
-          create: {
-            method: input.paymentMethod,
-            status: "SUCCEEDED",
-            amount: input.totalAmount,
+          create: input.payments.map(part => ({
+            method: part.method,
+            status: "SUCCEEDED" as const,
+            amount: part.amount,
             currency: "RUB",
             cashierId: input.cashierId,
-          },
+            payload: input.payments.length > 1 ? { ticketTypeIds: part.ticketTypeIds } : undefined,
+          })),
         },
       },
       include: { items: true, payments: true },

@@ -21,7 +21,8 @@ export const cashierSaleSchema = z
     sessionPublicId: z.string().trim().min(1),
     items: z.array(cashierSaleItemSchema).min(1).max(DOMAIN_CONFIG.maxReservationLineItems),
     /** CASH / CARD_TERMINAL / CARD_ONLINE («Сайт» — онлайн-оплата, без смены Order.source). */
-    paymentMethod: z.enum(["CASH", "CARD_TERMINAL", "CARD_ONLINE"]),
+    paymentMethod: z.enum(["CASH", "CARD_TERMINAL", "CARD_ONLINE", "MIXED"]),
+    cashTicketCodes: z.array(z.string().min(1)).optional(),
     customerName: z.string().trim().min(2).max(120).optional().default("Гость кассы"),
     customerPhone: z
       .string()
@@ -38,6 +39,13 @@ export const cashierSaleSchema = z
       .default("cashier-guest@lemuriapark.local"),
   })
   .strict()
+  .refine(({ paymentMethod, cashTicketCodes, items }) => {
+    if (paymentMethod !== "MIXED") return cashTicketCodes === undefined;
+    const active = items.filter(item => item.quantity > 0).map(item => item.ticketTypeCode);
+    const cash = new Set(cashTicketCodes);
+    return cash.size > 0 && [...cash].every(code => active.includes(code)) &&
+      active.some(code => !cash.has(code));
+  }, { message: "Выберите билеты для оплаты наличными и картой", path: ["cashTicketCodes"] })
   .refine((value) => value.items.some((item) => item.quantity > 0), {
     message: "Нужно выбрать хотя бы один билет",
     path: ["items"],

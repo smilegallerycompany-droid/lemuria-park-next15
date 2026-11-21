@@ -69,6 +69,7 @@ function loadPrefs(): Prefs {
 }
 
 function paymentLabel(method: string | null) {
+  if (method === "MIXED") return "Наличные + карта";
   if (method === "CASH") return "Наличные";
   if (method === "CARD_TERMINAL") return "Карта";
   if (method === "CARD_ONLINE") return "Сайт";

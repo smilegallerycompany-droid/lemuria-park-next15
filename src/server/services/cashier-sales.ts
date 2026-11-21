@@ -116,6 +116,18 @@ async function createCashierSaleInTransaction(
 
   const totalAmount = computeOrderTotal(lineItems);
   assertSessionSellableAtCashier(session, new Date());
+  const cashCodes = new Set(input.cashTicketCodes);
+  const methods = input.paymentMethod === "MIXED"
+    ? (["CASH", "CARD_TERMINAL"] as const)
+    : [input.paymentMethod];
+  const payments = methods.map(method => {
+    const lines = lineItems.filter((_, index) => input.paymentMethod !== "MIXED" ||
+      cashCodes.has(requestedItems[index].ticketTypeCode) === (method === "CASH"));
+    return { method, amount: computeOrderTotal(lines), ticketTypeIds: lines.map(line => line.ticketTypeId) };
+  });
+  if (input.paymentMethod === "MIXED" && payments.some(part => part.amount <= 0)) {
+    throw new DomainError("ORDER_NOT_PAYABLE", "Обе части оплаты должны быть больше нуля");
+  }
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,
@@ -126,7 +138,7 @@ async function createCashierSaleInTransaction(
     customerPhone: input.customerPhone,
     customerEmail: input.customerEmail,
     totalAmount,
-    paymentMethod: input.paymentMethod,
+    payments,
     idempotencyKey,
     idempotencyPayloadHash: idempotencyKey ? hashIdempotencyPayload(input) : undefined,
     items: lineItems,
@@ -137,8 +149,7 @@ async function createCashierSaleInTransaction(
     shiftId: shift.id,
     orderId: order.id,
     userId: cashierId,
-    paymentMethod: input.paymentMethod,
-    amount: totalAmount,
+    payments,
     ticketsCount,
   });
 

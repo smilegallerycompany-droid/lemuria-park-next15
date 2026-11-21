@@ -22,7 +22,8 @@ function makeLiveReport({payments=[],operations=[],refunds={total:0,cash:0,card:
   for(const payment of payments){
     const method=payment.method==='CASH'?'cash':'card',order=payment.order;
     const lines=[...order.items.map(x=>({...x,product:'tickets'})),...order.extras.map(x=>({...x,product:x.code==='FEED'?'feed':x.code==='PHOTO'?'photo':'balabas'}))];
-    const amounts=allocate(payment.amount,lines.map(x=>x.subtotalAmount));
+    const paidTypes = payment.payload?.ticketTypeIds;
+    const amounts=allocate(payment.amount,lines.map(x=>Array.isArray(paidTypes) && !paidTypes.includes(x.ticketTypeId) ? 0 : x.subtotalAmount));
     lines.forEach((line,i)=>{
       products[line.product][method]+=amounts[i];products[line.product].total+=amounts[i];
       if(line.product==='tickets'){
@@ -53,7 +54,7 @@ function makeReport(input){return require('./paper-daily-policy.cjs').makePaperR
 async function extend(tx,{operationWhere,paymentWhere,revenue,refunds}){
   const [operations,payments]=await Promise.all([
     tx.parkOperation.findMany({where:operationWhere,orderBy:[{date:'asc'},{createdAt:'asc'}],select:{id:true,locationId:true,shiftId:true,date:true,kind:true,person:true,note:true,amountKopecks:true,quantity:true,method:true,createdAt:true,cancelledAt:true,location:{select:{name:true}},creator:{select:{name:true}},receipt:{select:{fileName:true}}}}),
-    tx.payment.findMany({where:paymentWhere,select:{id:true,createdAt:true,amount:true,method:true,order:{select:{id:true,locationId:true,createdAt:true,shiftId:true,status:true,items:{select:{id:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
+    tx.payment.findMany({where:paymentWhere,select:{id:true,createdAt:true,amount:true,method:true,payload:true,order:{select:{id:true,locationId:true,createdAt:true,shiftId:true,status:true,items:{select:{id:true,ticketTypeId:true,ticketTypeName:true,unitPriceAmount:true,subtotalAmount:true,quantity:true}},extras:{select:{id:true,code:true,subtotalAmount:true,quantity:true,unitPriceAmount:true}}}}}})
   ]);
   return makeReport({operations,payments,revenue,refunds});
 }
