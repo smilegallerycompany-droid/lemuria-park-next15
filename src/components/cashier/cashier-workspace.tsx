@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -73,6 +73,9 @@ export function CashierWorkspace() {
   const [search, setSearch] = useState("");
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const saleAttempt = useRef<{ payload: string; key: string } | null>(null);
+  const [mixed, setMixed] = useState(false);
+  const [cashCodes, setCashCodes] = useState<string[]>([]);
   const [selling, setSelling] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
@@ -152,7 +155,9 @@ export function CashierWorkspace() {
     !selling &&
     canSubmitTicketSelection(quantities, selectedSession?.remaining ?? 0);
 
-  const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
+  const mixedLines = sessionsData?.ticketTypes.filter(t => quantities[t.code] > 0) ?? [];
+  const cashPart = mixedLines.reduce((sum, t) => sum + (cashCodes.includes(t.code) ? (t.unitPrice ?? 0) * quantities[t.code] : 0), 0);
+  const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE" | "MIXED") => {
     if (!selectedSession || !canSell) return;
     if (Date.parse(selectedSession.endsAt) <= Date.now()) {
       setError("Сеанс уже закончился. Выберите другое время.");
@@ -170,16 +175,24 @@ export function CashierWorkspace() {
           }))
           .filter((item) => item.quantity > 0) ?? [];
 
-      const order = await createCashierSale(
-        {
-          sessionPublicId: selectedSession.publicId,
-          items,
-          paymentMethod,
-        },
-        crypto.randomUUID(),
-      );
+      const input = {
+        sessionPublicId: selectedSession.publicId,
+        items,
+        paymentMethod,
+        cashTicketCodes: paymentMethod === "MIXED"
+          ? mixedLines.filter(t => cashCodes.includes(t.code)).map(t => t.code)
+          : undefined,
+      };
+      const payload = JSON.stringify(input);
+      if (saleAttempt.current?.payload !== payload) {
+        saleAttempt.current = { payload, key: crypto.randomUUID() };
+      }
+      const order = await createCashierSale(input, saleAttempt.current.key);
+      saleAttempt.current = null;
       setStatusMessage(`Продажа ${order.number} · ${formatMoneyFromKopecks(order.totalAmount)}`);
       setQuantities({});
+      setMixed(false);
+      setCashCodes([]);
       try {
         await refreshSessions();
         await refreshOrders();
@@ -493,6 +506,19 @@ export function CashierWorkspace() {
                       <CreditCard aria-hidden />
                       Карта
                     </Button>
+                    <Button variant="outline" disabled={!canSell || mixedLines.length < 2}
+                      onClick={() => setMixed(!mixed)} aria-expanded={mixed}>Наличные + карта</Button>
+                    {mixed && <fieldset className="grid gap-3 rounded-2xl border p-4">
+                      <legend>Какие билеты оплачивают наличными?</legend>
+                      {mixedLines.map(t => <label key={t.code} className="flex items-center gap-2">
+                        <input type="checkbox" checked={cashCodes.includes(t.code)}
+                          onChange={e => setCashCodes(e.target.checked ? [...cashCodes, t.code] : cashCodes.filter(code => code !== t.code))} />
+                        {t.name} × {quantities[t.code]}
+                      </label>)}
+                      <p>Наличными {formatMoneyFromKopecks(cashPart)} · Картой {formatMoneyFromKopecks(totalAmount - cashPart)}</p>
+                      <Button disabled={!canSell || cashPart <= 0 || cashPart >= totalAmount}
+                        onClick={() => void sell("MIXED")}>Подтвердить смешанную оплату</Button>
+                    </fieldset>}
                     <Button
                       size="lg"
                       variant="outline"

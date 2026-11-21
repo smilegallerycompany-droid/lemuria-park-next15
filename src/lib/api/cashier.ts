@@ -71,7 +71,8 @@ export function createCashierSale(
   input: {
     sessionPublicId: string;
     items: Array<{ ticketTypeCode: string; quantity: number }>;
-    paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE";
+    paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE" | "MIXED";
+    cashTicketCodes?: string[];
     customerName?: string;
   },
   idempotencyKey: string,

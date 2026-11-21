@@ -87,7 +87,7 @@ export async function GET() {
             payments: {
               where: { status: "SUCCEEDED" },
               select: { method: true },
-              take: 1,
+
             },
             session: { select: { startsAt: true } },
           },
@@ -155,7 +155,7 @@ export async function GET() {
         totalAmount: order.totalAmount,
         createdAt: order.createdAt.toISOString(),
         ticketCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
-        paymentMethod: order.payments[0]?.method ?? null,
+        paymentMethod: order.payments.length > 1 ? "MIXED" : order.payments[0]?.method ?? null,
         sessionStartsAt: order.session.startsAt.toISOString(),
       })),
     });

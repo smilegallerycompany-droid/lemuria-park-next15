@@ -1,4 +1,4 @@
-import type { UserRole } from "@prisma/client";
+import type { Refund, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { recordAuditLog } from "@/lib/audit";
 import { DomainError } from "@/server/domain/errors";
@@ -144,6 +144,52 @@ export async function initiateRefund(params: {
     throw new DomainError("REFUND_AMOUNT_INVALID", "Сумма возврата больше оплаченного");
   }
 
+  const mixed = order.source === "CASHIER" && order.payments.some(p => p.method === "CASH") &&
+    order.payments.some(p => p.method === "CARD_TERMINAL");
+  if (mixed) {
+    return prisma.$transaction(async tx => {
+      const claimed = await tx.ticket.updateMany({
+        where: { id: { in: selected.map(t => t.id) }, status: { in: allowUsed ? ["VALID", "USED"] : ["VALID"] } },
+        data: { status: "REFUNDED" },
+      });
+      if (claimed.count !== selected.length) throw new DomainError("REFUND_NOT_ALLOWED", "Билеты уже изменились");
+      const rows: Refund[] = [];
+      let allocated = 0;
+      for (const payment of order.payments) {
+        const data = payment.payload;
+        const codes = data && typeof data === "object" && !Array.isArray(data) ? data.ticketTypeIds : null;
+        if (!Array.isArray(codes)) throw new DomainError("REFUND_NOT_ALLOWED", "Не найдена разбивка оплаты");
+        const tickets = selected.filter(t => codes.includes(t.orderItem.ticketTypeId));
+        if (!tickets.length) continue;
+        const part = tickets.reduce((sum, t) => sum + t.orderItem.unitPriceAmount, 0);
+        allocated += part;
+        const refund = await tx.refund.create({
+          data: {
+            orderId: order.id, paymentId: payment.id, amount: part, status: "SUCCEEDED",
+            completedAt: new Date(), reason: params.reason, actorId: params.actorId,
+            idempotencyKey: rows.length === 0 ? params.idempotencyKey : undefined,
+            tickets: { create: tickets.map(t => ({ ticketId: t.id, amount: t.orderItem.unitPriceAmount })) },
+          },
+        });
+        rows.push(refund);
+        if (order.shiftId && payment.method === "CASH") {
+          await tx.cashierShift.update({ where: { id: order.shiftId }, data: { cashRefundsAmount: { increment: part } } });
+          await tx.cashOperation.create({ data: { shiftId: order.shiftId, userId: params.actorId,
+            orderId: order.id, type: "REFUND", amount: part, comment: params.reason } });
+        }
+        const active = await tx.ticket.count({ where: { orderId: order.id, status: { in: ["VALID", "USED"] },
+          orderItem: { ticketTypeId: { in: codes.filter((v): v is string => typeof v === "string") } } } });
+        if (!active) await tx.payment.update({ where: { id: payment.id }, data: { status: "REFUNDED" } });
+      }
+      if (allocated !== amount || !rows.length) throw new DomainError("REFUND_AMOUNT_INVALID", "Не сходится разбивка возврата");
+      const remaining = await tx.ticket.count({ where: { orderId: order.id, status: { in: ["VALID", "USED"] } } });
+      const orderStatus = remaining ? "PAID" : "REFUNDED";
+      await tx.order.update({ where: { id: order.id }, data: { status: orderStatus } });
+      await recordAuditLog(tx, { actorId: params.actorId, action: "ORDER_REFUND_SUCCEEDED",
+        entityType: "Order", entityId: order.id, metadata: { amount, refundIds: rows.map(row => row.id) } });
+      return { refund: rows[0], refunds: rows, orderStatus, provider: "local" as const };
+    }, { isolationLevel: "Serializable" });
+  }
   const payment = order.payments.find((p) => p.status === "SUCCEEDED") ?? order.payments[0];
   if (!payment) {
     throw new DomainError("ORDER_NOT_PAID", "Нет успешного платежа для возврата");
