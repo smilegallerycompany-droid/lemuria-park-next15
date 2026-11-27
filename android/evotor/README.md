@@ -21,3 +21,24 @@ gradle :app:testDebugUnitTest :app:assembleDebug -PevotorAppUuid=UUID_ИЗ_КА�
 ## Подпись обновления установленной кассы
 
 `assembleRelease` требует `EVOTOR_KEYSTORE`, `EVOTOR_STORE_PASSWORD`, `EVOTOR_KEY_ALIAS`, `EVOTOR_KEY_PASSWORD`. Для PKCS12 дополнительно `EVOTOR_KEYSTORE_TYPE=PKCS12`. Пароли не передавать аргументами Gradle и не коммитить. Проверяется SHA-256 сертификата установленной 0.1.2: `e697bff5efb8c5227b78f7fe6637a97a940550623535c6df19ddcec8092b1d10`. Другой сертификат блокирует сборку. Это не восстанавливает утраченный ключ. Не удалять рабочее приложение ради debug-APK.
+
+## Установка рядом с текущей кассой
+
+Отдельное тестовое приложение в кабинете Эвотора использует пакет
+`ru.lemuriapark.cashier.replacement` и собственный UUID. Команда сборки,
+после загрузки ключа из Yandex Lockbox в защищённый временный каталог:
+
+```bash
+gradle --no-daemon :app:testReleaseUnitTest :app:assembleRelease \
+  -PevotorReplacement=true -PevotorAppUuid=UUID_НОВОГО_ПРИЛОЖЕНИЯ_ЭВОТОРА
+```
+
+Для нового пакета используйте ключ `lemuria-evotor-replacement-signing` из
+тестового проекта с alias `lemuria-cashier` и типом PKCS12. Gradle проверяет
+сертификат до подписания. Проверяйте итоговый APK командой
+`apksigner verify --min-sdk-version 23 --print-certs`, затем сверяйте UUID и ID
+пакета с карточкой в кабинете.
+
+Сборка подключается только к тестовому API. У нового пакета собственные настройки
+и журнал. Для проверки используйте тестовый токен, сопоставьте позиции с
+карточками Эвотора и убедитесь, что на устройстве нет незавершённого расчёта.

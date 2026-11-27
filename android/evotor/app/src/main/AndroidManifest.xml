@@ -3,7 +3,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <application android:label="Лемурия Парк · касса" android:allowBackup="false"
+    <application android:label="${cashierLabel}" android:allowBackup="false"
         android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <meta-data android:name="app_uuid" android:value="${evotorAppUuid}" />
         <service android:name=".CheckoutService" android:exported="false" android:stopWithTask="false" />

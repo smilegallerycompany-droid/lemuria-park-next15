@@ -27,7 +27,8 @@ import ru.evotor.framework.inventory.ProductQuery;
 import ru.evotor.query.Cursor;
 
 public final class MainActivity extends Activity {
-    static final String DEFAULT_URL = "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai" + CrmClient.PATH;
+    static final String DEFAULT_URL = (BuildConfig.STAGING_ONLY
+            ? CrmClient.STAGING_ORIGIN : "https://crm.xn--80ajjjbhwgdz8k.xn--p1ai") + CrmClient.PATH;
 
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -60,7 +61,7 @@ public final class MainActivity extends Activity {
         content.setPadding(padding, padding, padding, padding);
         TextView name = new TextView(this);
         name.setTextSize(24);
-        name.setText("Лемурия Парк · касса");
+        name.setText(getApplicationInfo().loadLabel(getPackageManager()));
         content.addView(name);
         status = new TextView(this);
         status.setTextSize(17);

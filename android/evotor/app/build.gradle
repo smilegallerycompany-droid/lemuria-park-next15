@@ -1,7 +1,18 @@
 plugins {
     id 'com.android.application' version '8.7.3'
 }
-// Never silently substitute a debug key for an installed-terminal update.
+def replacement = providers.gradleProperty('evotorReplacement').orNull == 'true'
+def appUuid = providers.gradleProperty('evotorAppUuid').get()
+if (!(appUuid ==~ /(?i)[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}/)) {
+    throw new GradleException('Set evotorAppUuid to the UUID of the application in the Evotor developer portal')
+}
+if (replacement && appUuid.equalsIgnoreCase('d67c78e8-ee63-4bf7-81ab-4766da84336b')) {
+    throw new GradleException('The replacement package requires its own Evotor application UUID')
+}
+def expectedCertificate = replacement
+    ? 'd91253504e29b80dc6b3cf19e3723a22cac170138e20b48428d9cf06c5b7cb60'
+    : 'e697bff5efb8c5227b78f7fe6637a97a940550623535c6df19ddcec8092b1d10'
+// Keep each package on its own signing certificate across releases.
 def signingEnv = ['EVOTOR_KEYSTORE', 'EVOTOR_STORE_PASSWORD', 'EVOTOR_KEY_ALIAS', 'EVOTOR_KEY_PASSWORD']
 def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
 if (releaseRequested) {
@@ -15,8 +26,8 @@ if (releaseRequested) {
     if (!store.isKeyEntry(alias)) throw new GradleException('Signing alias has no private key')
     def certificate = store.getCertificate(alias)
     def fingerprint = java.security.MessageDigest.getInstance('SHA-256').digest(certificate.encoded).encodeHex().toString()
-    if (fingerprint != 'e697bff5efb8c5227b78f7fe6637a97a940550623535c6df19ddcec8092b1d10') {
-        throw new GradleException('Signing certificate does not match the installed 0.1.2 APK; update refused')
+    if (fingerprint != expectedCertificate) {
+        throw new GradleException('Signing certificate does not match this package')
     }
 }
 android {
@@ -35,13 +46,16 @@ android {
         }
     }
     buildTypes { release { signingConfig signingConfigs.release } }
+    buildFeatures { buildConfig true }
     defaultConfig {
-        applicationId 'ru.lemuriapark.cashier'
+        applicationId replacement ? 'ru.lemuriapark.cashier.replacement' : 'ru.lemuriapark.cashier'
         minSdk 23
         targetSdk 28
         versionCode 4
         versionName '0.1.3'
-        manifestPlaceholders.evotorAppUuid = providers.gradleProperty('evotorAppUuid').get()
+        manifestPlaceholders.evotorAppUuid = appUuid
+        manifestPlaceholders.cashierLabel = replacement ? 'Лемурия Парк · тестовая касса' : 'Лемурия Парк · касса'
+        buildConfigField 'boolean', 'STAGING_ONLY', replacement.toString()
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

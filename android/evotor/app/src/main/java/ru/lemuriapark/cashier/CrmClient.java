@@ -11,10 +11,14 @@ import org.json.JSONObject;
 
 final class CrmClient implements CheckoutEngine.Remote {
     static final String PATH = "/api/integrations/evotor/checkout";
+    static final String STAGING_ORIGIN = "https://d5d9sorlbdsebnpfr97f.0ly8ed4d.apigw.yandexcloud.net";
     private final URL endpoint;
     private final String token;
 
     CrmClient(String url, String token) throws IOException {
+        if (BuildConfig.STAGING_ONLY && !(STAGING_ORIGIN + PATH).equals(url)) {
+            throw new IllegalArgumentException("Для тестовой кассы укажите адрес тестового API");
+        }
         endpoint = new URL(url);
         if (!"https".equals(endpoint.getProtocol()) || endpoint.getHost().isEmpty() ||
                 endpoint.getUserInfo() != null || !PATH.equals(endpoint.getPath()) ||
