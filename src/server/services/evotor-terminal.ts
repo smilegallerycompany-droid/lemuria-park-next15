@@ -7,7 +7,12 @@ const terminalSchema = z.array(z.object({
   tokenHash: z.string().regex(/^[a-f0-9]{64}$/),
 }));
 function terminals() {
-  const rows = terminalSchema.parse(JSON.parse(process.env.EVOTOR_TERMINALS_JSON || "[]"));
+  let rows: z.infer<typeof terminalSchema>;
+  try {
+    rows = terminalSchema.parse(JSON.parse(process.env.EVOTOR_TERMINALS_JSON || "[]"));
+  } catch {
+    throw new ApiError("NOT_CONFIGURED", "Некорректная конфигурация касс", 503);
+  }
   if (new Set(rows.map(t => t.id)).size !== rows.length || new Set(rows.map(t => t.tokenHash)).size !== rows.length) {
     throw new ApiError("NOT_CONFIGURED", "Неоднозначная конфигурация касс", 503);
   }

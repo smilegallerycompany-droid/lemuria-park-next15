@@ -30,4 +30,15 @@ function makeTerminalRoute(body){
   new Script(body);
   return body;
 }
-module.exports={patchSalesRoute,makeTerminalRoute};
+function makeStatusRoute(body){
+  body=once(body,'a.id=28,a.ids=[28]','a.id=99581003,a.ids=[99581003]');
+  body=once(body,'54096:(a,b,c)','99581004:(a,b,c)');
+  body=once(body,'b(b.s=54096)','b(b.s=99581004)');
+  body=once(body,'require("../../../../webpack-runtime.js")','require("../../../../../webpack-runtime.js")');
+  body=once(body,'c.d(d,{POST:()=>Z})',
+    'c.d(d,{GET:()=>evotorStatus});function evotorStatus(request){return require("/app/evotor-production-status.cjs").handle(request,{prisma:A.z,requireCashier:x.Xf,locationIdsForActor:y.eC,ApiError:v.hD,handleApiError:v.hS})}');
+  body=body.replaceAll('/api/cashier/sales','/api/cashier/sales/status');
+  new Script(body);
+  return body;
+}
+module.exports={patchSalesRoute,makeTerminalRoute,makeStatusRoute};

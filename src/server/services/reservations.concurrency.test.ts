@@ -71,6 +71,7 @@ async function cleanupSession(locationId: string, sessionId: string) {
   await prisma.payment.deleteMany({ where: { order: { sessionId } } });
   await prisma.orderItem.deleteMany({ where: { order: { sessionId } } });
   await prisma.cashOperation.deleteMany({ where: { shift: { locationId } } });
+  await prisma.evotorCheckout.deleteMany({ where: { order: { sessionId } } });
   await prisma.order.deleteMany({ where: { sessionId } });
   await prisma.cashierShift.deleteMany({ where: { locationId } });
   await prisma.reservationItem.deleteMany({ where: { reservation: { sessionId } } });
@@ -151,6 +152,10 @@ test("online reservation and cashier sale never oversell last seats", async (t) 
     },
   });
 
+  const previousTerminals = process.env.EVOTOR_TERMINALS_JSON;
+  process.env.EVOTOR_TERMINALS_JSON = JSON.stringify([
+    { id: `race-${session.id}`, locationId: location.id, tokenHash: "0".repeat(64) },
+  ]);
   try {
     const online = () =>
       createReservation({
@@ -163,11 +168,13 @@ test("online reservation and cashier sale never oversell last seats", async (t) 
           sessionPublicId: session.publicId,
           items: [{ ticketTypeCode: "ADULT", quantity: 2 }],
           paymentMethod: "CASH",
+          cashReceived: 200000,
           customerName: "Race Guest",
           customerPhone: "+70000000000",
           customerEmail: "race@lemuriapark.local",
         },
         cashier.id,
+        `race-${session.id}`,
       );
 
     const [a, b] = await Promise.allSettled([online(), cashierSale()]);
@@ -176,6 +183,10 @@ test("online reservation and cashier sale never oversell last seats", async (t) 
 
     assert.equal(fulfilled.length, 1, "exactly one channel should win the last seats");
     assert.equal(rejected.length, 1);
+    const reason = (rejected[0] as PromiseRejectedResult).reason;
+    assert.ok(reason instanceof DomainError &&
+      ["SESSION_SOLD_OUT", "INSUFFICIENT_CAPACITY"].includes(reason.code),
+      `loser must be rejected for capacity, not a broken checkout: ${reason}`);
 
     const occupying = await prisma.orderItem.aggregate({
       _sum: { quantity: true },
@@ -195,6 +206,8 @@ test("online reservation and cashier sale never oversell last seats", async (t) 
       (occupying._sum.quantity ?? 0) + (reserved._sum.quantity ?? 0);
     assert.ok(total <= 2, `oversold: occupying+reserved=${total}`);
   } finally {
+    if (previousTerminals === undefined) delete process.env.EVOTOR_TERMINALS_JSON;
+    else process.env.EVOTOR_TERMINALS_JSON = previousTerminals;
     await cleanupSession(location.id, session.id);
   }
 });

@@ -3,6 +3,21 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
 import { authenticateTerminal, handleTerminalRequest, terminalForLocation } from "./evotor-checkout";
+import { ApiError } from "@/lib/api/response";
+
+test("malformed terminal configuration fails closed with a useful 503", () => {
+  const before = process.env.EVOTOR_TERMINALS_JSON;
+  try {
+    for (const invalid of ["{", "{}", '[{"id":"terminal","locationId":"location","tokenHash":"bad"}]']) {
+      process.env.EVOTOR_TERMINALS_JSON = invalid;
+      assert.throws(() => terminalForLocation("location"),
+        error => error instanceof ApiError && error.code === "NOT_CONFIGURED" && error.status === 503);
+    }
+  } finally {
+    if (before === undefined) delete process.env.EVOTOR_TERMINALS_JSON;
+    else process.env.EVOTOR_TERMINALS_JSON = before;
+  }
+});
 
 test("terminal credentials are bound to exactly one location and reject the connectivity label", () => {
   const before = process.env.EVOTOR_TERMINALS_JSON;
