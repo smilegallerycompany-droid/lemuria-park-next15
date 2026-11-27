@@ -20,6 +20,7 @@ test("terminal credentials are bound to exactly one location and reject the conn
 
 test("a claimed checkout cannot be issued twice, including after UNKNOWN", async t => {
   const job = {id:"job", claimId: null as string | null, state:"QUEUED", terminalId:"t1", cashReceived:100000, changeAmount:10000,
+    receiptPayload: {version:1,totalAmount:90000,items:[{code:"ADULT",quantity:1,amount:90000}]},
     order:{locationId:"l1", source:"CASHIER", status:"AWAITING_PAYMENT", totalAmount:90000, payments:[{method:"CASH",status:"PENDING"}], items:[{ticketType:{code:"ADULT"}, quantity:1, subtotalAmount:90000}]}};
   const tx = {
     $queryRaw: async () => [],
@@ -33,11 +34,19 @@ test("a claimed checkout cannot be issued twice, including after UNKNOWN", async
   prisma.$transaction = (async (fn: any) => fn(tx)) as typeof original;
   t.after(() => { prisma.$transaction = original; });
   const terminal = {id:"t1", locationId:"l1"};
+  const originalSnapshot = job.receiptPayload;
+  job.receiptPayload = {...originalSnapshot, totalAmount:1};
+  await assert.rejects(handleTerminalRequest(terminal, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"}), /состав чека/);
+  assert.equal(job.state,"QUEUED");
+  assert.equal(job.claimId,null);
+  job.receiptPayload = originalSnapshot;
   const first = await handleTerminalRequest(terminal, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"});
   assert.equal((first as any).sale.cashReceived, 100000);
   assert.equal((first as any).sale.changeAmount, 10000);
+  job.order.items[0].ticketType.code = "RENAMED_AFTER_ORDER";
   const recovered = await handleTerminalRequest(terminal, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"});
   assert.equal((recovered as any).sale.id, "job");
+  assert.equal((recovered as any).sale.items[0].code, "ADULT");
   await assert.rejects(
     handleTerminalRequest({id:"t1", locationId:"other-location"}, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"}),
     /перепривязана/,
@@ -68,8 +77,10 @@ test("first fiscal result records net cash, tickets and shift exactly once", asy
   const payment = {id:"p",method:"CASH",status:"PENDING"};
   const order = {id:"o", locationId:"l1", source:"CASHIER", status:"AWAITING_PAYMENT",totalAmount:90000,
     shiftId:"s",cashierId:"u",sessionId:"session",payments:[payment],tickets:[] as any[],
-    items:[{id:"i",ticketTypeId:"adult",quantity:1}]};
-  const job: any = {id:"job",terminalId:"t1",state:"CLAIMED",order};
+    items:[{id:"i",ticketTypeId:"adult",quantity:1}],
+    extras:[{code:"FEED",quantity:2,subtotalAmount:60000}]};
+  const job: any = {id:"job",terminalId:"t1",state:"CLAIMED",order,
+    receiptPayload:{version:1,totalAmount:90000,items:[{code:"ADULT",quantity:1,amount:30000},{code:"FEED",quantity:2,amount:60000}]}};
   const shifts: any[] = [], cash: any[] = [];
   const tx = {
     $queryRaw:async()=>[], evotorCheckout:{findUnique:async()=>job,update:async({data}:any)=>Object.assign(job,data)},
@@ -89,6 +100,7 @@ test("first fiscal result records net cash, tickets and shift exactly once", asy
   await handleTerminalRequest({id:"t1",locationId:"l1"},{action:"result",result});
   assert.equal(order.status,"PAID"); assert.equal(payment.status,"SUCCEEDED");
   assert.equal(shifts.length,1); assert.equal(shifts[0].data.cashSalesAmount.increment,90000);
+  assert.equal(shifts[0].data.ticketsCount.increment,1);
   assert.equal(cash.length,1); assert.equal(cash[0].data.amount,90000);
   assert.equal(order.tickets.length,1); assert.equal(job.fiscalKey,"1234567890123456:4");
 });

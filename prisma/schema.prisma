@@ -799,6 +799,7 @@ model EvotorCheckout {
   state String @default("QUEUED")
   cashReceived Int?
   changeAmount Int?
+  receiptPayload Json?
   fiscalKey String? @unique
   result Json?
   createdAt DateTime @default(now())

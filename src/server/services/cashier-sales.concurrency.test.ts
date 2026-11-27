@@ -146,6 +146,8 @@ test("a late cashier sale succeeds once and new sales stop at the end", async (t
     const checkout = await prisma.evotorCheckout.findUniqueOrThrow({ where: { orderId: first.id } });
     assert.equal(checkout.cashReceived, 100000);
     assert.equal(checkout.changeAmount, 20000);
+    assert.deepEqual(checkout.receiptPayload, {version:1,totalAmount:80000,
+      items:[{code:ticketType.code,quantity:1,amount:80000}]});
     const after = await listCashierSessionsForToday(location.id);
     assert.equal(after.sessions.find((item) => item.publicId === session.publicId)?.remaining, 7);
 
@@ -159,6 +161,10 @@ test("a late cashier sale succeeds once and new sales stop at the end", async (t
     assert.equal(claims.filter(r => "sale" in r && r.sale !== null).length, 1);
     const recovered = await handleTerminalRequest(terminal, {action: "claim", claimId: nonces[winner]});
     assert.equal("sale" in recovered && recovered.sale?.id, checkout.id);
+    await prisma.ticketType.update({where:{id:ticketType.id},data:{code:ticketType.code+"-changed"}});
+    const stable = await handleTerminalRequest(terminal, {action:"claim",claimId:nonces[winner]});
+    assert.equal("sale" in stable && stable.sale?.items[0].code,ticketType.code);
+    await prisma.ticketType.update({where:{id:ticketType.id},data:{code:ticketType.code}});
     const proof = {requestId: checkout.id, outcome: "FISCALIZED", amount: 80000, paymentMethod: "CASH",
       receipt: {serial: "1234567890123456", documentNumber: "123", fiscalSign: "12345"}};
     await Promise.all(Array.from({length: 6}, () => handleTerminalRequest(terminal, {action: "result", result: proof})));

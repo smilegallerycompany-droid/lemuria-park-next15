@@ -23,6 +23,7 @@ import type { CashierSaleInput } from "@/lib/validation/cashier";
 
 import { ApiError } from "@/lib/api/response";
 import { terminalForLocation } from "@/server/services/evotor-checkout";
+import { prepareEvotorReceipt } from "@/server/services/evotor-receipt";
 
 function isRetryable(error: unknown): boolean {
   return (
@@ -123,6 +124,7 @@ async function createCashierSaleInTransaction(
         atDate: session.startsAt,
       });
       return {
+        code: ticketType.code,
         ticketTypeId: price.ticketTypeId,
         ticketTypeName: price.ticketTypeName,
         quantity: item.quantity,
@@ -142,6 +144,7 @@ async function createCashierSaleInTransaction(
   if (input.paymentMethod === "CASH" && (input.cashReceived === undefined || input.cashReceived < totalAmount)) {
     throw new ApiError("VALIDATION_ERROR", "Укажите полученную сумму не меньше суммы заказа", 400);
   }
+  const receiptPayload = prepareEvotorReceipt({ totalAmount, items: lineItems });
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,
@@ -162,6 +165,7 @@ async function createCashierSaleInTransaction(
   if (terminal) {
     await tx.evotorCheckout.create({ data: {
       orderId: order.id, terminalId: terminal.id,
+      receiptPayload,
       cashReceived: input.paymentMethod === "CASH" ? input.cashReceived : null,
       changeAmount: input.paymentMethod === "CASH" ? input.cashReceived! - totalAmount : null,
     }});

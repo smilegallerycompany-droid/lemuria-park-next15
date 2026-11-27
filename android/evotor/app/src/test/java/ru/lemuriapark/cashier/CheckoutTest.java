@@ -49,6 +49,24 @@ public final class CheckoutTest {
         assertThrows(org.json.JSONException.class, () -> new Sale(data));
     }
 
+    @Test public void ticketFeedPhotoAndStandaloneGoodsPreserveAmounts() throws Exception {
+        JSONArray items = new JSONArray()
+                .put(new JSONObject().put("code", "ADULT").put("quantity", 1).put("amount", 90000))
+                .put(new JSONObject().put("code", "FEED").put("quantity", 2).put("amount", 60000))
+                .put(new JSONObject().put("code", "PHOTO").put("quantity", 1).put("amount", 50000));
+        JSONObject data = new JSONObject().put("id", "mixed-lines").put("paymentMethod", "CASH")
+                .put("totalAmount", 200000).put("cashReceived", 250000).put("changeAmount", 50000).put("items", items);
+        Sale cash = new Sale(data);
+        assertEquals(3, cash.lines.size());
+        assertEquals("FEED", cash.lines.get(1).code);
+        assertEquals(new BigDecimal("300.00"), cash.lines.get(1).unitPrice);
+        assertEquals(50000, cash.changeAmount);
+        items.remove(0);
+        Sale standalone = new Sale(data.put("paymentMethod", "CARD_TERMINAL").put("totalAmount", 110000));
+        assertEquals(2, standalone.lines.size());
+        assertEquals(110000, standalone.amount);
+    }
+
     @Test public void cashPrintIsPersistedBeforeDispatchAndNeverRepeated() throws Exception {
         SharedPreferences preferences = inMemoryPreferences();
         CheckoutJournal journal = new CheckoutJournal(preferences);

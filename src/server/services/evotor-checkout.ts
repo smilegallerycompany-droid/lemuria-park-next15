@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { ApiError } from "@/lib/api/response";
 import { recordSaleOnShift } from "@/server/services/cashier-shifts";
 import { issueTicketsForOrder } from "@/server/services/tickets";
+import { readEvotorReceipt } from "@/server/services/evotor-receipt";
 
 const terminalSchema = z.array(z.object({
   id: z.string().min(1), locationId: z.string().min(1),
@@ -50,7 +51,7 @@ export async function handleTerminalRequest(terminal: { id: string; locationId: 
     // never reassigned on timeout because its fiscal outcome can be uncertain.
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${terminal.id}, 0))::text`;
     if (body.action === "claim") {
-      const include = { order: { include: { items: { include: { ticketType: true } }, payments: true } } } as const;
+      const include = { order: { include: { payments: true } } } as const;
       const previous = await tx.evotorCheckout.findFirst({ where: { terminalId: terminal.id, claimId: body.claimId }, include });
       // A terminal can be reassigned in configuration while a claim is pending.
       // Recovery must never send the old location's order to the new location.
@@ -63,7 +64,7 @@ export async function handleTerminalRequest(terminal: { id: string; locationId: 
       const job = previous ?? await tx.evotorCheckout.findFirst({
         where: { terminalId: terminal.id, state: "QUEUED", order: { locationId: terminal.locationId } },
         orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        include: { order: { include: { items: { include: { ticketType: true } }, payments: true } } },
+        include,
       });
       if (!job) return { sale: null, unresolvedRequestId: null };
       if (job.order.status !== "AWAITING_PAYMENT" || job.order.source !== "CASHIER" ||
@@ -71,11 +72,12 @@ export async function handleTerminalRequest(terminal: { id: string; locationId: 
           !["CASH", "CARD_TERMINAL"].includes(job.order.payments[0].method)) {
         throw new ApiError("CONFLICT", "Некорректное состояние заказа кассы", 409);
       }
+      const snapshot = readEvotorReceipt(job.receiptPayload, job.order.totalAmount);
       await tx.evotorCheckout.update({ where: { id: job.id }, data: { state: "CLAIMED", claimId: body.claimId } });
       return { unresolvedRequestId: null, sale: {
         id: job.id, totalAmount: job.order.totalAmount, paymentMethod: job.order.payments[0].method,
         cashReceived: job.cashReceived, changeAmount: job.changeAmount,
-        items: job.order.items.map(item => ({ code: item.ticketType.code, quantity: item.quantity, amount: item.subtotalAmount })),
+        items: snapshot.items,
       }};
     }
     const result = body.result;
@@ -101,6 +103,7 @@ export async function handleTerminalRequest(terminal: { id: string; locationId: 
       throw new ApiError("CONFLICT", "Заказ требует сверки", 409);
     }
     if (result.outcome === "FISCALIZED") {
+      readEvotorReceipt(job.receiptPayload, order.totalAmount);
       if (!result.receipt || result.amount !== order.totalAmount || result.paymentMethod !== payment.method) {
         throw new ApiError("CONFLICT", "Чек не соответствует заказу", 409);
       }
