@@ -41,6 +41,10 @@ function build(source,dest){
  'await globalThis.LemuriaEvotor.pay({sessionPublicId:eY.publicId,items:eG,extras:eV,secondarySessionPublicId:eX?ea:void 0,paymentMethod:e,quoteFingerprint:eq.fingerprint,adultCompanionConfirmed:!0},eq.totalAmount,W.id)');
  ui=fs.readFileSync(path.join(__dirname,'evotor-browser-checkout.js'),'utf8')+'\n'+ui;
  files.set('.next/'+asset,ui);
+ // Standalone Next images omit the public next/server entry and untraced
+ // modules. Bundle that dependency instead of leaving a runtime require.
+ const domain=require('esbuild').buildSync({entryPoints:[path.join(__dirname,'evotor-payment-domain.ts')],bundle:true,platform:'node',format:'cjs',external:['@prisma/client'],write:false});
+ files.set('evotor-payment-domain.cjs',domain.outputFiles[0].text);
  for(const [name,body]of files)if(name.endsWith('.js')||name.endsWith('.cjs'))new Script(body,{filename:name});
  fs.cpSync(source,dest,{recursive:true});
  for(const [name,body]of files){const output=path.join(dest,name);fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,body);}
