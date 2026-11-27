@@ -14,11 +14,11 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 
   DATABASE_URL: z
-    .string({ required_error: "DATABASE_URL is required" })
+    .string({ error: "DATABASE_URL is required" })
     .min(1, "DATABASE_URL is required"),
 
   NEXT_PUBLIC_APP_URL: z
-    .string({ required_error: "NEXT_PUBLIC_APP_URL is required" })
+    .string({ error: "NEXT_PUBLIC_APP_URL is required" })
     .url({ message: "NEXT_PUBLIC_APP_URL must be a valid URL" }),
 
   /** ЮKassa (Russian acquiring — works without VPN). */

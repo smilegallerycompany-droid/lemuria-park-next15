@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- Deliberately partial Prisma transaction mocks; real database concurrency is tested separately. */
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";

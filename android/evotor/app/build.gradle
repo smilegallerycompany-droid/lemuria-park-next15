@@ -1,10 +1,40 @@
 plugins {
     id 'com.android.application' version '8.7.3'
 }
+// Never silently substitute a debug key for an installed-terminal update.
+def signingEnv = ['EVOTOR_KEYSTORE', 'EVOTOR_STORE_PASSWORD', 'EVOTOR_KEY_ALIAS', 'EVOTOR_KEY_PASSWORD']
+def releaseRequested = gradle.startParameter.taskNames.any { it.toLowerCase().contains('release') }
+if (releaseRequested) {
+    def missing = signingEnv.findAll { !System.getenv(it) }
+    if (!missing.empty) throw new GradleException('Release signing requires: ' + missing.join(', '))
+    def store = java.security.KeyStore.getInstance(System.getenv('EVOTOR_KEYSTORE_TYPE') ?: 'JKS')
+    file(System.getenv('EVOTOR_KEYSTORE')).withInputStream { stream ->
+        store.load(stream, System.getenv('EVOTOR_STORE_PASSWORD').toCharArray())
+    }
+    def alias = System.getenv('EVOTOR_KEY_ALIAS')
+    if (!store.isKeyEntry(alias)) throw new GradleException('Signing alias has no private key')
+    def certificate = store.getCertificate(alias)
+    def fingerprint = java.security.MessageDigest.getInstance('SHA-256').digest(certificate.encoded).encodeHex().toString()
+    if (fingerprint != 'e697bff5efb8c5227b78f7fe6637a97a940550623535c6df19ddcec8092b1d10') {
+        throw new GradleException('Signing certificate does not match the installed 0.1.2 APK; update refused')
+    }
+}
 android {
     namespace 'ru.lemuriapark.cashier'
     compileSdk 35
     buildToolsVersion "35.0.0"
+    signingConfigs {
+        release {
+            if (releaseRequested) {
+                storeFile file(System.getenv('EVOTOR_KEYSTORE'))
+                storePassword System.getenv('EVOTOR_STORE_PASSWORD')
+                keyAlias System.getenv('EVOTOR_KEY_ALIAS')
+                keyPassword System.getenv('EVOTOR_KEY_PASSWORD')
+                storeType System.getenv('EVOTOR_KEYSTORE_TYPE') ?: 'JKS'
+            }
+        }
+    }
+    buildTypes { release { signingConfig signingConfigs.release } }
     defaultConfig {
         applicationId 'ru.lemuriapark.cashier'
         minSdk 23
@@ -23,4 +53,11 @@ dependencies {
     implementation 'com.github.evotor:query-api:1.2.0'
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.json:json:20240303'
+}
+tasks.configureEach { task ->
+    if (task.name == 'preReleaseBuild') {
+        task.doFirst {
+            if (!releaseRequested) throw new GradleException('Use assembleRelease explicitly with verified signing credentials')
+        }
+    }
 }
