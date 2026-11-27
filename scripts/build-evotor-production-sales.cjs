@@ -25,7 +25,7 @@ function makeTerminalRoute(body){
   body=once(body,'b(b.s=54096)','b(b.s=99581002)');
   body=once(body,'require("../../../../webpack-runtime.js")','require("../../../../../webpack-runtime.js")');
   body=once(body,'c.d(d,{POST:()=>Z})',
-    'c.d(d,{POST:()=>evotorPost});function evotorPost(request){return require("/app/evotor-production-terminal.cjs").handle(request,{prisma:A.z,recordAuditLog:C.xN,recordSaleOnShift:U.wS,issueTicketsForOrder:T.G,handleApiError:v.hS})}');
+    'c.d(d,{GET:()=>evotorPost,POST:()=>evotorPost});function evotorPost(request){return require("/app/evotor-production-terminal.cjs").handle(request,{prisma:A.z,recordAuditLog:C.xN,recordSaleOnShift:U.wS,issueTicketsForOrder:T.G,handleApiError:v.hS})}');
   body=body.replaceAll('/api/cashier/sales',endpoint);
   new Script(body);
   return body;

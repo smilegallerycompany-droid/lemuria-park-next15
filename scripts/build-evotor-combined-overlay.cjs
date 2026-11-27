@@ -30,7 +30,7 @@ function build(source,dest){
  shifts=once(shifts,'let j=(0,g.pN)(a.closingCashAmount,d.expectedCashAmount);','if(await c.evotorCheckout.count({where:{state:{in:["QUEUED","CLAIMED"]},order:{shiftId:h.id}}}))throw new f.J("FORBIDDEN","Дождитесь результата оплаты Эвотора или выполните сверку перед закрытием смены");let j=(0,g.pN)(a.closingCashAmount,d.expectedCashAmount);');
  files.set('.next/server/chunks/7114.js',shifts);
  files.set('prisma/schema.prisma',prepareSchema(read('prisma/schema.prisma'),fs.readFileSync(path.join(__dirname,'../prisma/schema.prisma'),'utf8')));
- for(const file of ['evotor-production-sales.cjs','evotor-production-capacity.cjs','evotor-production-terminal.cjs','evotor-production-status.cjs'])files.set(file,fs.readFileSync(path.join(__dirname,file),'utf8'));
+ for(const file of ['evotor-production-sales.cjs','evotor-production-capacity.cjs','evotor-production-terminal.cjs','evotor-production-status.cjs','evotor-connectivity.cjs'])files.set(file,fs.readFileSync(path.join(__dirname,file),'utf8'));
  for(const folder of ['20261127120000_evotor_checkout','20261127150000_evotor_receipt_snapshot'])files.set('prisma/migrations/'+folder+'/migration.sql',fs.readFileSync(path.join(__dirname,'../prisma/migrations',folder,'migration.sql'),'utf8'));
  const assets=JSON.parse(read('.next/app-build-manifest.json')).pages['/(cashier)/cashier/page'];
  const asset=assets.find(x=>x.includes('/app/(cashier)/cashier/page-'));assert.ok(asset,'Cashier page not found');

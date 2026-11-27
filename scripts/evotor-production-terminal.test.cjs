@@ -7,6 +7,7 @@ const {handle,withPaymentDates}=require("./evotor-production-terminal.cjs");
 const {makeTerminalRoute}=require("./build-evotor-production-sales.cjs");
 const {createTerminalHandler}=require("../src/server/services/evotor-checkout-core.ts");
 const {ApiError}=require("../src/lib/api/response.ts");
+const {checkLabel}=require("./evotor-connectivity.cjs");
 
 test("fiscal proof invokes deployed accounting and bundle ticket issuer once",async()=>{
   const calls=[];
@@ -46,6 +47,26 @@ test("HTTP boundary authenticates before processing body and bounds request size
   domain.authenticateTerminal=()=>({id:"terminal",locationId:"location"});
   assert.equal((await handle(new Request("https://example.invalid",{method:"POST",body:"x".repeat(16385)}),context,domain)).status,413);
   assert.equal((await handle(new Request("https://example.invalid",{method:"POST",body:"{"}),context,domain)).status,400);
+});
+
+test("staging diagnostic never reaches the payment handler",async()=>{
+  const {APP_ENV}=process.env;
+  const url="https://example.invalid/api/integrations/evotor/checkout";
+  const domain={ApiError,authenticateTerminal:()=>{throw new ApiError("UNAUTHORIZED","Нет доступа",401);}};
+  const diagnostic=action=>new Request(url,{method:"POST",body:JSON.stringify({action}),
+    headers:{authorization:"Bearer "+checkLabel,"content-type":"application/json"}});
+  try {
+    process.env.APP_ENV="staging";
+    const response=await handle(diagnostic("claim"),{},domain);
+    assert.deepEqual((await response.json()).data,{mode:"CONNECTIVITY_ONLY",sale:null,unresolvedRequestId:null});
+    assert.equal((await handle(diagnostic("result"),{},domain)).status,409);
+    process.env.APP_ENV="production";
+    assert.equal((await handle(diagnostic("claim"),{},domain)).status,401);
+    assert.equal((await handle(new Request(url),{},domain)).status,404);
+  } finally {
+    if(APP_ENV===undefined)delete process.env.APP_ENV;
+    else process.env.APP_ENV=APP_ENV;
+  }
 });
 
 const root=process.env.EVOTOR_PRODUCTION_REVIEW_ROOT;
