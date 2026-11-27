@@ -38,6 +38,11 @@ test("a claimed checkout cannot be issued twice, including after UNKNOWN", async
   assert.equal((first as any).sale.changeAmount, 10000);
   const recovered = await handleTerminalRequest(terminal, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"});
   assert.equal((recovered as any).sale.id, "job");
+  await assert.rejects(
+    handleTerminalRequest({id:"t1", locationId:"other-location"}, {action:"claim",claimId:"11111111-1111-4111-8111-111111111111"}),
+    /перепривязана/,
+  );
+  assert.equal(job.state, "CLAIMED");
   const second = await handleTerminalRequest(terminal, {action:"claim",claimId:"22222222-2222-4222-8222-222222222222"});
   assert.equal((second as any).sale, null);
   assert.equal((second as any).unresolvedRequestId, "job");

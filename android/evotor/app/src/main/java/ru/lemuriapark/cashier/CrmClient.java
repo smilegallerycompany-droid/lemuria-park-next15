@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import javax.net.ssl.HttpsURLConnection;
 import org.json.JSONObject;
 
-final class CrmClient {
+final class CrmClient implements CheckoutEngine.Remote {
     static final String PATH = "/api/integrations/evotor/checkout";
     private final URL endpoint;
     private final String token;
@@ -27,11 +27,11 @@ final class CrmClient {
         this.token = token;
     }
 
-    JSONObject claim(String claimId) throws Exception {
+    public JSONObject claim(String claimId) throws Exception {
         return post(new JSONObject().put("action", "claim").put("claimId", claimId), 15000);
     }
 
-    void report(JSONObject result) throws Exception {
+    public void report(JSONObject result) throws Exception {
         JSONObject data = post(new JSONObject().put("action", "result").put("result", result), 5000);
         String outcome = result.getString("outcome");
         if (("FISCALIZED".equals(outcome) || "DECLINED".equals(outcome)) &&

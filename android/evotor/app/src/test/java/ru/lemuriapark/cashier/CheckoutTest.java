@@ -81,9 +81,9 @@ public final class CheckoutTest {
                 .put("totalAmount", total).put("items", new JSONArray().put(line));
     }
 
-    private SharedPreferences inMemoryPreferences() {
+    static SharedPreferences inMemoryPreferences() {
         Map<String, String> disk = new HashMap<>();
-        ClassLoader loader = getClass().getClassLoader();
+        ClassLoader loader = CheckoutTest.class.getClassLoader();
         return (SharedPreferences) Proxy.newProxyInstance(loader, new Class<?>[]{SharedPreferences.class},
                 (proxy, method, args) -> {
                     if ("getString".equals(method.getName())) return disk.getOrDefault((String) args[0], (String) args[1]);

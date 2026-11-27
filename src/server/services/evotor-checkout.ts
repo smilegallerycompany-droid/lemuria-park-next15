@@ -52,6 +52,11 @@ export async function handleTerminalRequest(terminal: { id: string; locationId: 
     if (body.action === "claim") {
       const include = { order: { include: { items: { include: { ticketType: true } }, payments: true } } } as const;
       const previous = await tx.evotorCheckout.findFirst({ where: { terminalId: terminal.id, claimId: body.claimId }, include });
+      // A terminal can be reassigned in configuration while a claim is pending.
+      // Recovery must never send the old location's order to the new location.
+      if (previous && previous.order.locationId !== terminal.locationId) {
+        throw new ApiError("CONFLICT", "Касса перепривязана к другой локации: требуется сверка", 409);
+      }
       if (previous && previous.state !== "CLAIMED") return { sale: null, completedClaim: true, unresolvedRequestId: null };
       const unresolved = await tx.evotorCheckout.findFirst({ where: { terminalId: terminal.id, state: "CLAIMED" } });
       if (unresolved && unresolved.claimId !== body.claimId) return { sale: null, unresolvedRequestId: unresolved.id };
