@@ -1,0 +1,9 @@
+{
+  "imageDigest": "sha256:43000d6ee0539e58232d397d34430bf0897b988ccc2163f9c3d7144e9ea19acc",
+  "files": {
+    ".next/server/chunks/670.js": "4ab9681d48c37f1ea04901717933c5b4b08962d4c6d6507ce9fc24de28ec9c1c",
+    ".next/server/chunks/4654.js": "f67aeb86a63199d2b73ee06c4dfd198668dd6faa69fc09f48a8ace468df4537c",
+    ".next/server/app/api/cashier/sales/route.js": "7da0d3b800a98566813d9c56235a7ee565abddeee99a66593cf275f0cf7f37fb",
+    "prisma/schema.prisma": "d294ed01f2714792b1e2cd27ff0aeb23c43b6fab8c080dcdb033adf969e4c581"
+  }
+}
