@@ -47,6 +47,10 @@ try {
    assert.equal(quote.body.data.totalAmount,amount);
    input.quoteFingerprint=quote.body.data.fingerprint;
    assert.equal(typeof input.quoteFingerprint,'string');
+   if(cash){
+    const invalid=await call('/api/cashier/sales',{...input,cashReceived:amount-1},{...staff,'Idempotency-Key':randomUUID()});
+    assert.equal(invalid.status,400,JSON.stringify(invalid));
+   }
   }
   const sale=await call('/api/cashier/sales',input,{...staff,'Idempotency-Key':key});
   assert.equal(sale.status,201,JSON.stringify(sale)); assert.equal(sale.body.data.status,'AWAITING_PAYMENT');

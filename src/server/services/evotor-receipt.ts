@@ -15,25 +15,25 @@ const receipt = z.object({
 
 type PricedLine = { code: string; quantity: number; unitPriceAmount: number; subtotalAmount: number };
 
-/** Adapter for the deployed quote shape: tickets use ticketTypeId while
+/** Adapter for the deployed quote shape: tickets use ticketTypeCode while
  * OrderExtra uses code. Bundle secondarySessionId stays in the order domain;
  * it must not multiply the bank charge or the fiscal line quantity.
  * ticketTypes must be the server's locked catalog rows, never client values.
  */
 export function prepareQuotedEvotorReceipt(quote: {
   totalAmount: number;
-  items: Array<Omit<PricedLine, "code"> & { ticketTypeId: string; secondarySessionId?: string | null }>;
+  items: Array<Omit<PricedLine, "code"> & { ticketTypeCode: string; secondarySessionId?: string | null }>;
   extras?: PricedLine[];
-}, ticketTypes: Array<{ id: string; code: string }>) {
-  const codes = new Map(ticketTypes.map(type => [type.id, type.code]));
+}, ticketTypes: Array<{ code: string }>) {
+  const codes = new Set(ticketTypes.map(type => type.code));
   if (codes.size !== ticketTypes.length) {
     throw new ApiError("CONFLICT", "Неоднозначный справочник позиций чека", 409);
   }
   return prepareEvotorReceipt({
     totalAmount: quote.totalAmount,
     items: quote.items.map(item => {
-      const code = codes.get(item.ticketTypeId);
-      if (!code) throw new ApiError("CONFLICT", "Не найден код позиции чека", 409);
+      const code = item.ticketTypeCode;
+      if (!codes.has(code)) throw new ApiError("CONFLICT", "Не найден код позиции чека", 409);
       return { ...item, code };
     }),
     extras: quote.extras,

@@ -9,19 +9,27 @@ function parseSale(raw, parse, ApiError) {
   return {...sale, ...(cashReceived !== undefined ? {cashReceived} : {})};
 }
 
-async function createPending(tx, input, priced, legacyCreate, domain = require("/app/evotor-payment-domain.cjs")) {
-  const {ApiError, terminalForLocation, prepareQuotedEvotorReceipt} = domain;
+async function createPending(tx, input, priced, legacyCreate, domain = require("/app/evotor-payment-domain.cjs"), ApiError = domain.ApiError) {
+  const {terminalForLocation, prepareQuotedEvotorReceipt} = domain;
   if (!["CASH","CARD_TERMINAL"].includes(input.paymentMethod)) {
     throw new ApiError("VALIDATION_ERROR", "Оплату должен подтвердить Эвотор", 400);
   }
-  const terminal=terminalForLocation(input.locationId);
-  if (!terminal) throw new ApiError("NOT_CONFIGURED", "Для локации не настроен Эвотор",503);
   if (!input.idempotencyKey) throw new ApiError("VALIDATION_ERROR", "Требуется идентификатор операции",400);
   const cash=input.paymentMethod === "CASH";
   if (cash && (!Number.isInteger(priced.cashReceived) || priced.cashReceived < input.totalAmount || priced.cashReceived > 2147483647)) {
     throw new ApiError("VALIDATION_ERROR", "Укажите полученную сумму не меньше суммы заказа",400);
   }
-  const receiptPayload=prepareQuotedEvotorReceipt(priced.quote,priced.ticketTypes);
+  let terminal, receiptPayload;
+  try {
+    terminal=terminalForLocation(input.locationId);
+    receiptPayload=prepareQuotedEvotorReceipt(priced.quote,priced.ticketTypes);
+  } catch (error) {
+    if (error instanceof domain.ApiError) {
+      throw new ApiError(error.code,error.message,error.status,error.details);
+    }
+    throw error;
+  }
+  if (!terminal) throw new ApiError("NOT_CONFIGURED", "Для локации не настроен Эвотор",503);
   if (receiptPayload.totalAmount !== input.totalAmount) throw new ApiError("CONFLICT", "Сумма заказа изменилась",409);
   // Reuse the exact deployed mapping of OrderItem/OrderExtra/customer fields.
   // Only intercept the single atomic create; no temporary paid order is written.

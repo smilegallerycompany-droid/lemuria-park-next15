@@ -12,7 +12,7 @@ function patchSalesRoute(body){
     'paymentMethod:a.paymentMethod,...void 0!==a.cashReceived?{cashReceived:a.cashReceived}:{},customerName:a.customerName');
   body=once(body,'s=await O.n.createCashierPaid(a,{', 's=await '+POLICY+'.createPending(a,{');
   body=once(body,'items:q,extras:p.extras}),t=q.reduce',
-    'items:q,extras:p.extras},{quote:p,ticketTypes:m,cashReceived:b.cashReceived},O.n.createCashierPaid),t=q.reduce');
+    'items:q,extras:p.extras},{quote:p,ticketTypes:m,cashReceived:b.cashReceived},O.n.createCashierPaid,void 0,v.hD),t=q.reduce');
   body=once(body,'return await (0,U.wS)(a,{shiftId:k.id,orderId:s.id',
     'if("AWAITING_PAYMENT"===s.status)return s;return await (0,U.wS)(a,{shiftId:k.id,orderId:s.id');
   new Script(body);

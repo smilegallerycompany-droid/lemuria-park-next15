@@ -13,10 +13,10 @@ const domain={ApiError,prepareQuotedEvotorReceipt,terminalForLocation:()=>({id:"
 const input={number:"test",sessionId:"primary",locationId:"location",cashierId:"cashier",shiftId:"shift",
   customerName:"Гость",customerPhone:"+70000000000",customerEmail:"guest@example.invalid",
   totalAmount:150000,paymentMethod:"CASH",idempotencyKey:"unique",idempotencyPayloadHash:"hash",
-  items:[{ticketTypeId:"type",ticketTypeName:"Комбо",secondarySessionId:"secondary",quantity:1,unitPriceAmount:100000,subtotalAmount:100000}],
+  items:[{ticketTypeId:"type",ticketTypeCode:"BUNDLE",ticketTypeName:"Комбо",secondarySessionId:"secondary",quantity:1,unitPriceAmount:100000,subtotalAmount:100000}],
   extras:[{code:"FEED",name:"Корм",quantity:1,unitPriceAmount:30000,subtotalAmount:30000},
     {code:"PHOTO",name:"Фото",quantity:1,unitPriceAmount:20000,subtotalAmount:20000}]};
-const priced={quote:input,ticketTypes:[{id:"type",code:"BUNDLE"}],cashReceived:200000};
+const priced={quote:input,ticketTypes:[{code:"BUNDLE"}],cashReceived:200000};
 
 function repository(){
   const context={exports:{}};

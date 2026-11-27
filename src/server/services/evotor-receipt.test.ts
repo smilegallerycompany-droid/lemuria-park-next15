@@ -7,16 +7,17 @@ const feed = {code:"FEED",quantity:2,unitPriceAmount:30000,subtotalAmount:60000}
 const photo = {code:"PHOTO",quantity:1,unitPriceAmount:50000,subtotalAmount:50000};
 
 test("production quote keeps a two-session bundle as one priced line and adds goods", () => {
-  const quote = {totalAmount:230000,items:[{ticketTypeId:"bundle",secondarySessionId:"park-2",
+  const quote = {totalAmount:230000,items:[{ticketTypeCode:"BUNDLE",secondarySessionId:"park-2",
     quantity:2,unitPriceAmount:60000,subtotalAmount:120000}],extras:[feed,photo]};
   const before = JSON.stringify(quote);
-  const snapshot = prepareQuotedEvotorReceipt(quote,[{id:"bundle",code:"BUNDLE"}]);
+  const snapshot = prepareQuotedEvotorReceipt(quote,[{code:"BUNDLE"}]);
+  assert.equal(snapshot.items[0].code,"BUNDLE");
   assert.equal(snapshot.items[0].quantity,2);
   assert.equal(snapshot.items[0].amount,120000);
   assert.equal(snapshot.totalAmount,230000);
   assert.equal(JSON.stringify(quote),before);
   assert.throws(()=>prepareQuotedEvotorReceipt(quote,[]));
-  assert.throws(()=>prepareQuotedEvotorReceipt(quote,[{id:"bundle",code:"A"},{id:"bundle",code:"B"}]));
+  assert.throws(()=>prepareQuotedEvotorReceipt(quote,[{code:"BUNDLE"},{code:"BUNDLE"}]));
 });
 
 test("ticket, feed and photo retain separate fiscal lines and exact total", () => {
