@@ -21,6 +21,9 @@ import { issueTicketsForOrder } from "@/server/services/tickets";
 import { recordSaleOnShift, requireOpenShift } from "@/server/services/cashier-shifts";
 import type { CashierSaleInput } from "@/lib/validation/cashier";
 
+import { ApiError } from "@/lib/api/response";
+import { terminalForLocation } from "@/server/services/evotor-checkout";
+
 function isRetryable(error: unknown): boolean {
   return (
     error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -34,16 +37,21 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Cashier walk-up sale — reuses Session capacity + Pricing domain, creates a
- * PAID Order with source=CASHIER. Does not alter the online reservation flow.
+ * pending Order with source=CASHIER for Evotor payments. Only fiscal proof
+ * records paid totals. Does not alter the online reservation flow.
  */
 export async function createCashierSale(
   input: CashierSaleInput,
   cashierId: string,
   idempotencyKey?: string,
 ) {
+  if (input.paymentMethod !== "CASH" && input.paymentMethod !== "CARD_TERMINAL") {
+    throw new ApiError("VALIDATION_ERROR", "Онлайн-оплату подтверждает платёжный сервис", 400);
+  }
   if (idempotencyKey) {
     const existing = await orderRepository.findByIdempotencyKey(prisma, idempotencyKey);
     if (existing) {
+      if (existing.cashierId !== cashierId) throw new ApiError("FORBIDDEN", "Заказ другого кассира", 403);
       assertIdempotencyPayloadMatches(existing.idempotencyPayloadHash, input);
       return existing;
     }
@@ -73,6 +81,14 @@ async function createCashierSaleInTransaction(
   cashierId: string,
   idempotencyKey: string | undefined,
 ) {
+  if (idempotencyKey) {
+    const existing = await orderRepository.findByIdempotencyKey(tx, idempotencyKey);
+    if (existing) {
+      if (existing.cashierId !== cashierId) throw new ApiError("FORBIDDEN", "Заказ другого кассира", 403);
+      assertIdempotencyPayloadMatches(existing.idempotencyPayloadHash, input);
+      return existing;
+    }
+  }
   const now = new Date();
   await Promise.all([expireStaleReservations(tx, now), expireStalePaymentOrders(tx, now)]);
 
@@ -81,6 +97,8 @@ async function createCashierSaleInTransaction(
   await sessionRepository.lockForUpdate(tx, session.id);
 
   const shift = await requireOpenShift(tx, cashierId, session.locationId);
+  await tx.$queryRaw`SELECT id FROM "CashierShift" WHERE id = ${shift.id} FOR UPDATE`;
+  await requireOpenShift(tx, cashierId, session.locationId);
 
   const requestedItems = input.items.filter((item) => item.quantity > 0);
   const totalRequested = sumRequestedQuantity(requestedItems);
@@ -116,6 +134,14 @@ async function createCashierSaleInTransaction(
 
   const totalAmount = computeOrderTotal(lineItems);
   assertSessionSellableAtCashier(session, new Date());
+  const terminal = input.paymentMethod === "CARD_ONLINE" ? null : terminalForLocation(session.locationId);
+  if (input.paymentMethod !== "CARD_ONLINE" && !terminal) {
+    throw new ApiError("NOT_CONFIGURED", "Для этой локации не настроен Эвотор", 503);
+  }
+  if (terminal && !idempotencyKey) throw new ApiError("VALIDATION_ERROR", "Требуется идентификатор операции", 400);
+  if (input.paymentMethod === "CASH" && (input.cashReceived === undefined || input.cashReceived < totalAmount)) {
+    throw new ApiError("VALIDATION_ERROR", "Укажите полученную сумму не меньше суммы заказа", 400);
+  }
   const order = await orderRepository.createCashierPaid(tx, {
     number: generateOrderNumber(),
     sessionId: session.id,
@@ -127,10 +153,20 @@ async function createCashierSaleInTransaction(
     customerEmail: input.customerEmail,
     totalAmount,
     paymentMethod: input.paymentMethod,
+    awaitingFiscalization: Boolean(terminal),
     idempotencyKey,
     idempotencyPayloadHash: idempotencyKey ? hashIdempotencyPayload(input) : undefined,
     items: lineItems,
   });
+
+  if (terminal) {
+    await tx.evotorCheckout.create({ data: {
+      orderId: order.id, terminalId: terminal.id,
+      cashReceived: input.paymentMethod === "CASH" ? input.cashReceived : null,
+      changeAmount: input.paymentMethod === "CASH" ? input.cashReceived! - totalAmount : null,
+    }});
+    return order;
+  }
 
   const ticketsCount = lineItems.reduce((sum, i) => sum + i.quantity, 0);
   await recordSaleOnShift(tx, {

@@ -30,3 +30,10 @@ docs/screenshots/*.png
 docs/qa-screenshots/
 docs/qa-screenshots-rc2/
 docs/qa-screenshots-rc3/
+
+# Android build outputs and signing material
+android/**/build/
+android/**/.gradle/
+android/**/local.properties
+*.jks
+*.keystore

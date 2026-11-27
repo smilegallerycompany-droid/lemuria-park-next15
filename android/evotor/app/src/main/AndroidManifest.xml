@@ -1,0 +1,20 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <application android:label="Лемурия Парк · касса" android:allowBackup="false"
+        android:usesCleartextTraffic="false" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <meta-data android:name="app_uuid" android:value="${evotorAppUuid}" />
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.EVOTOR" />
+            </intent-filter>
+            <meta-data android:name="ru.evotor.launcher.BACKGROUND_COLOR" android:value="#28543B" />
+            <meta-data android:name="ru.evotor.launcher.GRANTS" android:resource="@array/cashier_grants" />
+        </activity>
+    </application>
+</manifest>
