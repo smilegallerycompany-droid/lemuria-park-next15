@@ -53,15 +53,17 @@ test("staging diagnostic never reaches the payment handler",async()=>{
   const {APP_ENV}=process.env;
   const url="https://example.invalid/api/integrations/evotor/checkout";
   const domain={ApiError,authenticateTerminal:()=>{throw new ApiError("UNAUTHORIZED","Нет доступа",401);}};
-  const diagnostic=action=>new Request(url,{method:"POST",body:JSON.stringify({action}),
-    headers:{authorization:"Bearer "+checkLabel,"content-type":"application/json"}});
+  const diagnostic=(action, prefix)=>new Request(url,{method:"POST",body:JSON.stringify({action}),
+    headers:{authorization:prefix+checkLabel,"content-type":"application/json"}});
   try {
-    process.env.APP_ENV="staging";
-    const response=await handle(diagnostic("claim"),{},domain);
-    assert.deepEqual((await response.json()).data,{mode:"CONNECTIVITY_ONLY",sale:null,unresolvedRequestId:null});
-    assert.equal((await handle(diagnostic("result"),{},domain)).status,409);
-    process.env.APP_ENV="production";
-    assert.equal((await handle(diagnostic("claim"),{},domain)).status,401);
+    for (const prefix of ["Bearer ", ""]) {
+      process.env.APP_ENV="staging";
+      const response=await handle(diagnostic("claim",prefix),{},domain);
+      assert.deepEqual((await response.json()).data,{mode:"CONNECTIVITY_ONLY",sale:null,unresolvedRequestId:null});
+      assert.equal((await handle(diagnostic("result",prefix),{},domain)).status,409);
+      process.env.APP_ENV="production";
+      assert.equal((await handle(diagnostic("claim",prefix),{},domain)).status,401);
+    }
     assert.equal((await handle(new Request(url),{},domain)).status,404);
   } finally {
     if(APP_ENV===undefined)delete process.env.APP_ENV;

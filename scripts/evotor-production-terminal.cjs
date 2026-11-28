@@ -27,7 +27,7 @@ function withPaymentDates(prisma, clock = () => new Date()) {
 async function handle(request, context, domain = require("/app/evotor-payment-domain.cjs")) {
   const reply=(status,body)=>Response.json(body,{status,headers:{"Cache-Control":"no-store"}});
   if (process.env.APP_ENV === "staging" &&
-      (request.method === "GET" || request.headers.get("authorization") === "Bearer " + diagnostic.checkLabel)) {
+      (request.method === "GET" || diagnostic.hasDiagnosticLabel(request))) {
     return diagnostic.handle(request);
   }
   if (request.method === "GET") return reply(404, {ok:false,error:{code:"NOT_FOUND"}});
