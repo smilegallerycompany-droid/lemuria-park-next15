@@ -21,6 +21,7 @@ export const cashierSaleSchema = z
     sessionPublicId: z.string().trim().min(1),
     items: z.array(cashierSaleItemSchema).min(1).max(DOMAIN_CONFIG.maxReservationLineItems),
     /** CASH / CARD_TERMINAL / CARD_ONLINE («Сайт» — онлайн-оплата, без смены Order.source). */
+    cashReceived: z.number().int().min(0).max(2147483647).optional(),
     paymentMethod: z.enum(["CASH", "CARD_TERMINAL", "CARD_ONLINE"]),
     customerName: z.string().trim().min(2).max(120).optional().default("Гость кассы"),
     customerPhone: z

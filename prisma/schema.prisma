@@ -435,6 +435,7 @@ model Order {
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
 
+  evotorCheckout EvotorCheckout?
   items          OrderItem[]
   payments       Payment[]
   tickets        Ticket[]
@@ -787,4 +788,22 @@ model MediaObject {
   galleryItems GalleryItem[]
 
   @@index([createdAt])
+}
+
+model EvotorCheckout {
+  id String @id @default(cuid())
+  orderId String @unique
+  order Order @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  terminalId String
+  claimId String?
+  state String @default("QUEUED")
+  cashReceived Int?
+  changeAmount Int?
+  receiptPayload Json?
+  fiscalKey String? @unique
+  result Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([terminalId, claimId])
+  @@index([terminalId, state, createdAt])
 }

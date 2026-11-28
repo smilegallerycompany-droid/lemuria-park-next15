@@ -6,6 +6,11 @@ const checkLabel = "lemuria-evotor-staging-connectivity";
 const path = "/api/integrations/evotor/checkout";
 const maxRequestBytes = 1024;
 
+function hasDiagnosticLabel(request) {
+  const value = request.headers.get("authorization");
+  return value === checkLabel || value === "Bearer " + checkLabel;
+}
+
 function response(status, fields) {
   return Response.json(fields, { status, headers: { "Cache-Control": "no-store" } });
 }
@@ -45,7 +50,7 @@ async function handle(request, environment = process.env.APP_ENV) {
     return response(200, { ok: true, data: { mode: "CONNECTIVITY_ONLY" } });
   }
   if (request.method !== "POST") return fail(405, "METHOD_NOT_ALLOWED");
-  if (request.headers.get("authorization") !== "Bearer " + checkLabel) {
+  if (!hasDiagnosticLabel(request)) {
     return fail(401, "UNAUTHORIZED");
   }
   const action = await readAction(request);
@@ -57,4 +62,4 @@ async function handle(request, environment = process.env.APP_ENV) {
   });
 }
 
-module.exports = { checkLabel, handle, path };
+module.exports = { checkLabel, handle, hasDiagnosticLabel, path };

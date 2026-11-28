@@ -28,6 +28,7 @@ export interface CreateCashierOrderRecordInput {
   customerEmail: string;
   totalAmount: number;
   paymentMethod: PaymentMethod;
+  awaitingFiscalization?: boolean;
   idempotencyKey?: string;
   idempotencyPayloadHash?: string;
   items: OrderLineItemInput[];
@@ -122,7 +123,7 @@ export const orderRepository = {
         number: input.number,
         sessionId: input.sessionId,
         locationId: input.locationId ?? null,
-        status: "PAID",
+        status: input.awaitingFiscalization ? "AWAITING_PAYMENT" : "PAID",
         source: "CASHIER",
         cashierId: input.cashierId,
         shiftId: input.shiftId ?? null,
@@ -145,7 +146,7 @@ export const orderRepository = {
         payments: {
           create: {
             method: input.paymentMethod,
-            status: "SUCCEEDED",
+            status: input.awaitingFiscalization ? "PENDING" : "SUCCEEDED",
             amount: input.totalAmount,
             currency: "RUB",
             cashierId: input.cashierId,

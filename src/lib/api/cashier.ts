@@ -73,8 +73,10 @@ export function createCashierSale(
     items: Array<{ ticketTypeCode: string; quantity: number }>;
     paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE";
     customerName?: string;
+    cashReceived?: number;
   },
   idempotencyKey: string,
+  options?: RequestOptions,
 ) {
   return apiPost<{
     number: string;
@@ -82,7 +84,7 @@ export function createCashierSale(
     source: string;
     totalAmount: number;
     items: Array<{ ticketTypeName: string; quantity: number; subtotal: number }>;
-  }>("/api/cashier/sales", input, { idempotencyKey });
+  }>("/api/cashier/sales", input, { ...options, idempotencyKey });
 }
 
 export type CashierCheckInResult = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,7 +19,8 @@ import { Badge } from "@/components/ui/badge";
 import { QuantityStepper } from "@/components/ui/quantity-stepper";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoneyFromKopecks, cn } from "@/lib/utils";
-import { ApiClientError } from "@/lib/api/client";
+import { ApiClientError, apiGet } from "@/lib/api/client";
+import { cashierSaleSchema } from "@/lib/validation/cashier";
 import {
   cashierCheckIn,
   createCashierSale,
@@ -74,6 +75,15 @@ export function CashierWorkspace() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selling, setSelling] = useState(false);
+  const [cashEntry, setCashEntry] = useState(false);
+  const [cashText, setCashText] = useState("");
+  const paymentBusy = useRef(false);
+  const cashReceived = /^\d{1,7}([.,]\d{1,2})?$/.test(cashText)
+    ? Math.round(Number(cashText.replace(",", ".")) * 100) : null;
+  type Attempt = { key: string; input: Parameters<typeof createCashierSale>[0] };
+  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [attemptReady, setAttemptReady] = useState(false);
+
   const [loadingSessions, setLoadingSessions] = useState(false);
 
   const timezone = sessionsData?.location.timezone ?? "Europe/Moscow";
@@ -150,49 +160,81 @@ export function CashierWorkspace() {
     Boolean(selectedSession) &&
     !selectedSession?.soldOut &&
     !selling &&
+    attemptReady &&
     canSubmitTicketSelection(quantities, selectedSession?.remaining ?? 0);
 
-  const sell = async (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
-    if (!selectedSession || !canSell) return;
-    if (Date.parse(selectedSession.endsAt) <= Date.now()) {
-      setError("Сеанс уже закончился. Выберите другое время.");
-      return;
-    }
-    setSelling(true);
-    setError(null);
-    setStatusMessage(null);
+  useEffect(() => {
+    if (!user) return;
     try {
-      const items =
-        sessionsData?.ticketTypes
-          .map((ticketType) => ({
-            ticketTypeCode: ticketType.code,
-            quantity: quantities[ticketType.code] ?? 0,
-          }))
-          .filter((item) => item.quantity > 0) ?? [];
-
-      const order = await createCashierSale(
-        {
-          sessionPublicId: selectedSession.publicId,
-          items,
-          paymentMethod,
-        },
-        crypto.randomUUID(),
-      );
-      setStatusMessage(`Продажа ${order.number} · ${formatMoneyFromKopecks(order.totalAmount)}`);
-      setQuantities({});
-      try {
-        await refreshSessions();
-        await refreshOrders();
-        await reloadShift();
-      } catch {
-        /* sale already committed; avoid treating a pool timeout as a failed sale */
+      const saved = localStorage.getItem(`evotor-checkout-${user.id}`);
+      if (saved) {
+        const value = JSON.parse(saved);
+        if (!value || typeof value.key !== "string" || !value.key.trim()) throw new Error("Invalid attempt");
+        cashierSaleSchema.parse(value.input);
+        setAttempt(value); setSelling(true); paymentBusy.current = true;
       }
-    } catch (err) {
-      setError(err instanceof ApiClientError ? err.message : "Продажа не выполнена");
-      void refreshSessions();
-    } finally {
-      setSelling(false);
+    } catch {
+      setError("Не удалось восстановить операцию. Проверьте заказ перед новой продажей.");
+      setSelling(true); paymentBusy.current = true;
+    } finally { setAttemptReady(true); }
+  }, [user]);
+
+  useEffect(() => {
+    if (!attempt || !user) return;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let number: string | null = null;
+    let controller: AbortController | null = null;
+    async function check() {
+      controller = new AbortController();
+      const timeout = setTimeout(() => controller?.abort(), 15000);
+      try {
+        const order = number
+          ? await apiGet<{ number: string; status: string; totalAmount: number }>(`/api/cashier/sales/status?number=${encodeURIComponent(number)}`, { signal: controller.signal })
+          : await createCashierSale(attempt!.input, attempt!.key, { signal: controller.signal });
+        number = order.number;
+        if (stopped) return;
+        if (order.status === "PAID" || order.status === "CANCELLED") {
+          localStorage.removeItem(`evotor-checkout-${user!.id}`);
+          setAttempt(null); setSelling(false); paymentBusy.current = false;
+          if (order.status === "PAID") {
+            setStatusMessage(`Чек оформлен · ${order.number} · ${formatMoneyFromKopecks(order.totalAmount)}`);
+            setQuantities({}); setCashEntry(false); setCashText("");
+          } else setError("Оплата отменена на кассе. Заказ не оплачен.");
+          void refreshSessions(); void refreshOrders(); void reloadShift();
+          return;
+        }
+        setStatusMessage(`Заказ ${order.number}. Ожидаем подтверждение чека от Эвотора.`);
+      } catch (error) {
+        if (stopped) return;
+        if (!number && error instanceof ApiClientError &&
+            ["VALIDATION_ERROR", "NOT_CONFIGURED", "SESSION_NOT_AVAILABLE", "SESSION_SOLD_OUT", "INSUFFICIENT_CAPACITY", "SHIFT_NOT_OPEN"].includes(error.code)) {
+          localStorage.removeItem(`evotor-checkout-${user!.id}`);
+          setAttempt(null); setSelling(false); paymentBusy.current = false;
+          setError(error.message); return;
+        }
+        setStatusMessage("Проверяем результат операции. Ожидаем связь с кассой.");
+      } finally { clearTimeout(timeout); }
+      if (!stopped) timer = setTimeout(check, 2500);
     }
+    void check();
+    return () => { stopped = true; clearTimeout(timer); controller?.abort(); };
+  }, [attempt, user, refreshSessions, refreshOrders, reloadShift]);
+
+  const sell = (paymentMethod: "CASH" | "CARD_TERMINAL" | "CARD_ONLINE") => {
+    if (!selectedSession || !canSell || !user || paymentBusy.current) return;
+    if (paymentMethod === "CASH" && (cashReceived === null || cashReceived < totalAmount)) return;
+    const input = {
+      sessionPublicId: selectedSession.publicId,
+      items: sessionsData!.ticketTypes.map(t => ({ ticketTypeCode: t.code, quantity: quantities[t.code] ?? 0 })).filter(t => t.quantity > 0),
+      paymentMethod,
+      ...(paymentMethod === "CASH" ? { cashReceived: cashReceived! } : {}),
+    };
+    const next = { key: crypto.randomUUID(), input };
+    try { localStorage.setItem(`evotor-checkout-${user.id}`, JSON.stringify(next)); }
+    catch { setError("Разрешите сохранение данных сайта для восстановления оплаты."); return; }
+    paymentBusy.current = true;
+    setSelling(true); setError(null); setStatusMessage("Передаём заказ на кассу…"); setAttempt(next);
   };
 
   if (bootstrapping || !user) {
@@ -474,11 +516,21 @@ export function CashierWorkspace() {
                         Выберите хотя бы один билет
                       </p>
                     ) : null}
+                    {cashEntry && <div className="rounded-xl border p-4">
+                      <label htmlFor="cash-received">Получено наличными, ₽</label>
+                      <Input id="cash-received" inputMode="decimal" value={cashText}
+                        disabled={selling} onChange={e => setCashText(e.target.value)} />
+                      <p aria-live="polite">{cashReceived === null ? "Введите сумму" : cashReceived < totalAmount
+                        ? `Не хватает ${formatMoneyFromKopecks(totalAmount - cashReceived)}`
+                        : `Сдача ${formatMoneyFromKopecks(cashReceived - totalAmount)}`}</p>
+                      <Button disabled={!canSell || cashReceived === null || cashReceived < totalAmount}
+                        onClick={() => sell("CASH")}>Пробить чек</Button>
+                    </div>}
                     <Button
                       size="lg"
                       className="h-14 text-base"
                       disabled={!canSell}
-                      onClick={() => void sell("CASH")}
+                      onClick={() => setCashEntry(true)}
                     >
                       <Banknote aria-hidden />
                       Наличные

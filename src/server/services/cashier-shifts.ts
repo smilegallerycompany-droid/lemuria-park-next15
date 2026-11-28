@@ -369,6 +369,13 @@ export async function closeCashierShift(params: {
   }
 
   const closed = await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "CashierShift" WHERE id = ${shift.id} FOR UPDATE`;
+    const pending = await tx.evotorCheckout.count({ where: { order: { shiftId: shift.id }, state: { in: ["QUEUED", "CLAIMED"] } } });
+    if (pending) throw new DomainError("INVALID_STATUS_TRANSITION", "Дождитесь результата оплаты на Эвоторе перед закрытием смены");
+    const current = await tx.cashierShift.findUniqueOrThrow({ where: { id: shift.id } });
+    if (current.updatedAt.getTime() !== shift.updatedAt.getTime()) {
+      throw new DomainError("INVALID_STATUS_TRANSITION", "Данные смены изменились. Обновите расчёт перед закрытием");
+    }
     const updated = await tx.cashierShift.update({
       where: { id: shift.id },
       data: {
